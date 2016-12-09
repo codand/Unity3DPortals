@@ -24,10 +24,10 @@ public class InputManager : MonoBehaviour {
                 case TouchPhase.Ended:
                     break;
                 case TouchPhase.Moved:
-                    float rotationX = touch.deltaPosition.x * Config.mouseSensitivity;
+                    float rotationX = touch.deltaPosition.x * _mouseSensitivity;
                     _playerController.Rotate(rotationX);
 
-                    float rotationY = touch.deltaPosition.y * Config.mouseSensitivity;
+                    float rotationY = touch.deltaPosition.y * _mouseSensitivity;
                     _playerController.RotateHead(rotationY);
                     break;
                 case TouchPhase.Stationary:

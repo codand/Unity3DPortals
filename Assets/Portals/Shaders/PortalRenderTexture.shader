@@ -67,7 +67,7 @@
 		Pass
 		{
 			Tags{ "RenderType" = "Opaque" }
-			Offset -1, -1.0
+			Offset -1.0, -1000.0
 			//Offset -0.1, -0.1
 
 			CGPROGRAM
