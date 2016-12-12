@@ -2,14 +2,23 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.VR;
 
 namespace Portals {
+
+    internal class PortalRootCamera {
+        public readonly Camera parent;
+        public readonly Camera left;
+        public readonly Camera right;
+
+
+    }
+
     //[ExecuteInEditMode]
     public class Portal : MonoBehaviour {
         [SerializeField] private Portal _exitPortal;
         [SerializeField] private int _maxRecursiveDepth = 2;
         [SerializeField] private float _clippingDistance = 0.0f;
-        [SerializeField] private Collider _backface;
         [SerializeField] private bool _useCullingMatrix = true;
         [SerializeField] private bool _useProjectionMatrix = true;
 
@@ -122,9 +131,12 @@ namespace Portals {
         //    RestoreMaterialProperties();
         //}
 
+        bool IsCameraRenderingBothEyes (Camera camera) {
+            return camera.stereoTargetEye == StereoTargetEyeMask.Both && camera.targetTexture == null;
+        }
+
         Stack<Texture> stack = new Stack<Texture>();
         void OnWillRenderObject() {
-            //Debug.Log(Camera.current.name + " will render: " + gameObject.name);
             //_wasSeenByCamera[Camera.current] = true;
             //SaveMaterialProperties();
 
@@ -181,118 +193,30 @@ namespace Portals {
             // Reset camera values to match the parent cam
             UpdateCameraModes(currentCam, portalCam);
 
-            // Adjust camera transform
-            ApplyWorldToPortalTransform(portalCam.transform, currentCam.transform);
-
-            // Adjust camera projection matrix so that the clipping plane aligns with the exit portal
-            if (_useProjectionMatrix) {
-                Vector4 clippingPlane = GetTransformPlane(exitPortal.transform);
-                ApplyCustomProjectionMatrix(portalCam, clippingPlane, Mathf.Pow(this.GetScaleMultiplier(), s_depth + 1));
-            } else {
-                portalCam.ResetProjectionMatrix();
-            }
-            if (_useCullingMatrix) {
-                ApplyCustomClippingFrustum(portalCam);
-            } else {
-                portalCam.ResetCullingMatrix();
-            }
-
-            // Release the target texture from the previous frame
-            if (portalCam.targetTexture) {
-                RenderTexture.ReleaseTemporary(portalCam.targetTexture);
-            }
-            // Create a temporary RenderTexture for our current depth to render to.
-            // This will stick around until the next frame.
-            RenderTextureFormat fmt = portalCam.hdr ? RenderTextureFormat.DefaultHDR : RenderTextureFormat.Default;
-            RenderTexture temp = RenderTexture.GetTemporary(currentCam.pixelWidth, currentCam.pixelHeight, 24, fmt);
-            temp.name = "tex-" + portalCam.name;
-            portalCam.targetTexture = temp;
-            
-
-            //if (portalCam.targetTexture == null) {
-            //    portalCam.targetTexture = new RenderTexture(currentCam.pixelWidth, currentCam.pixelHeight, 24, RenderTextureFormat.Default);
-            //}
-
-            // For simultaneous recurisve rendering of nearby portals
-            //stack.Push(portalCam.targetTexture);
-
-
-
             Portal parentPortal = _currentlyRenderingPortal;
             _currentlyRenderingPortal = this;
 
             s_depth++;
-            portalCam.Render();
-            s_depth--;
 
+            if (currentCam.stereoTargetEye == StereoTargetEyeMask.Both || currentCam.stereoTargetEye == StereoTargetEyeMask.Left) {
+                RenderTexture leftEyeTexture = portalCam.GetComponent<PortalCamera>().RenderIntoTexture(Camera.MonoOrStereoscopicEye.Left);
+                _portalMaterial.SetTexture("_LeftEyeTexture", leftEyeTexture);
+            }
+            if (currentCam.stereoTargetEye == StereoTargetEyeMask.Both || currentCam.stereoTargetEye == StereoTargetEyeMask.Right) {
+                RenderTexture rightEyeTexture = portalCam.GetComponent<PortalCamera>().RenderIntoTexture(Camera.MonoOrStereoscopicEye.Right);
+                _portalMaterial.SetTexture("_RightEyeTexture", rightEyeTexture);
+            }
+
+            s_depth--;
                 
             _currentlyRenderingPortal = parentPortal;
 
-
-
-            _portalMaterial.SetTexture("_MainTex", portalCam.targetTexture);
-            //_portalMaterial.mainTexture = null;
             if (s_depth < _maxRecursiveDepth) {
                 GetComponent<Renderer>().sharedMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
             }
             //Debug.Log("Pushing: " + portalCam.targetTexture);
-
-            //Debug.Log("OnWillRenderObject END  : " + gameObject.name);
-
         }
-
-        public static Vector4 GetTransformPlane(Transform trans) {
-            Vector3 normal = trans.forward;
-            float d = Vector3.Dot(normal, trans.position);
-            Vector4 plane = new Vector4(normal.x, normal.y, normal.z, d);
-            return plane;
-        }
-
-        void ApplyCustomProjectionMatrix(Camera camera, Vector4 plane, float scale) {
-            // Restore original projection matrix
-            camera.ResetProjectionMatrix();
-
-            bool onFarSide = new Plane(-1 * plane, plane.w + _clippingDistance).GetSide(camera.transform.position);
-            if (onFarSide) {
-                return;
-            }
-
-            // Project our world space clipping plane to the camera's local coordinates
-            // e.g. normal (0, 0, 1) becomes (1, 0, 0) if we're looking left parallel to the plane
-            Vector4 transformedNormal = camera.transform.InverseTransformDirection(plane).normalized;
-            Vector4 transformedPoint = camera.transform.InverseTransformPoint(plane.w * plane);
-
-            // Calculate the d value for our plane by projecting our transformed point
-            // onto our transformed normal vector.
-            float projectedDistance = Vector4.Dot(transformedNormal, transformedPoint);
-            projectedDistance = projectedDistance * scale + _clippingDistance;
-
-            // Not sure why x and y have to be negative. 
-            Vector4 transformedPlane = new Vector4(-transformedNormal.x, -transformedNormal.y, transformedNormal.z, projectedDistance);
-
-            // Reassign to camera
-            camera.projectionMatrix = camera.CalculateObliqueMatrix(transformedPlane);
-
-            //Matrix4x4 projectionMatrix = camera.projectionMatrix;
-            //CalculateObliqueMatrix(ref projectionMatrix, transformedPlane);
-            //camera.projectionMatrix = projectionMatrix;
-        }
-
-        //private static void CalculateObliqueMatrix(ref Matrix4x4 projection, Vector4 clipPlane) {
-        //    Vector4 q = projection.inverse * new Vector4(
-        //        Mathf.Sign(clipPlane.x),
-        //        Mathf.Sign(clipPlane.y),
-        //        1.0f,
-        //        1.0f
-        //    );
-        //    Vector4 c = clipPlane * (2.0F / (Vector4.Dot(clipPlane, q)));
-        //    // third row = clip plane - fourth row
-        //    projection[2] = c.x - projection[3];
-        //    projection[6] = c.y - projection[7];
-        //    projection[10] = c.z - projection[11];
-        //    projection[14] = c.w - projection[15];
-        //}
-
+        
         public Vector3[] GetCorners() {
             Bounds bounds = GetComponent<MeshFilter>().sharedMesh.bounds;
 
@@ -308,163 +232,7 @@ namespace Portals {
                 lowerRight,
             };
         }
-
-        void ApplyCustomClippingFrustum(Camera camera) {
-            // Note to future self: This works as is, but it does not handle the clipping plane unfortunately.
-            // For right now, I'm going to turn this off, but it should be enabled in the future.
-
-            Bounds bounds = exitPortal.GetComponent<MeshFilter>().sharedMesh.bounds;
-
-            // Lower left of the backside of our plane in world coordinates
-            Vector3 pa = exitPortal.transform.TransformPoint(new Vector3(bounds.extents.x, -bounds.extents.y, 0));
-
-            // Lower right
-            Vector3 pb = exitPortal.transform.TransformPoint(new Vector3(-bounds.extents.x, -bounds.extents.y, 0));
-
-            // Upper left
-            Vector3 pc = exitPortal.transform.TransformPoint(new Vector3(bounds.extents.x, bounds.extents.y, 0));
-
-            Vector3 pe = camera.transform.position;
-
-            // Calculate what our horizontal field of view would be with off-axis projection.
-            // If this fov is greater than our camera's fov, we should just use the camera's default projection
-            // matrix instead. Otherwise, the frustum's fov will approach 180 degrees (way too large).
-            Vector3 camToLowerLeft = pa - camera.transform.position;
-            camToLowerLeft.y = 0;
-            Vector3 camToLowerRight = pb - camera.transform.position;
-            camToLowerRight.y = 0;
-            float fieldOfView = Vector3.Angle(camToLowerLeft, camToLowerRight);
-            if (fieldOfView > camera.fieldOfView) {
-                camera.ResetCullingMatrix();
-            } else {
-                camera.cullingMatrix = CalculateOffAxisProjectionMatrix(camera, pa, pb, pc, pe);
-            }
-        }
-
-        Matrix4x4 CalculateOffAxisProjectionMatrix(Camera camera, Vector3 pa, Vector3 pb, Vector3 pc, Vector3 pe) {
-            // eye position
-            float n = camera.nearClipPlane;
-            // distance of near clipping plane
-            float f = camera.farClipPlane;
-            // distance of far clipping plane
-
-            Vector3 va; // from pe to pa
-            Vector3 vb; // from pe to pb
-            Vector3 vc; // from pe to pc
-            Vector3 vr; // right axis of screen
-            Vector3 vu; // up axis of screen
-            Vector3 vn; // normal vector of screen
-
-            float l; // distance to left screen edge
-            float r; // distance to right screen edge
-            float b; // distance to bottom screen edge
-            float t; // distance to top screen edge
-            float d; // distance from eye to screen 
-
-            vr = pb - pa;
-            vu = pc - pa;
-            va = pa - pe;
-            vb = pb - pe;
-            vc = pc - pe;
-
-            // are we looking at the backface of the plane object?
-            if (Vector3.Dot(-Vector3.Cross(va, vc), vb) < 0.0) {
-                // mirror points along the z axis (most users 
-                // probably expect the x axis to stay fixed)
-                vu = -vu;
-                pa = pc;
-                pb = pa + vr;
-                pc = pa + vu;
-                va = pa - pe;
-                vb = pb - pe;
-                vc = pc - pe;
-            }
-
-            vr.Normalize();
-            vu.Normalize();
-            vn = -Vector3.Cross(vr, vu);
-            // we need the minus sign because Unity 
-            // uses a left-handed coordinate system
-            vn.Normalize();
-
-            d = -Vector3.Dot(va, vn);
-
-            // Set near clip plane
-            n = d; // + _clippingDistance;
-            //camera.nearClipPlane = n;
-
-            l = Vector3.Dot(vr, va) * n / d;
-            r = Vector3.Dot(vr, vb) * n / d;
-            b = Vector3.Dot(vu, va) * n / d;
-            t = Vector3.Dot(vu, vc) * n / d;
-
-            Matrix4x4 p = new Matrix4x4(); // projection matrix 
-            p[0, 0] = 2.0f * n / (r - l);
-            p[0, 1] = 0.0f;
-            p[0, 2] = (r + l) / (r - l);
-            p[0, 3] = 0.0f;
-
-            p[1, 0] = 0.0f;
-            p[1, 1] = 2.0f * n / (t - b);
-            p[1, 2] = (t + b) / (t - b);
-            p[1, 3] = 0.0f;
-
-            p[2, 0] = 0.0f;
-            p[2, 1] = 0.0f;
-            p[2, 2] = (f + n) / (n - f);
-            p[2, 3] = 2.0f * f * n / (n - f);
-
-            p[3, 0] = 0.0f;
-            p[3, 1] = 0.0f;
-            p[3, 2] = -1.0f;
-            p[3, 3] = 0.0f;
-
-            Matrix4x4 rm = new Matrix4x4(); // rotation matrix;
-            rm[0, 0] = vr.x;
-            rm[0, 1] = vr.y;
-            rm[0, 2] = vr.z;
-            rm[0, 3] = 0.0f;
-
-            rm[1, 0] = vu.x;
-            rm[1, 1] = vu.y;
-            rm[1, 2] = vu.z;
-            rm[1, 3] = 0.0f;
-
-            rm[2, 0] = vn.x;
-            rm[2, 1] = vn.y;
-            rm[2, 2] = vn.z;
-            rm[2, 3] = 0.0f;
-
-            rm[3, 0] = 0.0f;
-            rm[3, 1] = 0.0f;
-            rm[3, 2] = 0.0f;
-            rm[3, 3] = 1.0f;
-
-            Matrix4x4 tm = new Matrix4x4(); // translation matrix;
-            tm[0, 0] = 1.0f;
-            tm[0, 1] = 0.0f;
-            tm[0, 2] = 0.0f;
-            tm[0, 3] = -pe.x;
-
-            tm[1, 0] = 0.0f;
-            tm[1, 1] = 1.0f;
-            tm[1, 2] = 0.0f;
-            tm[1, 3] = -pe.y;
-
-            tm[2, 0] = 0.0f;
-            tm[2, 1] = 0.0f;
-            tm[2, 2] = 1.0f;
-            tm[2, 3] = -pe.z;
-
-            tm[3, 0] = 0.0f;
-            tm[3, 1] = 0.0f;
-            tm[3, 2] = 0.0f;
-            tm[3, 3] = 1.0f;
-
-            Matrix4x4 worldToCameraMatrix = rm * tm;
-            return p * worldToCameraMatrix;
-        }
-
+        
         public float GetScaleMultiplier() {
             float enterScale = Helpers.VectorInternalAverage(this.transform.lossyScale);
             float exitScale = Helpers.VectorInternalAverage(exitPortal.transform.lossyScale);
@@ -512,6 +280,22 @@ namespace Portals {
             target.position = exitPortal.transform.position + transformedDelta;
             target.rotation = worldToPortal * reference.rotation;
             target.localScale = reference.localScale * scale;
+        }
+
+        public void ApplyWorldToPortalTransform(Transform target, Vector3 referencePosition, Quaternion referenceRotation, Vector3 referenceScale) {
+            Quaternion worldToPortal = WorldToPortalQuaternion();
+
+            // Scale
+            float scale = GetScaleMultiplier();
+
+            // Translate
+            Vector3 positionDelta = referencePosition - this.transform.position;
+            Vector3 scaledPositionDelta = positionDelta * scale;
+            Vector3 transformedDelta = worldToPortal * scaledPositionDelta;
+
+            target.position = exitPortal.transform.position + transformedDelta;
+            target.rotation = worldToPortal * referenceRotation;
+            target.localScale = referenceScale * scale;
         }
 
         public Camera GetChildCamera(Camera camera) {

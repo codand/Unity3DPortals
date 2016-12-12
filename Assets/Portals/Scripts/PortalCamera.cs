@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.Rendering;
+using UnityEngine.VR;
 
 namespace Portals {
     [RequireComponent(typeof(Camera))]
@@ -16,6 +17,9 @@ namespace Portals {
         int _renderDepth;
         bool _useProjectionMatrix;
         bool _useCullingMatrix;
+        RenderTexture _leftEyeRenderTexture;
+        RenderTexture _rightEyeRenderTexture;
+
         public Matrix4x4 lastFrameWorldToCameraMatrix;
 
         public bool copyGI {
@@ -92,6 +96,18 @@ namespace Portals {
             }
         }
 
+        public RenderTexture leftEyeRenderTexture {
+            get {
+                return _leftEyeRenderTexture;
+            }
+        }
+
+        public RenderTexture rightEyeRenderTexture {
+            get {
+                return _rightEyeRenderTexture;
+            }
+        }
+
         RenderSettingsStruct _savedRenderSettings = new RenderSettingsStruct();
         RenderSettingsStruct _sceneRenderSettings = new RenderSettingsStruct();
 
@@ -99,6 +115,335 @@ namespace Portals {
             _camera = GetComponent<Camera>();
         }
 
+        void ReleaseTemporaryRenderTextureDelayed(RenderTexture texture) {
+            StartCoroutine(ReleaseTemporaryRenderTextureDelayedRoutine(texture));
+        }
+
+        IEnumerator ReleaseTemporaryRenderTextureDelayedRoutine(RenderTexture texture) {
+            // Don't do anything this current frame
+            yield return null;
+
+            // Wait until the next frame is done rendering
+            yield return new WaitForEndOfFrame();
+
+            RenderTexture.ReleaseTemporary(texture);
+        }
+
+        Vector3 GetStereoPosition(Camera camera, VRNode node) {
+            if (camera.stereoEnabled) {
+                // If our parent is rendering stereo, we need to handle eye offsets and root transformations
+                Vector3 localPosition = InputTracking.GetLocalPosition(node);
+
+                // GetLocalPosition returns the local position of the camera, but we need the global position
+                // so we have to manually grab the parent.
+                Transform parent = camera.transform.parent;
+                if (parent) {
+                    return parent.TransformPoint(localPosition);
+                } else {
+                    return localPosition;
+                }
+            } else {
+                // Otherwise, we can just return the camera's position
+                return camera.transform.position;
+            }
+        }
+
+        Quaternion GetStereoRotation(Camera camera, VRNode node) {
+            Quaternion localRotation = InputTracking.GetLocalRotation(node);
+            Transform parent = camera.transform.parent;
+            if (parent) {
+                return parent.rotation * localRotation;
+            } else {
+                return camera.transform.rotation;
+            }
+        }
+
+        public RenderTexture RenderIntoTexture(Camera.MonoOrStereoscopicEye eye) {
+            RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
+            ReleaseTemporaryRenderTextureDelayed(texture);
+
+            Vector3 parentEyePosition = Vector3.zero;
+            Quaternion parentEyeRotation = Quaternion.identity;
+
+            switch (eye) {
+                case Camera.MonoOrStereoscopicEye.Left:
+                    _leftEyeRenderTexture = texture;
+                    _camera.stereoTargetEye = StereoTargetEyeMask.Left;
+                    parentEyePosition = GetStereoPosition(_parent, VRNode.LeftEye);
+                    parentEyeRotation = GetStereoRotation(_parent, VRNode.LeftEye);
+                    break;
+                case Camera.MonoOrStereoscopicEye.Right:
+                    _rightEyeRenderTexture = texture;
+                    _camera.stereoTargetEye = StereoTargetEyeMask.Right;
+                    parentEyePosition = GetStereoPosition(_parent, VRNode.RightEye);
+                    parentEyeRotation = GetStereoRotation(_parent, VRNode.RightEye);
+                    break;
+                case Camera.MonoOrStereoscopicEye.Mono:
+                default:
+                    _leftEyeRenderTexture = texture;
+                    _camera.stereoTargetEye = StereoTargetEyeMask.None;
+                    parentEyePosition = GetStereoPosition(_parent, VRNode.LeftEye);
+                    parentEyeRotation = GetStereoRotation(_parent, VRNode.LeftEye);
+                    break;
+            }
+
+            // Adjust camera transform
+            _portal.ApplyWorldToPortalTransform(this.transform, parentEyePosition, parentEyeRotation, _parent.transform.lossyScale);
+
+            _camera.projectionMatrix = CalculateProjectionMatrix(eye);
+            _camera.cullingMatrix = CalculateCullingMatrix();
+
+            _camera.targetTexture = texture;
+            _camera.Render();
+
+            return texture;
+        }
+
+        void DecomposeMatrix4x4(Matrix4x4 matrix) {
+            float near = matrix.m23 / (matrix.m22 - 1);
+            float far = matrix.m23 / (matrix.m22 + 1);
+            float bottom = near * (matrix.m12 - 1) / matrix.m11;
+            float top = near * (matrix.m12 + 1) / matrix.m11;
+            float left = near * (matrix.m02 - 1) / matrix.m00;
+            float right = near * (matrix.m02 + 1) / matrix.m00;
+
+            Debug.Log("near: " + near);
+            Debug.Log("far: " + far);
+            Debug.Log("bottom: " + bottom);
+            Debug.Log("top: " + top);
+            Debug.Log("left: " + left);
+            Debug.Log("right: " + right);
+        }
+
+        void MakeProjectionMatrixOblique(ref Matrix4x4 projection, Vector4 clipPlane) {
+            Vector4 q = projection.inverse * new Vector4(
+                Mathf.Sign(clipPlane.x),
+                Mathf.Sign(clipPlane.y),
+                1.0f,
+                1.0f
+            );
+            Vector4 c = clipPlane * (2.0F / (Vector4.Dot(clipPlane, q)));
+            // third row = clip plane - fourth row
+            projection[2] = c.x - projection[3];
+            projection[6] = c.y - projection[7];
+            projection[10] = c.z - projection[11];
+            projection[14] = c.w - projection[15];
+        }
+
+        Vector4 CalculatePlaneFromTransform(Transform t) {
+            Vector3 normal = t.transform.forward;
+            Vector3 position = t.transform.position;
+            float d = Vector3.Dot(normal, position);
+            Vector4 plane = new Vector4(normal.x, normal.y, normal.z, d);
+            return plane;
+        }
+
+        Matrix4x4 CalculateProjectionMatrix(Camera.MonoOrStereoscopicEye eye) {
+            // Set targetTexture to null because GetStereoProjectionMatrix won't return a valid matrix otherwise.
+            RenderTexture savedTargetTexture = _camera.targetTexture;
+            _camera.targetTexture = null;
+
+            // Restore original projection matrix
+            _camera.ResetProjectionMatrix();
+
+            Matrix4x4 projectionMatrix;
+            switch (eye) {
+                case Camera.MonoOrStereoscopicEye.Left:
+                    projectionMatrix = _camera.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left);
+                    break;
+                case Camera.MonoOrStereoscopicEye.Right:
+                    projectionMatrix = _camera.GetStereoProjectionMatrix(Camera.StereoscopicEye.Right);
+                    break;
+                case Camera.MonoOrStereoscopicEye.Mono:
+                default:
+                    projectionMatrix = _camera.projectionMatrix;
+                    break;
+            }
+            _camera.targetTexture = savedTargetTexture;
+
+            // Calculate plane made from the exit portal's trnasform
+            Vector4 exitPortalPlane = CalculatePlaneFromTransform(_portal.exitPortal.transform);
+
+            // Determine whether or not we've crossed the plane already. If we have, we don't need to apply
+            // oblique frustum clipping.
+            bool onFarSide = new Plane(-1 * exitPortalPlane, exitPortalPlane.w).GetSide(transform.position);
+            if (onFarSide) {
+                return projectionMatrix;
+            }
+
+            // Project our world space clipping plane to the camera's local coordinates
+            // e.g. normal (0, 0, 1) becomes (1, 0, 0) if we're looking left parallel to the plane
+            Vector4 cameraSpaceNormal = _camera.transform.InverseTransformDirection(exitPortalPlane).normalized;
+            Vector4 cameraSpacePoint = _camera.transform.InverseTransformPoint(exitPortalPlane.w * exitPortalPlane);
+
+            // Calculate the d value for our plane by projecting our transformed point
+            // onto our transformed normal vector.
+            float distanceFromPlane = Vector4.Dot(cameraSpaceNormal, cameraSpacePoint);
+
+            // Not sure why x and y have to be negative. 
+            Vector4 cameraSpacePlane = new Vector4(-cameraSpaceNormal.x, -cameraSpaceNormal.y, cameraSpaceNormal.z, distanceFromPlane);
+
+            // Reassign to camera
+            //return _camera.CalculateObliqueMatrix(transformedPlane);
+
+            MakeProjectionMatrixOblique(ref projectionMatrix, cameraSpacePlane);
+            return projectionMatrix;
+        }
+
+        Matrix4x4 CalculateCullingMatrix() {
+            _camera.ResetCullingMatrix();
+
+            Bounds bounds = _portal.exitPortal.GetComponent<MeshFilter>().sharedMesh.bounds;
+
+            // Lower left of the backside of our plane in world coordinates
+            Vector3 pa = _portal.exitPortal.transform.TransformPoint(new Vector3(bounds.extents.x, -bounds.extents.y, 0));
+
+            // Lower right
+            Vector3 pb = _portal.exitPortal.transform.TransformPoint(new Vector3(-bounds.extents.x, -bounds.extents.y, 0));
+
+            // Upper left
+            Vector3 pc = _portal.exitPortal.transform.TransformPoint(new Vector3(bounds.extents.x, bounds.extents.y, 0));
+
+            Vector3 pe = _camera.transform.position;
+
+            // Calculate what our horizontal field of view would be with off-axis projection.
+            // If this fov is greater than our camera's fov, we should just use the camera's default projection
+            // matrix instead. Otherwise, the frustum's fov will approach 180 degrees (way too large).
+            Vector3 camToLowerLeft = pa - _camera.transform.position;
+            camToLowerLeft.y = 0;
+            Vector3 camToLowerRight = pb - _camera.transform.position;
+            camToLowerRight.y = 0;
+            float fieldOfView = Vector3.Angle(camToLowerLeft, camToLowerRight);
+            if (fieldOfView > _camera.fieldOfView) {
+                return _camera.cullingMatrix;
+            } else {
+                return CalculateOffAxisProjectionMatrix(_camera, pa, pb, pc, pe);
+            }
+        }
+
+        Matrix4x4 CalculateOffAxisProjectionMatrix(Camera camera, Vector3 pa, Vector3 pb, Vector3 pc, Vector3 pe) {
+            // eye position
+            float n = camera.nearClipPlane;
+            // distance of near clipping plane
+            float f = camera.farClipPlane;
+            // distance of far clipping plane
+
+            Vector3 va; // from pe to pa
+            Vector3 vb; // from pe to pb
+            Vector3 vc; // from pe to pc
+            Vector3 vr; // right axis of screen
+            Vector3 vu; // up axis of screen
+            Vector3 vn; // normal vector of screen
+
+            float l; // distance to left screen edge
+            float r; // distance to right screen edge
+            float b; // distance to bottom screen edge
+            float t; // distance to top screen edge
+            float d; // distance from eye to screen 
+
+            vr = pb - pa;
+            vu = pc - pa;
+            va = pa - pe;
+            vb = pb - pe;
+            vc = pc - pe;
+
+            // are we looking at the backface of the plane object?
+            if (Vector3.Dot(-Vector3.Cross(va, vc), vb) < 0.0) {
+                // mirror points along the z axis (most users 
+                // probably expect the x axis to stay fixed)
+                vu = -vu;
+                pa = pc;
+                pb = pa + vr;
+                pc = pa + vu;
+                va = pa - pe;
+                vb = pb - pe;
+                vc = pc - pe;
+            }
+
+            vr.Normalize();
+            vu.Normalize();
+            vn = -Vector3.Cross(vr, vu);
+            // we need the minus sign because Unity 
+            // uses a left-handed coordinate system
+            vn.Normalize();
+
+            d = -Vector3.Dot(va, vn);
+
+            // Set near clip plane
+            n = d; // + _clippingDistance;
+            //camera.nearClipPlane = n;
+
+            l = Vector3.Dot(vr, va) * n / d;
+            r = Vector3.Dot(vr, vb) * n / d;
+            b = Vector3.Dot(vu, va) * n / d;
+            t = Vector3.Dot(vu, vc) * n / d;
+
+            Matrix4x4 p = new Matrix4x4(); // projection matrix 
+            p[0, 0] = 2.0f * n / (r - l);
+            p[0, 1] = 0.0f;
+            p[0, 2] = (r + l) / (r - l);
+            p[0, 3] = 0.0f;
+
+            p[1, 0] = 0.0f;
+            p[1, 1] = 2.0f * n / (t - b);
+            p[1, 2] = (t + b) / (t - b);
+            p[1, 3] = 0.0f;
+
+            p[2, 0] = 0.0f;
+            p[2, 1] = 0.0f;
+            p[2, 2] = (f + n) / (n - f);
+            p[2, 3] = 2.0f * f * n / (n - f);
+
+            p[3, 0] = 0.0f;
+            p[3, 1] = 0.0f;
+            p[3, 2] = -1.0f;
+            p[3, 3] = 0.0f;
+
+            Matrix4x4 rm = new Matrix4x4(); // rotation matrix;
+            rm[0, 0] = vr.x;
+            rm[0, 1] = vr.y;
+            rm[0, 2] = vr.z;
+            rm[0, 3] = 0.0f;
+
+            rm[1, 0] = vu.x;
+            rm[1, 1] = vu.y;
+            rm[1, 2] = vu.z;
+            rm[1, 3] = 0.0f;
+
+            rm[2, 0] = vn.x;
+            rm[2, 1] = vn.y;
+            rm[2, 2] = vn.z;
+            rm[2, 3] = 0.0f;
+
+            rm[3, 0] = 0.0f;
+            rm[3, 1] = 0.0f;
+            rm[3, 2] = 0.0f;
+            rm[3, 3] = 1.0f;
+
+            Matrix4x4 tm = new Matrix4x4(); // translation matrix;
+            tm[0, 0] = 1.0f;
+            tm[0, 1] = 0.0f;
+            tm[0, 2] = 0.0f;
+            tm[0, 3] = -pe.x;
+
+            tm[1, 0] = 0.0f;
+            tm[1, 1] = 1.0f;
+            tm[1, 2] = 0.0f;
+            tm[1, 3] = -pe.y;
+
+            tm[2, 0] = 0.0f;
+            tm[2, 1] = 0.0f;
+            tm[2, 2] = 1.0f;
+            tm[2, 3] = -pe.z;
+
+            tm[3, 0] = 0.0f;
+            tm[3, 1] = 0.0f;
+            tm[3, 2] = 0.0f;
+            tm[3, 3] = 1.0f;
+
+            Matrix4x4 worldToCameraMatrix = rm * tm;
+            return p * worldToCameraMatrix;
+        }
         //public CameraEvent cameraEvent;
         //void OnValidate() {
         //    _camera.RemoveAllCommandBuffers();
@@ -106,7 +451,7 @@ namespace Portals {
         //    buf.SetGlobalMatrix("UNITY_MATRIX_VP", Matrix4x4.identity);
         //    buf.SetGlobalMatrix("UNITY_MATRIX_MVP", Matrix4x4.identity);
         //    _camera.AddCommandBuffer(cameraEvent, buf);
-            
+
         //}
         //void OnPreRender() {
         //    //if (!copyGI ||

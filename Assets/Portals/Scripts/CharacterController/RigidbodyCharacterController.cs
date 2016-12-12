@@ -67,6 +67,9 @@ namespace Portals {
         }
 
         public void RotateHead(float angle) {
+            if (!_head) {
+                return;
+            }
             _headAngle -= angle;
 
             if (_headAngle > _maxLookAngle) {

@@ -2,7 +2,8 @@
 {
 	Properties
 	{
-		_MainTex ("MainTex", 2D) = "white" {}
+		_LeftEyeTexture("LeftEyeTexture", 2D) = "white" {}
+		_RightEyeTexture("RightEyeTexture", 2D) = "white" {}
 	}
 
 	SubShader
@@ -77,10 +78,12 @@
 			#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME
 
 			#include "UnityCG.cginc"
+			#include "PortalVRHelpers.cginc"
 
 			struct appdata
 			{
 				float4 vertex : POSITION;
+				float4 uv : TEXCOORD0;
 			};
 
 			struct v2f {
@@ -92,7 +95,8 @@
 #ifdef SAMPLE_PREVIOUS_FRAME
 			float4x4 PORTAL_MATRIX_VP;
 #endif
-			sampler2D _MainTex;
+			sampler2D _LeftEyeTexture;
+			sampler2D _RightEyeTexture;
 
 			v2f vert(appdata v)
 			{
@@ -115,7 +119,10 @@
 
 			fixed4 frag(v2f i) : SV_Target
 			{
-				fixed4 col = tex2Dproj(_MainTex, UNITY_PROJ_COORD(i.uv));
+				fixed4 col = PORTAL_VR_CURRENT_EYE == PORTAL_VR_EYE_LEFT ? \
+					tex2Dproj(_LeftEyeTexture, UNITY_PROJ_COORD(i.uv)) : \
+					tex2Dproj(_RightEyeTexture, UNITY_PROJ_COORD(i.uv));
+				
 				return col;
 			}
 			ENDCG
