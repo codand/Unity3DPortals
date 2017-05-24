@@ -1,4 +1,4 @@
-﻿Shader "Portal/PortalRenderTexture"
+Shader "Portal/PortalRenderTexture"
 {
 	Properties
 	{
@@ -68,8 +68,8 @@
 		Pass
 		{
 			Tags{ "RenderType" = "Opaque" }
-			Offset -1.0, -1000.0
-			//Offset -0.1, -0.1
+			//Offset -1.0, -1000.0
+			Offset -0.1, -0.1
 
 			CGPROGRAM
 			#pragma vertex vert
@@ -128,7 +128,7 @@
 				fixed4 col;
 
 #ifdef UNITY_SINGLE_PASS_STEREO
-				if (unity_StereoEyeIndex == 0)
+				if (PORTAL_VR_CURRENT_EYE == PORTAL_VR_EYE_LEFT)
 				{
 					screenUV.x *= 2;
 					col = tex2D(_LeftEyeTexture, screenUV);
@@ -139,7 +139,7 @@
 					col = tex2D(_RightEyeTexture, screenUV);
 				}
 #else
-				if (unity_CameraProjection[0][2] < 0)
+				if (PORTAL_VR_CURRENT_EYE == PORTAL_VR_EYE_LEFT)
 				{
 					col = tex2D(_LeftEyeTexture, screenUV);
 				}

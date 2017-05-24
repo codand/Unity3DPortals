@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -163,14 +163,13 @@ namespace Portals {
             }
         }
 
-        public RenderTexture RenderIntoTexture(Camera.MonoOrStereoscopicEye eye) {
+        public RenderTexture RenderToTexture(Camera.MonoOrStereoscopicEye eye) {
             RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
             ReleaseTemporaryRenderTextureDelayed(texture);
 
             Vector3 parentEyePosition = Vector3.zero;
             Quaternion parentEyeRotation = Quaternion.identity;
 
-            //Debug.Log(_camera.name + ": " + eye);
             switch (eye) {
                 case Camera.MonoOrStereoscopicEye.Left:
                     _leftEyeRenderTexture = texture;
@@ -200,6 +199,13 @@ namespace Portals {
             _camera.cullingMatrix = CalculateCullingMatrix();
 
             _camera.targetTexture = texture;
+
+            //CommandBuffer buf = new CommandBuffer();
+            //buf.SetGlobalTexture("_RightEyeTexture", new RenderTargetIdentifier(texture));
+            //_camera.RemoveAllCommandBuffers();
+            //_camera.AddCommandBuffer(CameraEvent.BeforeForwardOpaque, buf);
+
+
             _camera.Render();
 
             return texture;
@@ -548,7 +554,7 @@ namespace Portals {
             Gizmos.color = new Color(1.0f, 0.0f, 0.0f, 1.0f);
             DrawFrustumGizmo(_camera.cullingMatrix);
 
-            Gizmos.color = new Color(0.0f, 1.0f, 0.0f, 1.0f); // Green 50%
+            Gizmos.color = new Color(0.0f, 1.0f, 0.0f, 1.0f);
             DrawFrustumGizmo(_camera.projectionMatrix * _camera.worldToCameraMatrix);
         }
 

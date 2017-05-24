@@ -1,4 +1,4 @@
-﻿Shader "Portals/UnlitVR"
+Shader "Portals/UnlitVR"
 {
 	Properties
 	{
@@ -52,26 +52,7 @@
 
 
 				fixed4 col;
-#ifdef UNITY_SINGLE_PASS_STEREO
-				if (unity_StereoEyeIndex == 0)
-				{
-					col = fixed4(1, 0, 0, 1);
-				}
-				else
-				{
-					col = col = fixed4(0, 1, 0, 1);
-				}
-#else
-				if (unity_CameraProjection[0][2] < 0)
-				{
-					col = fixed4(1, 0, 0, 1);
-				}
-				else
-				{
-					col = col = fixed4(0, 1, 0, 1);
-				}
-#endif
-
+				col = PORTAL_VR_CURRENT_EYE == PORTAL_VR_EYE_LEFT ? fixed4(1, 0, 0, 1) : fixed4(0, 1, 0, 1);
 				return col;
 			}
 			ENDCG

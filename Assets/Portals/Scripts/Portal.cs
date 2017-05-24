@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -18,7 +18,8 @@ namespace Portals {
     public class Portal : MonoBehaviour {
         [SerializeField] private Portal _exitPortal;
         [SerializeField] private int _maxRecursiveDepth = 2;
-        [SerializeField] private float _clippingDistance = 0.0f;
+        [SerializeField] private bool _fakeInfiniteRecursion = true;
+        //[SerializeField] private float _clippingDistance = 0.0f;
         [SerializeField] private bool _useCullingMatrix = true;
         [SerializeField] private bool _useProjectionMatrix = true;
 
@@ -163,25 +164,27 @@ namespace Portals {
             if (s_depth > 0 && _currentlyRenderingPortal != null && this == _currentlyRenderingPortal.exitPortal) {
                 return;
             }
-            
+
             // Stop recursion when we reach maximum depth
             if (s_depth >= _maxRecursiveDepth) {
-                //if (!_recursionCamera)
-                //    return;
-                if (_maxRecursiveDepth >= 2) {
-                    // Render the bottom portal using _recursionCamera's view/projection.
-                    PortalCamera pc = currentCam.GetComponent<PortalCamera>();
-                    Camera parentCam = pc.parent;
-                    GetComponent<Renderer>().sharedMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
 
-                    // TODO: Fix this up a bit nicer.
-                    GetComponent<Renderer>().sharedMaterial.SetMatrix("PORTAL_MATRIX_VP", parentCam.projectionMatrix * pc.lastFrameWorldToCameraMatrix);
-                    GetComponent<Renderer>().sharedMaterial.SetTexture("_MainTex", parentCam.targetTexture);
-                    pc.lastFrameWorldToCameraMatrix = parentCam.worldToCameraMatrix;
-                } else {
-                    GetComponent<Renderer>().sharedMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
+                if (_fakeInfiniteRecursion) {
+                    //if (!_recursionCamera)
+                    //    return;
+                    if (_maxRecursiveDepth >= 2) {
+                        // Render the bottom portal using _recursionCamera's view/projection.
+                        PortalCamera pc = currentCam.GetComponent<PortalCamera>();
+                        Camera parentCam = pc.parent;
+                        GetComponent<Renderer>().sharedMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
+
+                        // TODO: Fix this up a bit nicer.
+                        GetComponent<Renderer>().sharedMaterial.SetMatrix("PORTAL_MATRIX_VP", parentCam.projectionMatrix * pc.lastFrameWorldToCameraMatrix);
+                        GetComponent<Renderer>().sharedMaterial.SetTexture("_MainTex", parentCam.targetTexture);
+                        pc.lastFrameWorldToCameraMatrix = parentCam.worldToCameraMatrix;
+                    } else {
+                        GetComponent<Renderer>().sharedMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
+                    }
                 }
-                //stack.Push(null);
                 return;
             }
 
@@ -196,19 +199,27 @@ namespace Portals {
             Portal parentPortal = _currentlyRenderingPortal;
             _currentlyRenderingPortal = this;
 
+            Debug.Log("Rendering1: " + new string('*', s_depth) + gameObject.name + _portalMaterial.GetTexture("_RightEyeTexture").name);
+
             s_depth++;
 
-            if (currentCam.stereoTargetEye == StereoTargetEyeMask.Both || currentCam.stereoTargetEye == StereoTargetEyeMask.Left) {
-                RenderTexture leftEyeTexture = portalCam.GetComponent<PortalCamera>().RenderIntoTexture(Camera.MonoOrStereoscopicEye.Left);
-                _portalMaterial.SetTexture("_LeftEyeTexture", leftEyeTexture);
-            }
-            if (currentCam.stereoTargetEye == StereoTargetEyeMask.Both || currentCam.stereoTargetEye == StereoTargetEyeMask.Right) {
-                RenderTexture rightEyeTexture = portalCam.GetComponent<PortalCamera>().RenderIntoTexture(Camera.MonoOrStereoscopicEye.Right);
+            if (VRDevice.isPresent) {
+                if (currentCam.stereoTargetEye == StereoTargetEyeMask.Both || currentCam.stereoTargetEye == StereoTargetEyeMask.Left) {
+                    RenderTexture leftEyeTexture = portalCam.GetComponent<PortalCamera>().RenderToTexture(Camera.MonoOrStereoscopicEye.Left);
+                    _portalMaterial.SetTexture("_LeftEyeTexture", leftEyeTexture);
+                }
+                if (currentCam.stereoTargetEye == StereoTargetEyeMask.Both || currentCam.stereoTargetEye == StereoTargetEyeMask.Right) {
+                    RenderTexture rightEyeTexture = portalCam.GetComponent<PortalCamera>().RenderToTexture(Camera.MonoOrStereoscopicEye.Right);
+                    _portalMaterial.SetTexture("_RightEyeTexture", rightEyeTexture);
+                }
+            } else {
+                RenderTexture rightEyeTexture = portalCam.GetComponent<PortalCamera>().RenderToTexture(Camera.MonoOrStereoscopicEye.Mono);
                 _portalMaterial.SetTexture("_RightEyeTexture", rightEyeTexture);
             }
 
             s_depth--;
-                
+
+            Debug.Log("Rendering2: " + new string('*', s_depth) + gameObject.name + _portalMaterial.GetTexture("_RightEyeTexture").name);
             _currentlyRenderingPortal = parentPortal;
 
             if (s_depth < _maxRecursiveDepth) {
