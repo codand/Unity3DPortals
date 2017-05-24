@@ -76,6 +76,7 @@
 			#pragma fragment frag
 			//#pragma multi_compile_fog
 			#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME
+			#pragma multi_compile __ STEREO_RENDER
 
 			#include "UnityCG.cginc"
 			#include "PortalVRHelpers.cginc"
@@ -119,10 +120,34 @@
 
 			fixed4 frag(v2f i) : SV_Target
 			{
-				fixed4 col = PORTAL_VR_CURRENT_EYE == PORTAL_VR_EYE_LEFT ? \
-					tex2Dproj(_LeftEyeTexture, UNITY_PROJ_COORD(i.uv)) : \
-					tex2Dproj(_RightEyeTexture, UNITY_PROJ_COORD(i.uv));
-				
+				//fixed4 col = PORTAL_VR_CURRENT_EYE == PORTAL_VR_EYE_LEFT ? \
+				//	tex2Dproj(_LeftEyeTexture, UNITY_PROJ_COORD(i.uv)) : \
+				//	tex2Dproj(_RightEyeTexture, UNITY_PROJ_COORD(i.uv));
+
+				float2 screenUV = i.uv.xy / i.uv.w;
+				fixed4 col;
+
+#ifdef UNITY_SINGLE_PASS_STEREO
+				if (unity_StereoEyeIndex == 0)
+				{
+					screenUV.x *= 2;
+					col = tex2D(_LeftEyeTexture, screenUV);
+				}
+				else
+				{
+					screenUV.x = (screenUV.x - 0.5) * 2;
+					col = tex2D(_RightEyeTexture, screenUV);
+				}
+#else
+				if (unity_CameraProjection[0][2] < 0)
+				{
+					col = tex2D(_LeftEyeTexture, screenUV);
+				}
+				else
+				{
+					col = tex2D(_RightEyeTexture, screenUV);
+				}
+#endif
 				return col;
 			}
 			ENDCG
