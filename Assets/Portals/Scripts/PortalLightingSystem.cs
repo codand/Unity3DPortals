@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -87,7 +87,7 @@ public class PortalLightingSystem : MonoBehaviour {
             _cmdBuffer.SetGlobalColor("_LightColor", light.color * light.intensity);
 
 
-            Vector3[] corners = _portal.exitPortal.GetCorners();
+            Vector3[] corners = _portal.ExitPortal.GetCorners();
             Vector4[] planes = new Vector4[] {
                 MakePlane(corners[0], corners[1], corners[2]),
                 MakePlane(position, corners[0], corners[1]),

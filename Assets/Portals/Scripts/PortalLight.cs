@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -96,7 +96,7 @@ namespace Portals {
 
         Vector4[] GetShadowPlanes() {
             Vector3 position = transform.position;
-            Vector3[] corners = _portal.exitPortal.GetCorners();
+            Vector3[] corners = _portal.ExitPortal.GetCorners();
             Vector4[] shadowPlanes = new Vector4[] {
                 MakePlane(corners[0], corners[1], corners[2]),
                 MakePlane(position, corners[0], corners[1]),
@@ -110,7 +110,7 @@ namespace Portals {
 
         Matrix4x4 GetMVPMatrix() {
             // http://answers.unity3d.com/questions/12713/how-do-i-reproduce-the-mvp-matrix.html
-            Matrix4x4 m = _portal.exitPortal.transform.localToWorldMatrix;
+            Matrix4x4 m = _portal.ExitPortal.transform.localToWorldMatrix;
             Matrix4x4 v = transform.worldToLocalMatrix;
             // TODO: Find out what the actual shadow near plane should be.
             Matrix4x4 p = Matrix4x4.Perspective(_light.spotAngle, 1.0f, 0.1f, QualitySettings.shadowDistance);
@@ -144,9 +144,9 @@ namespace Portals {
             }
             _commandBuffer.Clear();
 
-            if (_portal && _portal.exitPortal) {
+            if (_portal && _portal.ExitPortal) {
                 _commandBuffer.SetGlobalFloat("_UseShadowPlanes", 1);
-                Vector3[] corners3 = _portal.exitPortal.GetCorners();
+                Vector3[] corners3 = _portal.ExitPortal.GetCorners();
                 Vector4[] corners4 = new Vector4[corners3.Length];
                 for (int i = 0; i < corners3.Length; i++) {
                     Vector3 c3 = corners3[i];
@@ -215,9 +215,9 @@ namespace Portals {
                 _portalToChild.TryGetValue(portal, out child);
 
                 // Check every portal in the scene if we're in range
-                if (portal.exitPortal && IsInRange(portal.transform.position)) {
+                if (portal.ExitPortal && IsInRange(portal.transform.position)) {
                     // Don't recurse on our own portal
-                    if (!_portal || _portal.exitPortal != portal) {
+                    if (!_portal || _portal.ExitPortal != portal) {
                         // If there isn't a child, let's spawn a new one.
                         if (!child) {
                             _portalToChild[portal] = SpawnLight(portal);
@@ -254,7 +254,7 @@ namespace Portals {
         void LateUpdate() {
             if (_parentLight) {
                 CopyParentLightRecursive();
-                if (_portal && _portal.exitPortal) {
+                if (_portal && _portal.ExitPortal) {
                     _portal.ApplyWorldToPortalTransform(this.transform, _parentLight.transform);
                 }
             }

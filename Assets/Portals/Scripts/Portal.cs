@@ -5,31 +5,21 @@ using UnityEngine.Rendering;
 using UnityEngine.VR;
 
 namespace Portals {
-
-    internal class PortalRootCamera {
-        public readonly Camera parent;
-        public readonly Camera left;
-        public readonly Camera right;
-
-
-    }
-
     //[ExecuteInEditMode]
     public class Portal : MonoBehaviour {
         [SerializeField] private Portal _exitPortal;
         [SerializeField] private int _maxRecursiveDepth = 2;
         [SerializeField] private bool _fakeInfiniteRecursion = true;
-        //[SerializeField] private float _clippingDistance = 0.0f;
         [SerializeField] private bool _useCullingMatrix = true;
         [SerializeField] private bool _useProjectionMatrix = true;
+        // TODO: Make this only appear when useProjectionMatrix is enabled
+        [SerializeField] private float _clippingOffset = 0.25f;
+        [SerializeField] private bool _copyGI = false;
 
-        public bool copyGI = false;
-
-        public Portal exitPortal {
-            get {
-                return _exitPortal;
-            }
+        public Portal ExitPortal {
+            get { return _exitPortal; }
             set {
+                // TODO: Make this use a default texture instead of disabling the renderer
                 if (value) {
                     GetComponent<Renderer>().enabled = true;
                 } else {
@@ -37,6 +27,36 @@ namespace Portals {
                 }
                 _exitPortal = value;
             }
+        }
+
+        public int MaxRecursiveDepth {
+            get { return _maxRecursiveDepth; }
+            set { _maxRecursiveDepth = value; }
+        }
+
+        public bool FakeInfiniteRecursion {
+            get { return _fakeInfiniteRecursion; }
+            set { _fakeInfiniteRecursion = value; }
+        }
+
+        public bool UseCullingMatrix {
+            get { return _useCullingMatrix; }
+            set { _useCullingMatrix = value; }
+        }
+
+        public bool UseProjectionMatrix {
+            get { return _useProjectionMatrix; }
+            set { _useProjectionMatrix = value; }
+        }
+
+        public float ClippingOffset {
+            get { return _clippingOffset; }
+            set { _clippingOffset = value; }
+        }
+
+        public bool CopyGI {
+            get { return _copyGI; }
+            set { _copyGI = value; }
         }
 
         public List<Collider> ignoredColliders = new List<Collider>();
@@ -86,10 +106,9 @@ namespace Portals {
         //bool hasPopped = false;
 
         //void SaveMaterialProperties() {
-        //    //stack.Push(Camera.current.targetTexture);
+        //    stack.Push(Camera.current.targetTexture);
         //}
         //void RestoreMaterialProperties() {
-        //    //Debug.Log("Restoring texture: " + tex.name + " to material: " + _portalMaterial.name + " after camera render: " + Camera.current);
         //    if (stack.Count == 0) {
         //        //Debug.Log("Empty");
         //        return;
@@ -104,6 +123,7 @@ namespace Portals {
         //    }
         //    Texture tex = stack.Pop();
 
+        //    Debug.Log("Restoring texture: " + tex.name + " to material: " + _portalMaterial.name + " after camera render: " + Camera.current);
         //    if (!tex) {
         //        //Debug.Log("!tex");
         //        return;
@@ -113,10 +133,9 @@ namespace Portals {
         //    //_portalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
         //}
 
-        //void Update() {
-        //    _wasSeenByCamera.Clear();
-        //    hasPopped = false;
-        //}
+        void Update() {
+            _wasRenderedByCamera.Clear();
+        }
 
         //void OnRenderObject() {
         //    bool wasSeen;
@@ -136,11 +155,32 @@ namespace Portals {
             return camera.stereoTargetEye == StereoTargetEyeMask.Both && camera.targetTexture == null;
         }
 
-        Stack<Texture> stack = new Stack<Texture>();
-        void OnWillRenderObject() {
-            //_wasSeenByCamera[Camera.current] = true;
-            //SaveMaterialProperties();
+        private Dictionary<Camera, bool> _wasRenderedByCamera = new Dictionary<Camera, bool>();
+        private Stack<Texture> _savedTextures = new Stack<Texture>();
 
+        void PushCurrentTexture() {
+            _wasRenderedByCamera[Camera.current] = true;
+            _savedTextures.Push(_portalMaterial.GetTexture("_RightEyeTexture"));
+        }
+
+        void PopCurrentTexture() {
+            Texture tex = _savedTextures.Pop();
+            _portalMaterial.SetTexture("_RightEyeTexture", tex);
+            _portalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
+            _wasRenderedByCamera[Camera.current] = false;
+        }
+
+        void OnRenderObject() {
+            bool wasRendered;
+            _wasRenderedByCamera.TryGetValue(Camera.current, out wasRendered);
+            if (wasRendered) {
+                //Debug.Log("OnRenderObject: " + gameObject.name + " " + Camera.current + " " + tex.name);
+                PopCurrentTexture();
+            }
+        }
+
+        //Stack<Texture> stack = new Stack<Texture>();
+        void OnWillRenderObject() {
             if (!enabled ||
                 !GetComponent<Renderer>() ||
                 !GetComponent<Renderer>().sharedMaterial ||
@@ -148,7 +188,7 @@ namespace Portals {
                 return;
             }
 
-            if (!exitPortal) {
+            if (!ExitPortal) {
                 GetComponent<Renderer>().enabled = false;
                 return;
             }
@@ -161,9 +201,16 @@ namespace Portals {
             if (currentCam.name == "SceneCamera" || currentCam.name == "Reflection Probes Camera" || currentCam.name == "Preview Camera")
                 return;
 
-            if (s_depth > 0 && _currentlyRenderingPortal != null && this == _currentlyRenderingPortal.exitPortal) {
+            if (s_depth > 0 && _currentlyRenderingPortal != null && this == _currentlyRenderingPortal.ExitPortal) {
                 return;
             }
+
+            //_wasSeenByCamera[Camera.current] = true;
+            //SaveMaterialProperties();
+
+            //Debug.Log("OnWillRenderObject:       " + gameObject.name + " " + Camera.current.name);
+
+            PushCurrentTexture();
 
             // Stop recursion when we reach maximum depth
             if (s_depth >= _maxRecursiveDepth) {
@@ -175,12 +222,15 @@ namespace Portals {
                         // Render the bottom portal using _recursionCamera's view/projection.
                         PortalCamera pc = currentCam.GetComponent<PortalCamera>();
                         Camera parentCam = pc.parent;
+                        PortalCamera parentPC = parentCam.GetComponent<PortalCamera>();
                         GetComponent<Renderer>().sharedMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
 
                         // TODO: Fix this up a bit nicer.
-                        GetComponent<Renderer>().sharedMaterial.SetMatrix("PORTAL_MATRIX_VP", parentCam.projectionMatrix * pc.lastFrameWorldToCameraMatrix);
-                        GetComponent<Renderer>().sharedMaterial.SetTexture("_MainTex", parentCam.targetTexture);
-                        pc.lastFrameWorldToCameraMatrix = parentCam.worldToCameraMatrix;
+                        GetComponent<Renderer>().sharedMaterial.SetMatrix("PORTAL_MATRIX_VP", parentPC.lastFrameProjectionMatrix * pc.lastFrameWorldToCameraMatrix);
+                        GetComponent<Renderer>().sharedMaterial.SetTexture("_RightEyeTexture", parentPC.lastFrameRenderTexture);
+                        //pc.lastFrameWorldToCameraMatrix = parentCam.worldToCameraMatrix;
+                        //parentPC.lastFrameProjectionMatrix = parentCam.projectionMatrix;
+                        //parentPC.lastFrameRenderTexture = parentCam.targetTexture;
                     } else {
                         GetComponent<Renderer>().sharedMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
                     }
@@ -199,7 +249,7 @@ namespace Portals {
             Portal parentPortal = _currentlyRenderingPortal;
             _currentlyRenderingPortal = this;
 
-            Debug.Log("Rendering1: " + new string('*', s_depth) + gameObject.name + _portalMaterial.GetTexture("_RightEyeTexture").name);
+            //Debug.Log("OnWillRenderObject 1: " + new string('*', s_depth) + gameObject.name + " " + _portalMaterial.GetTexture("_RightEyeTexture"));
 
             s_depth++;
 
@@ -219,7 +269,7 @@ namespace Portals {
 
             s_depth--;
 
-            Debug.Log("Rendering2: " + new string('*', s_depth) + gameObject.name + _portalMaterial.GetTexture("_RightEyeTexture").name);
+            //Debug.Log("OnWillRenderObject 2: " + new string('*', s_depth) + gameObject.name + " " + _portalMaterial.GetTexture("_RightEyeTexture"));
             _currentlyRenderingPortal = parentPortal;
 
             if (s_depth < _maxRecursiveDepth) {
@@ -246,7 +296,7 @@ namespace Portals {
         
         public float GetScaleMultiplier() {
             float enterScale = Helpers.VectorInternalAverage(this.transform.lossyScale);
-            float exitScale = Helpers.VectorInternalAverage(exitPortal.transform.lossyScale);
+            float exitScale = Helpers.VectorInternalAverage(ExitPortal.transform.lossyScale);
 
             return exitScale / enterScale;
         }
@@ -254,13 +304,13 @@ namespace Portals {
         public Quaternion WorldToPortalQuaternion() {
             // Transforms a quaternion or vector into the second portal's space.
             // We have to flip the camera in between so that we face the outside direction of the portal
-            return exitPortal.transform.rotation * Quaternion.Euler(180, 0, 180) * Quaternion.Inverse(this.transform.rotation);
+            return ExitPortal.transform.rotation * Quaternion.Euler(180, 0, 180) * Quaternion.Inverse(this.transform.rotation);
         }
 
         public Matrix4x4 WorldToPortalMatrix() {
-            Vector3 translation = exitPortal.transform.position - this.transform.position;
+            Vector3 translation = ExitPortal.transform.position - this.transform.position;
             //Vector3 translation = Vector3.zero;
-            Quaternion rotation = exitPortal.transform.rotation * Quaternion.Inverse(this.transform.rotation);
+            Quaternion rotation = ExitPortal.transform.rotation * Quaternion.Inverse(this.transform.rotation);
             //Quaternion rotation = WorldToPortalQuaternion();
             //Quaternion rotation = Quaternion.identity;
             //Debug.Log(translation);
@@ -274,7 +324,7 @@ namespace Portals {
             Vector3 scaledPositionDelta = positionDelta * GetScaleMultiplier();
             Vector3 transformedDelta = WorldToPortalQuaternion() * scaledPositionDelta;
 
-            return exitPortal.transform.position + transformedDelta;
+            return ExitPortal.transform.position + transformedDelta;
         }
 
         public void ApplyWorldToPortalTransform(Transform target, Transform reference) {
@@ -288,7 +338,7 @@ namespace Portals {
             Vector3 scaledPositionDelta = positionDelta * scale;
             Vector3 transformedDelta = worldToPortal * scaledPositionDelta;
 
-            target.position = exitPortal.transform.position + transformedDelta;
+            target.position = ExitPortal.transform.position + transformedDelta;
             target.rotation = worldToPortal * reference.rotation;
             target.localScale = reference.localScale * scale;
         }
@@ -304,7 +354,7 @@ namespace Portals {
             Vector3 scaledPositionDelta = positionDelta * scale;
             Vector3 transformedDelta = worldToPortal * scaledPositionDelta;
 
-            target.position = exitPortal.transform.position + transformedDelta;
+            target.position = ExitPortal.transform.position + transformedDelta;
             target.rotation = worldToPortal * referenceRotation;
             target.localScale = referenceScale * scale;
         }
@@ -331,7 +381,8 @@ namespace Portals {
             dest.aspect = src.aspect;
             dest.orthographicSize = src.orthographicSize;
             dest.renderingPath = src.renderingPath;
-            dest.hdr = src.hdr;
+            dest.allowHDR = src.allowHDR;
+            dest.allowMSAA = src.allowMSAA;
 
             // TODO: Fix occlusion culling
             dest.useOcclusionCulling = src.useOcclusionCulling;
@@ -357,12 +408,11 @@ namespace Portals {
 
                 PortalCamera pc = go.AddComponent<PortalCamera>();
                 pc.enterScene = this.gameObject.scene;
-                pc.exitScene = exitPortal.gameObject.scene;
-                pc.copyGI = true;
+                pc.exitScene = ExitPortal.gameObject.scene;
                 pc.parent = currentCamera;
                 pc.portal = this;
 
-                if (this.gameObject.scene != exitPortal.gameObject.scene) {
+                if (this.gameObject.scene != ExitPortal.gameObject.scene) {
                     //PortalCameraRenderSettings thing = go.AddComponent<PortalCameraRenderSettings>();
                     //thing.scene = exitPortal.gameObject.scene;
                 }
@@ -429,21 +479,21 @@ namespace Portals {
 
 
         void OnTriggerEnter(Collider collider) {
-            if (!exitPortal) {
+            if (!ExitPortal) {
                 return;
             }
 
             foreach (Collider other in ignoredColliders) {
                 Physics.IgnoreCollision(collider, other, true);
             }
-            foreach (Collider other in exitPortal.ignoredColliders) {
+            foreach (Collider other in ExitPortal.ignoredColliders) {
                 Physics.IgnoreCollision(collider, other, true);
             }
             //SpawnClone(collider.gameObject);
         }
 
         void OnTriggerStay(Collider collider) {
-            if (!exitPortal) {
+            if (!ExitPortal) {
                 return;
             }
 
@@ -456,7 +506,7 @@ namespace Portals {
         }
 
         void OnTriggerExit(Collider collider) {
-            if (!exitPortal) {
+            if (!ExitPortal) {
                 return;
             }
 
@@ -464,7 +514,7 @@ namespace Portals {
             foreach (Collider other in ignoredColliders) {
                 Physics.IgnoreCollision(collider, other, false);
             }
-            foreach (Collider other in exitPortal.ignoredColliders) {
+            foreach (Collider other in ExitPortal.ignoredColliders) {
                 Physics.IgnoreCollision(collider, other, false);
             }
             //DestroyClone(collider.gameObject);
@@ -542,9 +592,9 @@ namespace Portals {
         }
 
         void OnDrawGizmos() {
-            if (exitPortal) {
+            if (ExitPortal) {
                 Gizmos.color = Color.magenta;
-                Gizmos.DrawLine(this.transform.position, exitPortal.transform.position);
+                Gizmos.DrawLine(this.transform.position, ExitPortal.transform.position);
             }
         }
     }

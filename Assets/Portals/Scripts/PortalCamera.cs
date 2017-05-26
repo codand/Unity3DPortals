@@ -8,28 +8,18 @@ using UnityEngine.VR;
 namespace Portals {
     [RequireComponent(typeof(Camera))]
     public class PortalCamera : MonoBehaviour {
-        bool _copyGI;
         Camera _parent;
         Camera _camera;
         Portal _portal;
         Scene _enterScene;
         Scene _exitScene;
         int _renderDepth;
-        bool _useProjectionMatrix;
-        bool _useCullingMatrix;
         RenderTexture _leftEyeRenderTexture;
         RenderTexture _rightEyeRenderTexture;
 
         public Matrix4x4 lastFrameWorldToCameraMatrix;
-
-        public bool copyGI {
-            get {
-                return _copyGI;
-            }
-            set {
-                _copyGI = value;
-            }
-        }
+        public Matrix4x4 lastFrameProjectionMatrix;
+        public Texture lastFrameRenderTexture;
 
         public Camera parent {
             get {
@@ -75,24 +65,6 @@ namespace Portals {
             }
             set {
                 _renderDepth = value;
-            }
-        }
-
-        public bool useProjectionMatrix {
-            get {
-                return _useProjectionMatrix;
-            }
-            set {
-                _useProjectionMatrix = value;
-            }
-        }
-
-        public bool useCullingMatrix {
-            get {
-                return _useCullingMatrix;
-            }
-            set {
-                _useCullingMatrix = value;
             }
         }
 
@@ -164,6 +136,10 @@ namespace Portals {
         }
 
         public RenderTexture RenderToTexture(Camera.MonoOrStereoscopicEye eye) {
+            lastFrameWorldToCameraMatrix = _parent.worldToCameraMatrix;
+            lastFrameProjectionMatrix = _camera.projectionMatrix;
+            lastFrameRenderTexture = _camera.targetTexture;
+
             RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
             ReleaseTemporaryRenderTextureDelayed(texture);
 
@@ -195,37 +171,39 @@ namespace Portals {
             // Adjust camera transform
             _portal.ApplyWorldToPortalTransform(this.transform, parentEyePosition, parentEyeRotation, _parent.transform.lossyScale);
 
-            _camera.projectionMatrix = CalculateProjectionMatrix(eye);
-            _camera.cullingMatrix = CalculateCullingMatrix();
+            if (_portal.UseProjectionMatrix) {
+                _camera.projectionMatrix = CalculateProjectionMatrix(eye);
+            } else {
+                _camera.ResetProjectionMatrix();
+            }
+
+            if (_portal.UseCullingMatrix) {
+                _camera.cullingMatrix = CalculateCullingMatrix();
+            } else {
+                _camera.ResetCullingMatrix();
+            }
 
             _camera.targetTexture = texture;
-
-            //CommandBuffer buf = new CommandBuffer();
-            //buf.SetGlobalTexture("_RightEyeTexture", new RenderTargetIdentifier(texture));
-            //_camera.RemoveAllCommandBuffers();
-            //_camera.AddCommandBuffer(CameraEvent.BeforeForwardOpaque, buf);
-
-
             _camera.Render();
 
             return texture;
         }
 
-        void DecomposeMatrix4x4(Matrix4x4 matrix) {
-            float near = matrix.m23 / (matrix.m22 - 1);
-            float far = matrix.m23 / (matrix.m22 + 1);
-            float bottom = near * (matrix.m12 - 1) / matrix.m11;
-            float top = near * (matrix.m12 + 1) / matrix.m11;
-            float left = near * (matrix.m02 - 1) / matrix.m00;
-            float right = near * (matrix.m02 + 1) / matrix.m00;
+        //void DecomposeMatrix4x4(Matrix4x4 matrix) {
+        //    float near = matrix.m23 / (matrix.m22 - 1);
+        //    float far = matrix.m23 / (matrix.m22 + 1);
+        //    float bottom = near * (matrix.m12 - 1) / matrix.m11;
+        //    float top = near * (matrix.m12 + 1) / matrix.m11;
+        //    float left = near * (matrix.m02 - 1) / matrix.m00;
+        //    float right = near * (matrix.m02 + 1) / matrix.m00;
 
-            Debug.Log("near: " + near);
-            Debug.Log("far: " + far);
-            Debug.Log("bottom: " + bottom);
-            Debug.Log("top: " + top);
-            Debug.Log("left: " + left);
-            Debug.Log("right: " + right);
-        }
+        //    Debug.Log("near: " + near);
+        //    Debug.Log("far: " + far);
+        //    Debug.Log("bottom: " + bottom);
+        //    Debug.Log("top: " + top);
+        //    Debug.Log("left: " + left);
+        //    Debug.Log("right: " + right);
+        //}
 
         void MakeProjectionMatrixOblique(ref Matrix4x4 projection, Vector4 clipPlane) {
             Vector4 q = projection.inverse * new Vector4(
@@ -274,11 +252,12 @@ namespace Portals {
             _camera.targetTexture = savedTargetTexture;
 
             // Calculate plane made from the exit portal's trnasform
-            Vector4 exitPortalPlane = CalculatePlaneFromTransform(_portal.exitPortal.transform);
+            Vector4 exitPortalPlane = CalculatePlaneFromTransform(_portal.ExitPortal.transform);
 
             // Determine whether or not we've crossed the plane already. If we have, we don't need to apply
-            // oblique frustum clipping.
-            bool onFarSide = new Plane(-1 * exitPortalPlane, exitPortalPlane.w).GetSide(transform.position);
+            // oblique frustum clipping. Offset the value by our portal's ClippingOffset to reduce the effects
+            // so that it swaps over slightly early. This helps reduce artifacts caused by loss of depth accuracy.
+            bool onFarSide = new Plane(-1 * exitPortalPlane, exitPortalPlane.w + _portal.ClippingOffset).GetSide(transform.position);
             if (onFarSide) {
                 return projectionMatrix;
             }
@@ -305,45 +284,45 @@ namespace Portals {
             return projectionMatrix;
         }
 
-        Matrix4x4 HMDMatrix4x4ToMatrix4x4(Valve.VR.HmdMatrix44_t input) {
-            var m = Matrix4x4.identity;
+        //Matrix4x4 HMDMatrix4x4ToMatrix4x4(Valve.VR.HmdMatrix44_t input) {
+        //    var m = Matrix4x4.identity;
 
-            m[0, 0] = input.m0;
-            m[0, 1] = input.m1;
-            m[0, 2] = input.m2;
-            m[0, 3] = input.m3;
+        //    m[0, 0] = input.m0;
+        //    m[0, 1] = input.m1;
+        //    m[0, 2] = input.m2;
+        //    m[0, 3] = input.m3;
 
-            m[1, 0] = input.m4;
-            m[1, 1] = input.m5;
-            m[1, 2] = input.m6;
-            m[1, 3] = input.m7;
+        //    m[1, 0] = input.m4;
+        //    m[1, 1] = input.m5;
+        //    m[1, 2] = input.m6;
+        //    m[1, 3] = input.m7;
 
-            m[2, 0] = input.m8;
-            m[2, 1] = input.m9;
-            m[2, 2] = input.m10;
-            m[2, 3] = input.m11;
+        //    m[2, 0] = input.m8;
+        //    m[2, 1] = input.m9;
+        //    m[2, 2] = input.m10;
+        //    m[2, 3] = input.m11;
 
-            m[3, 0] = input.m12;
-            m[3, 1] = input.m13;
-            m[3, 2] = input.m14;
-            m[3, 3] = input.m15;
+        //    m[3, 0] = input.m12;
+        //    m[3, 1] = input.m13;
+        //    m[3, 2] = input.m14;
+        //    m[3, 3] = input.m15;
 
-            return m;
-        }
+        //    return m;
+        //}
 
         Matrix4x4 CalculateCullingMatrix() {
             _camera.ResetCullingMatrix();
 
-            Bounds bounds = _portal.exitPortal.GetComponent<MeshFilter>().sharedMesh.bounds;
+            Bounds bounds = _portal.ExitPortal.GetComponent<MeshFilter>().sharedMesh.bounds;
 
             // Lower left of the backside of our plane in world coordinates
-            Vector3 pa = _portal.exitPortal.transform.TransformPoint(new Vector3(bounds.extents.x, -bounds.extents.y, 0));
+            Vector3 pa = _portal.ExitPortal.transform.TransformPoint(new Vector3(bounds.extents.x, -bounds.extents.y, 0));
 
             // Lower right
-            Vector3 pb = _portal.exitPortal.transform.TransformPoint(new Vector3(-bounds.extents.x, -bounds.extents.y, 0));
+            Vector3 pb = _portal.ExitPortal.transform.TransformPoint(new Vector3(-bounds.extents.x, -bounds.extents.y, 0));
 
             // Upper left
-            Vector3 pc = _portal.exitPortal.transform.TransformPoint(new Vector3(bounds.extents.x, bounds.extents.y, 0));
+            Vector3 pc = _portal.ExitPortal.transform.TransformPoint(new Vector3(bounds.extents.x, bounds.extents.y, 0));
 
             Vector3 pe = _camera.transform.position;
 
@@ -485,6 +464,9 @@ namespace Portals {
             Matrix4x4 worldToCameraMatrix = rm * tm;
             return p * worldToCameraMatrix;
         }
+
+
+
         //public CameraEvent cameraEvent;
         //void OnValidate() {
         //    _camera.RemoveAllCommandBuffers();

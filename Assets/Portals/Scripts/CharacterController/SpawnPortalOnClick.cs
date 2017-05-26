@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Portals;
@@ -20,8 +20,8 @@ public class SpawnPortalOnClick : MonoBehaviour {
     void Start() {
 
 
-        _leftPortal.exitPortal = _rightPortal;
-        _rightPortal.exitPortal = _leftPortal;
+        _leftPortal.ExitPortal = _rightPortal;
+        _rightPortal.ExitPortal = _leftPortal;
 
         _leftPortal.name = "Left Portal";
         _rightPortal.name = "Right Portal";

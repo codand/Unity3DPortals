@@ -68,8 +68,8 @@ Shader "Portal/PortalRenderTexture"
 		Pass
 		{
 			Tags{ "RenderType" = "Opaque" }
-			Offset -0.1, -10000
-			//Offset -0.1, -0.1
+			//Offset -1.0, -1000.0
+			Offset -0.1, -0.1
 
 			CGPROGRAM
 			#pragma vertex vert

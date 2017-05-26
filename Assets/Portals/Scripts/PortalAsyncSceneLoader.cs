@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -74,8 +74,8 @@ namespace Portals {
                 return;
             }
 
-            _portal.exitPortal = exitPortal;
-            exitPortal.exitPortal = _portal;
+            _portal.ExitPortal = exitPortal;
+            exitPortal.ExitPortal = _portal;
             _exitPortalSceneLoader = exitPortalSceneLoader;
             exitPortalSceneLoader._exitPortalSceneLoader = this;
 
@@ -92,12 +92,12 @@ namespace Portals {
                 return;
             }
 
-            _portal.exitPortal = null;
+            _portal.ExitPortal = null;
         }
 
         void OnPortalExit(Portal portal, GameObject obj) {
             if (_portal == portal) {
-                SceneManager.SetActiveScene(portal.exitPortal.gameObject.scene);
+                SceneManager.SetActiveScene(portal.ExitPortal.gameObject.scene);
                 _exitPortalSceneLoader._inTrigger = true;
             }
         }

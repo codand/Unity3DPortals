@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -64,7 +64,7 @@ namespace Portals {
                     _currentObjectPortal = null;
                 } else {
                     // Current object on previous side, use new positioning
-                    _currentObjectPortal = portal.exitPortal;
+                    _currentObjectPortal = portal.ExitPortal;
                 }
             } else if (obj == heldObject) {
                 // Current object exited portal
