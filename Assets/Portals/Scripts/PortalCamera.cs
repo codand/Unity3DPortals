@@ -136,7 +136,7 @@ namespace Portals {
         }
 
         public RenderTexture RenderToTexture(Camera.MonoOrStereoscopicEye eye) {
-            lastFrameWorldToCameraMatrix = _parent.worldToCameraMatrix;
+            lastFrameWorldToCameraMatrix = _camera.worldToCameraMatrix;
             lastFrameProjectionMatrix = _camera.projectionMatrix;
             lastFrameRenderTexture = _camera.targetTexture;
 
@@ -184,7 +184,9 @@ namespace Portals {
             }
 
             _camera.targetTexture = texture;
+            //GL.invertCulling = true;
             _camera.Render();
+            //GL.invertCulling = false;
 
             return texture;
         }

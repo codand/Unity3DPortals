@@ -4,6 +4,7 @@ Shader "Portal/PortalRenderTexture"
 	{
 		_LeftEyeTexture("LeftEyeTexture", 2D) = "white" {}
 		_RightEyeTexture("RightEyeTexture", 2D) = "white" {}
+		_TransparencyMask("TransparencyMask", 2D) = "white" {}
 	}
 
 	SubShader
@@ -65,17 +66,18 @@ Shader "Portal/PortalRenderTexture"
 		//	ENDCG
 		//}
 
+		Tags{ "RenderType" = "Transparent" "Queue" = "Transparent" }
+		Blend SrcAlpha OneMinusSrcAlpha
 		Pass
 		{
-			Tags{ "RenderType" = "Opaque" }
 			Offset -0.1, -10000
-			//Offset -0.1, -0.1
+			//Offset -1000, -1000
 
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
-			//#pragma multi_compile_fog
-			#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME
+			#pragma multi_compile_fog
+			#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME DONT_SAMPLE
 			#pragma multi_compile __ STEREO_RENDER
 
 			#include "UnityCG.cginc"
@@ -89,8 +91,9 @@ Shader "Portal/PortalRenderTexture"
 
 			struct v2f {
 				float4 pos : SV_POSITION;
-				float4 uv : TEXCOORD0;
-				//UNITY_FOG_COORDS(1)
+				float4 screenUV : TEXCOORD0;
+				float4 objUV : TEXCOORD1;
+				UNITY_FOG_COORDS(2)
 			};
 
 #ifdef SAMPLE_PREVIOUS_FRAME
@@ -98,11 +101,13 @@ Shader "Portal/PortalRenderTexture"
 #endif
 			sampler2D _LeftEyeTexture;
 			sampler2D _RightEyeTexture;
+			sampler2D _TransparencyMask;
 
 			v2f vert(appdata v)
 			{
 				v2f o;
 				o.pos = UnityObjectToClipPos(v.vertex);
+				o.objUV = v.uv;
 #ifdef SAMPLE_PREVIOUS_FRAME
 				// Instead of getting the clip position of our portal from the currently rendering camera,
 				// calculate the clip position of the portal from a higher level portal. PORTAL_MATRIX_VP == camera.projectionMatrix.
@@ -110,11 +115,11 @@ Shader "Portal/PortalRenderTexture"
 
 				// TODO: Figure out how to get this value properly (https://docs.unity3d.com/Manual/SL-UnityShaderVariables.html)
 				_ProjectionParams.x = 1;
-				o.uv = ComputeScreenPos(recursionClipPos);
+				o.screenUV = ComputeScreenPos(recursionClipPos);
 #else
-				o.uv = ComputeScreenPos(o.pos);
+				o.screenUV = ComputeScreenPos(o.pos);
 #endif
-				//UNITY_TRANSFER_FOG(o, o.pos);
+				UNITY_TRANSFER_FOG(o, o.pos);
 				return o;
 			}
 
@@ -124,7 +129,7 @@ Shader "Portal/PortalRenderTexture"
 				//	tex2Dproj(_LeftEyeTexture, UNITY_PROJ_COORD(i.uv)) : \
 				//	tex2Dproj(_RightEyeTexture, UNITY_PROJ_COORD(i.uv));
 
-				float2 screenUV = i.uv.xy / i.uv.w;
+				float2 screenUV = i.screenUV.xy / i.screenUV.w;
 				fixed4 col;
 
 #ifdef UNITY_SINGLE_PASS_STEREO
@@ -148,6 +153,13 @@ Shader "Portal/PortalRenderTexture"
 					col = tex2D(_RightEyeTexture, screenUV);
 				}
 #endif
+
+#ifdef DONT_SAMPLE
+				col.rgb = fixed3(1, 1, 1);
+#endif
+
+				col.a = tex2D(_TransparencyMask, i.objUV).r;
+				UNITY_APPLY_FOG(i.fogCoord, col);
 				return col;
 			}
 			ENDCG

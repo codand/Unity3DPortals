@@ -8,6 +8,7 @@ namespace Portals {
     //[ExecuteInEditMode]
     public class Portal : MonoBehaviour {
         [SerializeField] private Portal _exitPortal;
+        [SerializeField] private Texture _transparencyMask;
         [SerializeField] private int _maxRecursiveDepth = 2;
         [SerializeField] private bool _fakeInfiniteRecursion = true;
         [SerializeField] private bool _useCullingMatrix = true;
@@ -15,15 +16,15 @@ namespace Portals {
         // TODO: Make this only appear when useProjectionMatrix is enabled
         [SerializeField] private float _clippingOffset = 0.25f;
         [SerializeField] private bool _copyGI = false;
+        //public Projector _projector;
 
         public Portal ExitPortal {
             get { return _exitPortal; }
             set {
-                // TODO: Make this use a default texture instead of disabling the renderer
                 if (value) {
-                    GetComponent<Renderer>().enabled = true;
+                    _portalMaterial.EnableKeyword("DONT_SAMPLE");
                 } else {
-                    GetComponent<Renderer>().enabled = false;
+                    _portalMaterial.DisableKeyword("DONT_SAMPLE");
                 }
                 _exitPortal = value;
             }
@@ -159,22 +160,27 @@ namespace Portals {
         private Stack<Texture> _savedTextures = new Stack<Texture>();
 
         void PushCurrentTexture() {
+            Texture tex = _portalMaterial.GetTexture("_RightEyeTexture");
+            _savedTextures.Push(tex);
             _wasRenderedByCamera[Camera.current] = true;
-            _savedTextures.Push(_portalMaterial.GetTexture("_RightEyeTexture"));
+
+            //Debug.Log("PushCurrentTexture: " + new string('*', s_depth) + gameObject.name + " " + (tex ? tex.name : "null"));
         }
 
         void PopCurrentTexture() {
             Texture tex = _savedTextures.Pop();
             _portalMaterial.SetTexture("_RightEyeTexture", tex);
             _portalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
+            _portalMaterial.DisableKeyword("DONT_SAMPLE");
             _wasRenderedByCamera[Camera.current] = false;
+
+            //Debug.Log("PopCurrentTexture : " + new string('*', s_depth) + gameObject.name + " " + (tex ? tex.name : "null"));
         }
 
         void OnRenderObject() {
             bool wasRendered;
             _wasRenderedByCamera.TryGetValue(Camera.current, out wasRendered);
             if (wasRendered) {
-                //Debug.Log("OnRenderObject: " + gameObject.name + " " + Camera.current + " " + tex.name);
                 PopCurrentTexture();
             }
         }
@@ -205,10 +211,15 @@ namespace Portals {
                 return;
             }
 
+            // Set this 
+            _portalMaterial.SetTexture("_TransparencyMask", _transparencyMask);
+
             //_wasSeenByCamera[Camera.current] = true;
             //SaveMaterialProperties();
 
             //Debug.Log("OnWillRenderObject:       " + gameObject.name + " " + Camera.current.name);
+
+            //Debug.Log("OnWillRenderObject ENTER: " + new string('*', s_depth) + gameObject.name + " " + _portalMaterial.GetTexture("_RightEyeTexture"));
 
             PushCurrentTexture();
 
@@ -223,16 +234,23 @@ namespace Portals {
                         PortalCamera pc = currentCam.GetComponent<PortalCamera>();
                         Camera parentCam = pc.parent;
                         PortalCamera parentPC = parentCam.GetComponent<PortalCamera>();
-                        GetComponent<Renderer>().sharedMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
+                        //Debug.Log("Drawing final " + gameObject.name + " with " + parentPC.lastFrameRenderTexture);
 
-                        // TODO: Fix this up a bit nicer.
-                        GetComponent<Renderer>().sharedMaterial.SetMatrix("PORTAL_MATRIX_VP", parentPC.lastFrameProjectionMatrix * pc.lastFrameWorldToCameraMatrix);
-                        GetComponent<Renderer>().sharedMaterial.SetTexture("_RightEyeTexture", parentPC.lastFrameRenderTexture);
+                        if (pc.portal == this) {
+                            GetComponent<Renderer>().sharedMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
+                            GetComponent<Renderer>().sharedMaterial.SetMatrix("PORTAL_MATRIX_VP", parentPC.lastFrameProjectionMatrix * parentPC.lastFrameWorldToCameraMatrix);
+                            GetComponent<Renderer>().sharedMaterial.SetTexture("_RightEyeTexture", parentPC.lastFrameRenderTexture);
+                        } else {
+                            GetComponent<Renderer>().sharedMaterial.EnableKeyword("DONT_SAMPLE");
+                        }
+
+
                         //pc.lastFrameWorldToCameraMatrix = parentCam.worldToCameraMatrix;
                         //parentPC.lastFrameProjectionMatrix = parentCam.projectionMatrix;
                         //parentPC.lastFrameRenderTexture = parentCam.targetTexture;
                     } else {
                         GetComponent<Renderer>().sharedMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
+                        GetComponent<Renderer>().sharedMaterial.DisableKeyword("DONT_SAMPLE");
                     }
                 }
                 return;
@@ -249,10 +267,9 @@ namespace Portals {
             Portal parentPortal = _currentlyRenderingPortal;
             _currentlyRenderingPortal = this;
 
-            //Debug.Log("OnWillRenderObject 1: " + new string('*', s_depth) + gameObject.name + " " + _portalMaterial.GetTexture("_RightEyeTexture"));
+            //Debug.Log("Rendering " + portalCam);
 
             s_depth++;
-
             if (VRDevice.isPresent) {
                 if (currentCam.stereoTargetEye == StereoTargetEyeMask.Both || currentCam.stereoTargetEye == StereoTargetEyeMask.Left) {
                     RenderTexture leftEyeTexture = portalCam.GetComponent<PortalCamera>().RenderToTexture(Camera.MonoOrStereoscopicEye.Left);
@@ -266,16 +283,22 @@ namespace Portals {
                 RenderTexture rightEyeTexture = portalCam.GetComponent<PortalCamera>().RenderToTexture(Camera.MonoOrStereoscopicEye.Mono);
                 _portalMaterial.SetTexture("_RightEyeTexture", rightEyeTexture);
             }
-
             s_depth--;
 
-            //Debug.Log("OnWillRenderObject 2: " + new string('*', s_depth) + gameObject.name + " " + _portalMaterial.GetTexture("_RightEyeTexture"));
+            //if (_projector) {
+            //    _projector.aspectRatio = Camera.current.aspect;
+            //    _projector.material.SetTexture("_ShadowTex", _portalMaterial.GetTexture("_RightEyeTexture"));
+            //}
+
+            //Debug.Log("Done rendering " + portalCam);
+
+            //Debug.Log("OnWillRenderObject EXIT : " + new string('*', s_depth) + gameObject.name + " " + _portalMaterial.GetTexture("_RightEyeTexture"));
             _currentlyRenderingPortal = parentPortal;
 
             if (s_depth < _maxRecursiveDepth) {
                 GetComponent<Renderer>().sharedMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
+                GetComponent<Renderer>().sharedMaterial.DisableKeyword("DONT_SAMPLE");
             }
-            //Debug.Log("Pushing: " + portalCam.targetTexture);
         }
         
         public Vector3[] GetCorners() {
@@ -307,17 +330,18 @@ namespace Portals {
             return ExitPortal.transform.rotation * Quaternion.Euler(180, 0, 180) * Quaternion.Inverse(this.transform.rotation);
         }
 
-        public Matrix4x4 WorldToPortalMatrix() {
-            Vector3 translation = ExitPortal.transform.position - this.transform.position;
-            //Vector3 translation = Vector3.zero;
-            Quaternion rotation = ExitPortal.transform.rotation * Quaternion.Inverse(this.transform.rotation);
-            //Quaternion rotation = WorldToPortalQuaternion();
-            //Quaternion rotation = Quaternion.identity;
-            //Debug.Log(translation);
-            Vector3 scale = new Vector3(1f, 1f, -1f); // the last negative scale makes it point in the right direction
-
-            return Matrix4x4.TRS(translation, rotation, scale).inverse;
-        }
+        //public Matrix4x4 WorldToPortalMatrix() {
+        //    Vector3 translation = this.transform.position - ExitPortal.transform.position;
+        //    //Vector3 translation = Vector3.zero;
+        //    //Quaternion rotation = this.transform.rotation;
+        //    //Quaternion rotation = ExitPortal.transform.rotation * Quaternion.Inverse(this.transform.rotation);
+        //    //Quaternion rotation = WorldToPortalQuaternion();
+        //    //Quaternion rotation = Quaternion.identity;
+        //    Quaternion rotation = Quaternion.Euler(EULER_ANGLES);
+        //    //Debug.Log(translation);
+        //    Vector3 scale = new Vector3(1f, 1f, 1f); // the last negative scale makes it point in the right direction
+        //    return Matrix4x4.TRS(translation, rotation, scale);
+        //}
 
         public Vector3 MultiplyPoint(Vector3 point) {
             Vector3 positionDelta = point - this.transform.position;
