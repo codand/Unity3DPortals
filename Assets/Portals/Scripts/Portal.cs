@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 using UnityEngine.VR;
 
 namespace Portals {
-    [ExecuteInEditMode]
+    //[ExecuteInEditMode]
     public class Portal : MonoBehaviour {
         [SerializeField] private Portal _exitPortal;
         [SerializeField] private Texture _defaultTexture;
@@ -73,11 +73,6 @@ namespace Portals {
         // This is static because recursion can occur on more than one portal
         private static int s_depth;
 
-        //TODO: figure out what the hell this is for
-        // Used to prevent camera recusion in other portals
-        // This is static because recursion can occur on more than one portal
-        private static Portal _currentlyRenderingPortal;
-
         // Mesh spawned when walking through a portal so that you can't clip through the portal
         public static Mesh _mesh;
         
@@ -92,6 +87,9 @@ namespace Portals {
 
         // Dictionary mapping objects to their clones on the other side of a portal
         private Dictionary<GameObject, GameObject> _objectToClone = new Dictionary<GameObject, GameObject>();
+
+        private Dictionary<Camera, bool> _wasRenderedByCamera = new Dictionary<Camera, bool>();
+        private Stack<Texture> _savedTextures = new Stack<Texture>();
 
         void Awake() {
             if (!_mesh) {
@@ -129,68 +127,14 @@ namespace Portals {
             }
         }
 
-        //private Dictionary<Camera, bool> _wasSeenByCamera = new Dictionary<Camera, bool>();
-        //bool hasPopped = false;
-
-        //void SaveMaterialProperties() {
-        //    stack.Push(Camera.current.targetTexture);
-        //}
-        //void RestoreMaterialProperties() {
-        //    if (stack.Count == 0) {
-        //        //Debug.Log("Empty");
-        //        return;
-        //    }
-        //    if (!hasPopped) {
-        //        stack.Pop();
-        //        hasPopped = true;
-        //    }
-        //    if (stack.Count == 0) {
-        //        //Debug.Log("Popped and empty");
-        //        return;
-        //    }
-        //    Texture tex = stack.Pop();
-
-        //    Debug.Log("Restoring texture: " + tex.name + " to material: " + _portalMaterial.name + " after camera render: " + Camera.current);
-        //    if (!tex) {
-        //        //Debug.Log("!tex");
-        //        return;
-        //    }
-        //    //Debug.Log("Popped: " + tex.name);
-        //    _portalMaterial.mainTexture = tex;
-        //    //_portalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
-        //}
-
         void Update() {
             _wasRenderedByCamera.Clear();
         }
-
-        //void OnRenderObject() {
-        //    bool wasSeen;
-        //    _wasSeenByCamera.TryGetValue(Camera.current, out wasSeen);
-        //    if (wasSeen) {
-        //        OnPostRenderObject();
-        //    }
-        //}
-
-        //// Unity doesn't have an analogous magic method to OnWillRenderObject, so we have to make our own.
-        //void OnPostRenderObject() {
-        //    //Debug.Log(Camera.current.name + " finished rendering: " + gameObject.name);
-        //    RestoreMaterialProperties();
-        //}
-
-        bool IsCameraRenderingBothEyes (Camera camera) {
-            return camera.stereoTargetEye == StereoTargetEyeMask.Both && camera.targetTexture == null;
-        }
-
-        private Dictionary<Camera, bool> _wasRenderedByCamera = new Dictionary<Camera, bool>();
-        private Stack<Texture> _savedTextures = new Stack<Texture>();
 
         void PushCurrentTexture() {
             Texture tex = _portalMaterial.GetTexture("_RightEyeTexture");
             _savedTextures.Push(tex);
             _wasRenderedByCamera[Camera.current] = true;
-
-            //Debug.Log("PushCurrentTexture: " + new string('*', s_depth) + gameObject.name + " " + (tex ? tex.name : "null"));
         }
 
         void PopCurrentTexture() {
@@ -199,8 +143,6 @@ namespace Portals {
             _portalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
             _portalMaterial.DisableKeyword("DONT_SAMPLE");
             _wasRenderedByCamera[Camera.current] = false;
-
-            //Debug.Log("PopCurrentTexture : " + new string('*', s_depth) + gameObject.name + " " + (tex ? tex.name : "null"));
         }
 
         void OnRenderObject() {
@@ -225,106 +167,77 @@ namespace Portals {
                 return;
             }
 
-            Camera currentCam = Camera.current;
-            if (currentCam == null) {
+            if (Camera.current == null) {
                 return;
             }
 
-            if (currentCam.name == "SceneCamera" || currentCam.name == "Reflection Probes Camera" || currentCam.name == "Preview Camera")
+            if (Camera.current.name == "SceneCamera" || Camera.current.name == "Reflection Probes Camera" || Camera.current.name == "Preview Camera")
                 return;
 
-            if (s_depth > 0 && _currentlyRenderingPortal != null && this == _currentlyRenderingPortal.ExitPortal) {
+            PortalCamera currentPortalCam = Camera.current.GetComponent<PortalCamera>();
+
+            // Don't ever render our own exit portal
+            if (s_depth > 0 && currentPortalCam != null && this == currentPortalCam.portal.ExitPortal) {
                 return;
             }
 
-            // Set this 
+            // TODO: set these only once
             _portalMaterial.SetTexture("_TransparencyMask", _transparencyMask);
             _portalMaterial.SetTexture("_DefaultTexture", _defaultTexture);
-
-            //_wasSeenByCamera[Camera.current] = true;
-            //SaveMaterialProperties();
-
-            //Debug.Log("OnWillRenderObject:       " + gameObject.name + " " + Camera.current.name);
-
-            //Debug.Log("OnWillRenderObject ENTER: " + new string('*', s_depth) + gameObject.name + " " + _portalMaterial.GetTexture("_RightEyeTexture"));
 
             PushCurrentTexture();
 
             // Stop recursion when we reach maximum depth
             if (s_depth >= _maxRecursiveDepth) {
 
-                if (_fakeInfiniteRecursion) {
-                    //if (!_recursionCamera)
-                    //    return;
-                    if (_maxRecursiveDepth >= 2) {
-                        // Render the bottom portal using _recursionCamera's view/projection.
-                        PortalCamera pc = currentCam.GetComponent<PortalCamera>();
-                        Camera parentCam = pc.parent;
-                        PortalCamera parentPC = parentCam.GetComponent<PortalCamera>();
-                        //Debug.Log("Drawing final " + gameObject.name + " with " + parentPC.lastFrameRenderTexture);
+                if (_fakeInfiniteRecursion && _maxRecursiveDepth >= 2) {
+                    // Use the previous frame's RenderTexture from the parent camera to render the bottom layer.
+                    // This creates an illusion of infinite recursion, but only works with at least two real recursions
+                    // because the effect is unconvincing using the Main Camera's previous frame.
+                    Camera parentCam = currentPortalCam.parent;
+                    PortalCamera parentPortalCam = parentCam.GetComponent<PortalCamera>();
 
-                        if (pc.portal == this) {
-                            GetComponent<Renderer>().sharedMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
-                            GetComponent<Renderer>().sharedMaterial.SetMatrix("PORTAL_MATRIX_VP", parentPC.lastFrameProjectionMatrix * parentPC.lastFrameWorldToCameraMatrix);
-                            GetComponent<Renderer>().sharedMaterial.SetTexture("_RightEyeTexture", parentPC.lastFrameRenderTexture);
-                        } else {
-                            GetComponent<Renderer>().sharedMaterial.EnableKeyword("DONT_SAMPLE");
-                        }
-
-
-                        //pc.lastFrameWorldToCameraMatrix = parentCam.worldToCameraMatrix;
-                        //parentPC.lastFrameProjectionMatrix = parentCam.projectionMatrix;
-                        //parentPC.lastFrameRenderTexture = parentCam.targetTexture;
+                    if (currentPortalCam.portal == this) {
+                        // This portal is currently viewing itself.
+                        // Render the bottom of the stack with the parent camera's view/projection.
+                        GetComponent<Renderer>().sharedMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
+                        GetComponent<Renderer>().sharedMaterial.SetMatrix("PORTAL_MATRIX_VP", parentPortalCam.lastFrameProjectionMatrix * parentPortalCam.lastFrameWorldToCameraMatrix);
+                        GetComponent<Renderer>().sharedMaterial.SetTexture("_RightEyeTexture", parentPortalCam.lastFrameRenderTexture);
                     } else {
-                        GetComponent<Renderer>().sharedMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
+                        // We are viewing another portal.
+                        // Render the bottom of the stack with a base texture
                         GetComponent<Renderer>().sharedMaterial.EnableKeyword("DONT_SAMPLE");
                     }
                 } else {
                     GetComponent<Renderer>().sharedMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
                     GetComponent<Renderer>().sharedMaterial.EnableKeyword("DONT_SAMPLE");
                 }
+
+                // Exit. We don't need to process any further depths.
                 return;
             }
 
             // Initialize or get anything needed for this depth level
-            Camera portalCam = null;
-            CreatePortalObjects(currentCam, out portalCam);
-            portalCam.GetComponent<PortalCamera>().renderDepth = s_depth + 1;
-
-            // Reset camera values to match the parent cam
-            UpdateCameraModes(currentCam, portalCam);
-
-            Portal parentPortal = _currentlyRenderingPortal;
-            _currentlyRenderingPortal = this;
-
-            //Debug.Log("Rendering " + portalCam);
+            Camera camToRender = null;
+            CreatePortalObjects(Camera.current, out camToRender);
+            camToRender.GetComponent<PortalCamera>().renderDepth = s_depth + 1;
 
             s_depth++;
             if (VRDevice.isPresent) {
-                if (currentCam.stereoTargetEye == StereoTargetEyeMask.Both || currentCam.stereoTargetEye == StereoTargetEyeMask.Left) {
-                    RenderTexture leftEyeTexture = portalCam.GetComponent<PortalCamera>().RenderToTexture(Camera.MonoOrStereoscopicEye.Left);
+                if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Left) {
+                    RenderTexture leftEyeTexture = camToRender.GetComponent<PortalCamera>().RenderToTexture(Camera.MonoOrStereoscopicEye.Left);
                     _portalMaterial.SetTexture("_LeftEyeTexture", leftEyeTexture);
                 }
-                if (currentCam.stereoTargetEye == StereoTargetEyeMask.Both || currentCam.stereoTargetEye == StereoTargetEyeMask.Right) {
-                    RenderTexture rightEyeTexture = portalCam.GetComponent<PortalCamera>().RenderToTexture(Camera.MonoOrStereoscopicEye.Right);
+                if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Right) {
+                    RenderTexture rightEyeTexture = camToRender.GetComponent<PortalCamera>().RenderToTexture(Camera.MonoOrStereoscopicEye.Right);
                     _portalMaterial.SetTexture("_RightEyeTexture", rightEyeTexture);
                 }
             } else {
-                RenderTexture rightEyeTexture = portalCam.GetComponent<PortalCamera>().RenderToTexture(Camera.MonoOrStereoscopicEye.Mono);
+                RenderTexture rightEyeTexture = camToRender.GetComponent<PortalCamera>().RenderToTexture(Camera.MonoOrStereoscopicEye.Mono);
                 _portalMaterial.SetTexture("_RightEyeTexture", rightEyeTexture);
                 _backFaceMaterial.SetTexture("_RightEyeTexture", rightEyeTexture);
             }
             s_depth--;
-
-            //Debug.Log("Done rendering " + portalCam);
-
-            //Debug.Log("OnWillRenderObject EXIT : " + new string('*', s_depth) + gameObject.name + " " + _portalMaterial.GetTexture("_RightEyeTexture"));
-            _currentlyRenderingPortal = parentPortal;
-
-            if (s_depth < _maxRecursiveDepth) {
-                GetComponent<Renderer>().sharedMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
-                GetComponent<Renderer>().sharedMaterial.DisableKeyword("DONT_SAMPLE");
-            }
         }
         
         public Vector3[] GetCorners() {
@@ -415,34 +328,9 @@ namespace Portals {
             return cam;
         }
 
-        void UpdateCameraModes(Camera src, Camera dest) {
-            if (dest == null) {
-                return;
-            }
-            dest.clearFlags = src.clearFlags;
-            dest.backgroundColor = src.backgroundColor;
-            // update other values to match current camera.
-            // even if we are supplying custom camera&projection matrices,
-            // some of values are used elsewhere (e.g. skybox uses far plane)
-            dest.farClipPlane = src.farClipPlane;
-            dest.nearClipPlane = src.nearClipPlane;
-            dest.orthographic = src.orthographic;
-            dest.fieldOfView = src.fieldOfView;
-            dest.aspect = src.aspect;
-            dest.orthographicSize = src.orthographicSize;
-            dest.renderingPath = src.renderingPath;
-            dest.allowHDR = src.allowHDR;
-            dest.allowMSAA = src.allowMSAA;
-
-            // TODO: Fix occlusion culling
-            dest.useOcclusionCulling = src.useOcclusionCulling;
-        }
-
-        // On-demand create any objects we need for water
         void CreatePortalObjects(Camera currentCamera, out Camera portalCamera) {
             portalCamera = null;
 
-            // Camera for reflection
             _camToPortalCam.TryGetValue(currentCamera, out portalCamera);
             if (!portalCamera) // catch both not-in-dictionary and in-dictionary-but-deleted-GO
             {
@@ -637,7 +525,7 @@ namespace Portals {
             };
 
             Mesh mesh = new Mesh();
-            mesh.name = "Portal Backface";
+            mesh.name = "Portal Mesh";
             mesh.subMeshCount = 2;
             mesh.vertices = vertices;
             mesh.uv = uvs;

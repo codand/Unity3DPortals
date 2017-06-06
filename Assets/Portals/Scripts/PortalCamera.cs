@@ -168,6 +168,9 @@ namespace Portals {
                     break;
             }
 
+            // Copy parent camera's settings
+            UpdateCameraModes(_parent, _camera);
+
             // Adjust camera transform
             _portal.ApplyWorldToPortalTransform(this.transform, parentEyePosition, parentEyeRotation, _parent.transform.lossyScale);
 
@@ -183,12 +186,34 @@ namespace Portals {
                 _camera.ResetCullingMatrix();
             }
 
+
             _camera.targetTexture = texture;
-            //GL.invertCulling = true;
             _camera.Render();
-            //GL.invertCulling = false;
 
             return texture;
+        }
+
+        void UpdateCameraModes(Camera src, Camera dest) {
+            if (dest == null) {
+                return;
+            }
+            dest.clearFlags = src.clearFlags;
+            dest.backgroundColor = src.backgroundColor;
+            // update other values to match current camera.
+            // even if we are supplying custom camera&projection matrices,
+            // some of values are used elsewhere (e.g. skybox uses far plane)
+            dest.farClipPlane = src.farClipPlane;
+            dest.nearClipPlane = src.nearClipPlane;
+            dest.orthographic = src.orthographic;
+            dest.fieldOfView = src.fieldOfView;
+            dest.aspect = src.aspect;
+            dest.orthographicSize = src.orthographicSize;
+            dest.renderingPath = src.renderingPath;
+            dest.allowHDR = src.allowHDR;
+            dest.allowMSAA = src.allowMSAA;
+
+            // TODO: Fix occlusion culling
+            dest.useOcclusionCulling = src.useOcclusionCulling;
         }
 
         //void DecomposeMatrix4x4(Matrix4x4 matrix) {
