@@ -5,9 +5,10 @@ using UnityEngine.Rendering;
 using UnityEngine.VR;
 
 namespace Portals {
-    //[ExecuteInEditMode]
+    [ExecuteInEditMode]
     public class Portal : MonoBehaviour {
         [SerializeField] private Portal _exitPortal;
+        [SerializeField] private Texture _defaultTexture;
         [SerializeField] private Texture _transparencyMask;
         [SerializeField] private int _maxRecursiveDepth = 2;
         [SerializeField] private bool _fakeInfiniteRecursion = true;
@@ -16,7 +17,6 @@ namespace Portals {
         // TODO: Make this only appear when useProjectionMatrix is enabled
         [SerializeField] private float _clippingOffset = 0.25f;
         [SerializeField] private bool _copyGI = false;
-        //public Projector _projector;
 
         public Portal ExitPortal {
             get { return _exitPortal; }
@@ -73,21 +73,47 @@ namespace Portals {
         // This is static because recursion can occur on more than one portal
         private static int s_depth;
 
+        //TODO: figure out what the hell this is for
         // Used to prevent camera recusion in other portals
         // This is static because recursion can occur on more than one portal
         private static Portal _currentlyRenderingPortal;
 
-        // Cached material
+        // Mesh spawned when walking through a portal so that you can't clip through the portal
+        public static Mesh _mesh;
+        
+        // Per-portal instance of the backface object
+        private GameObject _backFace;
+
+        // Instanced material
         private Material _portalMaterial;
+
+        // Instanced backface material
+        private Material _backFaceMaterial;
 
         // Dictionary mapping objects to their clones on the other side of a portal
         private Dictionary<GameObject, GameObject> _objectToClone = new Dictionary<GameObject, GameObject>();
 
-        void OnEnable() {
-            if (!_portalMaterial) {
-                _portalMaterial = new Material(Shader.Find("Portal/PortalRenderTexture"));
-                _portalMaterial.name = "Runtime Material for " + this.gameObject.name;
-                GetComponent<MeshRenderer>().sharedMaterial = _portalMaterial;
+        void Awake() {
+            if (!_mesh) {
+                _mesh = MakeMesh();
+            }
+
+            GetComponent<MeshFilter>().sharedMesh = _mesh;
+
+            if (!_portalMaterial || !_backFaceMaterial) {
+                Material portalMaterial = new Material(Shader.Find("Portal/Portal"));
+                Material backFaceMaterial = new Material(Shader.Find("Portal/PortalBackface"));
+
+                portalMaterial.name = "Portal FrontFace (Instanced)";
+                backFaceMaterial.name = "Portal BackFace (Instanced)";
+
+                _portalMaterial = portalMaterial;
+                _backFaceMaterial = backFaceMaterial;
+
+                GetComponent<MeshRenderer>().sharedMaterials = new Material[] {
+                    _portalMaterial,
+                    _backFaceMaterial,
+                };
             }
         }
 
@@ -213,6 +239,7 @@ namespace Portals {
 
             // Set this 
             _portalMaterial.SetTexture("_TransparencyMask", _transparencyMask);
+            _portalMaterial.SetTexture("_DefaultTexture", _defaultTexture);
 
             //_wasSeenByCamera[Camera.current] = true;
             //SaveMaterialProperties();
@@ -250,8 +277,11 @@ namespace Portals {
                         //parentPC.lastFrameRenderTexture = parentCam.targetTexture;
                     } else {
                         GetComponent<Renderer>().sharedMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
-                        GetComponent<Renderer>().sharedMaterial.DisableKeyword("DONT_SAMPLE");
+                        GetComponent<Renderer>().sharedMaterial.EnableKeyword("DONT_SAMPLE");
                     }
+                } else {
+                    GetComponent<Renderer>().sharedMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
+                    GetComponent<Renderer>().sharedMaterial.EnableKeyword("DONT_SAMPLE");
                 }
                 return;
             }
@@ -282,13 +312,9 @@ namespace Portals {
             } else {
                 RenderTexture rightEyeTexture = portalCam.GetComponent<PortalCamera>().RenderToTexture(Camera.MonoOrStereoscopicEye.Mono);
                 _portalMaterial.SetTexture("_RightEyeTexture", rightEyeTexture);
+                _backFaceMaterial.SetTexture("_RightEyeTexture", rightEyeTexture);
             }
             s_depth--;
-
-            //if (_projector) {
-            //    _projector.aspectRatio = Camera.current.aspect;
-            //    _projector.material.SetTexture("_ShadowTex", _portalMaterial.GetTexture("_RightEyeTexture"));
-            //}
 
             //Debug.Log("Done rendering " + portalCam);
 
@@ -431,6 +457,8 @@ namespace Portals {
                 go.hideFlags = HideFlags.DontSave;
 
                 PortalCamera pc = go.AddComponent<PortalCamera>();
+                // TODO: Awake doesn't get called when using ExecuteInEditMode
+                pc.Awake();
                 pc.enterScene = this.gameObject.scene;
                 pc.exitScene = ExitPortal.gameObject.scene;
                 pc.parent = currentCamera;
@@ -442,41 +470,6 @@ namespace Portals {
                 }
 
                 _camToPortalCam[currentCamera] = portalCamera;
-
-                //CommandBuffer buf = new CommandBuffer();
-                //buf.name = "Copy GBuffer";
-
-                //int depthbuf = Shader.PropertyToID("_Depth");
-                //int gbuf0 = Shader.PropertyToID("_GBuf0");
-                //int gbuf1 = Shader.PropertyToID("_GBuf1");
-                //int gbuf2 = Shader.PropertyToID("_GBuf2");
-                //int gbuf3 = Shader.PropertyToID("_GBuf3");
-
-                //buf.ReleaseTemporaryRT(depthbuf);
-                //buf.ReleaseTemporaryRT(gbuf0);
-                //buf.ReleaseTemporaryRT(gbuf1);
-                //buf.ReleaseTemporaryRT(gbuf2);
-                //buf.ReleaseTemporaryRT(gbuf3);
-
-                //buf.GetTemporaryRT(depthbuf, portalCamera.pixelWidth, portalCamera.pixelHeight, 24, FilterMode.Point, RenderTextureFormat.RFloat, RenderTextureReadWrite.Default);
-                //buf.GetTemporaryRT(gbuf0, portalCamera.pixelWidth, portalCamera.pixelHeight, 24, FilterMode.Point, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default);
-                //buf.GetTemporaryRT(gbuf1, portalCamera.pixelWidth, portalCamera.pixelHeight, 24, FilterMode.Point, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default);
-                //buf.GetTemporaryRT(gbuf2, portalCamera.pixelWidth, portalCamera.pixelHeight, 24, FilterMode.Point, RenderTextureFormat.ARGB2101010, RenderTextureReadWrite.Default);
-                //buf.GetTemporaryRT(gbuf3, portalCamera.pixelWidth, portalCamera.pixelHeight, 24, FilterMode.Point, RenderTextureFormat.ARGB2101010, RenderTextureReadWrite.Default);
-
-                //buf.Blit(BuiltinRenderTextureType.ResolvedDepth, depthbuf);
-                //buf.Blit(BuiltinRenderTextureType.GBuffer0, gbuf0);
-                //buf.Blit(BuiltinRenderTextureType.GBuffer1, gbuf1);
-                //buf.Blit(BuiltinRenderTextureType.GBuffer2, gbuf2);
-                //buf.Blit(BuiltinRenderTextureType.GBuffer3, gbuf3);
-
-                //buf.SetGlobalTexture("_Depth", depthbuf);
-                //buf.SetGlobalTexture("_GBuf0", gbuf0);
-                //buf.SetGlobalTexture("_GBuf1", gbuf1);
-                //buf.SetGlobalTexture("_GBuf2", gbuf2);
-                //buf.SetGlobalTexture("_GBuf3", gbuf3);
-
-                //portalCamera.AddCommandBuffer(CameraEvent.AfterEverything, buf);
             }
         }
 
@@ -571,55 +564,87 @@ namespace Portals {
             //UnityEditor.EditorApplication.isPaused = true;
         }
 
-        Vector3 Plane3Intersect(Plane p1, Plane p2, Plane p3) { //get the intersection point of 3 planes
-            return ((-p1.distance * Vector3.Cross(p2.normal, p3.normal)) +
-                    (-p2.distance * Vector3.Cross(p3.normal, p1.normal)) +
-                    (-p3.distance * Vector3.Cross(p1.normal, p2.normal))) /
-                (Vector3.Dot(p1.normal, Vector3.Cross(p2.normal, p3.normal)));
-        }
-
-        void DrawFrustumGizmo(Matrix4x4 matrix) {
-            Vector3[] nearCorners = new Vector3[4]; //Approx'd nearplane corners
-            Vector3[] farCorners = new Vector3[4]; //Approx'd farplane corners
-            Plane[] camPlanes = GeometryUtility.CalculateFrustumPlanes(matrix); //get planes from matrix
-            Plane temp = camPlanes[1]; camPlanes[1] = camPlanes[2]; camPlanes[2] = temp; //swap [1] and [2] so the order is better for the loop
-
-            for (int i = 0; i < 4; i++) {
-                nearCorners[i] = Plane3Intersect(camPlanes[4], camPlanes[i], camPlanes[(i + 1) % 4]); //near corners on the created projection matrix
-                farCorners[i] = Plane3Intersect(camPlanes[5], camPlanes[i], camPlanes[(i + 1) % 4]); //far corners on the created projection matrix
-            }
-
-            for (int i = 0; i < 4; i++) {
-                Gizmos.DrawLine(nearCorners[i], nearCorners[(i + 1) % 4]); //near corners on the created projection matrix
-                Gizmos.DrawLine(farCorners[i], farCorners[(i + 1) % 4]); //far corners on the created projection matrix
-                Gizmos.DrawLine(nearCorners[i], farCorners[i]); //sides of the created projection matrix
-            }
-        }
-
-        void OnDrawGizmosSelected() {
-            if (!Camera.main) {
-                return;
-            }
-            Camera cam;
-            _camToPortalCam.TryGetValue(Camera.main, out cam);
-            if (cam) {
-                if (_useCullingMatrix) {
-                    Gizmos.color = new Color(1.0f, 0.0f, 0.0f, 1.0f);
-                    DrawFrustumGizmo(cam.cullingMatrix);
-                }
-                if (_useProjectionMatrix) {
-                    // TODO: ... I don't know, this is ugly
-                    //Gizmos.color = new Color(0.0f, 1.0f, 0.0f, 1.0f); // Green 50%
-                    //DrawFrustumGizmo(cam.projectionMatrix * cam.worldToCameraMatrix);
-                }
-            }
-        }
-
         void OnDrawGizmos() {
             if (ExitPortal) {
                 Gizmos.color = Color.magenta;
                 Gizmos.DrawLine(this.transform.position, ExitPortal.transform.position);
             }
+        }
+
+        private Mesh MakeMesh() {
+            // Front:
+            //  1  2
+            //  0  3
+
+            // Back
+            //  5  6
+            //  4  7
+
+            Vector3[] vertices = new Vector3[] {
+                // Front
+                new Vector3(-0.5f, -0.5f, 0),
+                new Vector3(-0.5f,  0.5f, 0),
+                new Vector3( 0.5f,  0.5f, 0),
+                new Vector3( 0.5f, -0.5f, 0),
+                
+                // Back
+                new Vector3(-0.5f, -0.5f, 1.0f),
+                new Vector3(-0.5f,  0.5f, 1.0f),
+                new Vector3( 0.5f,  0.5f, 1.0f),
+                new Vector3( 0.5f, -0.5f, 1.0f),
+            };
+
+            Vector2[] uvs = new Vector2[] {
+                // Front
+                new Vector2(0, 0),
+                new Vector2(0, 1),
+                new Vector2(1, 1),
+                new Vector2(1, 0),
+
+                // Back
+                new Vector2(0, 0),
+                new Vector2(0, 1),
+                new Vector2(1, 1),
+                new Vector2(1, 0),
+            };
+
+            int[] frontFaceTriangles = new int[] {
+                //Front
+                0, 1, 2,
+                2, 3, 0
+            };
+
+            int[] backFaceTriangles = new int[] {
+                // Left
+                0, 1, 5,
+                5, 4, 0,
+
+                // Back
+                4, 5, 6,
+                6, 7, 4,
+
+                // Right
+                7, 6, 2,
+                2, 3, 7,
+
+                // Top
+                6, 5, 1,
+                1, 2, 6,
+
+                // Bottom
+                0, 4, 7,
+                7, 3, 0
+            };
+
+            Mesh mesh = new Mesh();
+            mesh.name = "Portal Backface";
+            mesh.subMeshCount = 2;
+            mesh.vertices = vertices;
+            mesh.uv = uvs;
+            mesh.SetTriangles(frontFaceTriangles, 0);
+           mesh.SetTriangles(backFaceTriangles, 1);
+
+            return mesh;
         }
     }
 }

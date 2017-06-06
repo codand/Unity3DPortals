@@ -83,7 +83,7 @@ namespace Portals {
         RenderSettingsStruct _savedRenderSettings = new RenderSettingsStruct();
         RenderSettingsStruct _sceneRenderSettings = new RenderSettingsStruct();
 
-        void Awake() {
+        public void Awake() {
             _camera = GetComponent<Camera>();
         }
 
