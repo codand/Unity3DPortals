@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -26,7 +26,7 @@ namespace Portals {
         }
 
         private void OnPortalExit(Portal portal) {
-            Vector3 newUp = portal.WorldToPortalQuaternion() * upVector;
+            Vector3 newUp = portal.PortalRotation() * upVector;
             upVector = newUp.normalized;
         }
     }

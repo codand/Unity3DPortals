@@ -255,77 +255,57 @@ namespace Portals {
                 lowerRight,
             };
         }
-        
-        public float GetScaleMultiplier() {
-            float enterScale = Helpers.VectorInternalAverage(this.transform.lossyScale);
-            float exitScale = Helpers.VectorInternalAverage(ExitPortal.transform.lossyScale);
 
-            return exitScale / enterScale;
+        public float PortalScaleAverage() {
+            return Helpers.VectorInternalAverage(this.PortalScale());
+        }
+        
+        public Vector3 PortalScale() {
+            return new Vector3(
+                ExitPortal.transform.lossyScale.x / this.transform.lossyScale.x,
+                ExitPortal.transform.lossyScale.y / this.transform.lossyScale.y,
+                ExitPortal.transform.lossyScale.z / this.transform.lossyScale.z);
         }
 
-        public Quaternion WorldToPortalQuaternion() {
+        public Quaternion PortalRotation() {
             // Transforms a quaternion or vector into the second portal's space.
             // We have to flip the camera in between so that we face the outside direction of the portal
             return ExitPortal.transform.rotation * Quaternion.Euler(180, 0, 180) * Quaternion.Inverse(this.transform.rotation);
         }
 
-        //public Matrix4x4 WorldToPortalMatrix() {
-        //    Vector3 translation = this.transform.position - ExitPortal.transform.position;
-        //    //Vector3 translation = Vector3.zero;
-        //    //Quaternion rotation = this.transform.rotation;
-        //    //Quaternion rotation = ExitPortal.transform.rotation * Quaternion.Inverse(this.transform.rotation);
-        //    //Quaternion rotation = WorldToPortalQuaternion();
-        //    //Quaternion rotation = Quaternion.identity;
-        //    Quaternion rotation = Quaternion.Euler(EULER_ANGLES);
-        //    //Debug.Log(translation);
-        //    Vector3 scale = new Vector3(1f, 1f, 1f); // the last negative scale makes it point in the right direction
-        //    return Matrix4x4.TRS(translation, rotation, scale);
-        //}
+        public Matrix4x4 PortalMatrix() {
+            Quaternion flip = Quaternion.Euler(0, 180, 0);
 
-        public Vector3 MultiplyPoint(Vector3 point) {
-            Vector3 positionDelta = point - this.transform.position;
-            Vector3 scaledPositionDelta = positionDelta * GetScaleMultiplier();
-            Vector3 transformedDelta = WorldToPortalQuaternion() * scaledPositionDelta;
+            Matrix4x4 TRSEnter = Matrix4x4.TRS(
+                this.transform.position,
+                this.transform.rotation,
+                this.transform.lossyScale);
+            Matrix4x4 TRSExit = Matrix4x4.TRS(
+                ExitPortal.transform.position,
+                ExitPortal.transform.rotation * flip, // Flip around Y axis
+                ExitPortal.transform.lossyScale);
 
-            return ExitPortal.transform.position + transformedDelta;
+            return TRSExit * TRSEnter.inverse; // Place origin at portal, then apply Exit portal's transform
         }
 
-        public void ApplyWorldToPortalTransform(Transform target, Transform reference) {
-            Quaternion worldToPortal = WorldToPortalQuaternion();
+        public void ApplyWorldToPortalTransform(Transform target, Vector3 referencePosition, Quaternion referenceRotation, Vector3 referenceScale, bool ignoreScale = false) {
+            Vector3 inversePosition = transform.InverseTransformPoint(referencePosition);
 
-            // Scale
-            float scale = GetScaleMultiplier();
+            Quaternion flip = Quaternion.Euler(0, 180, 0);
 
-            // Translate
-            Vector3 positionDelta = reference.position - this.transform.position;
-            Vector3 scaledPositionDelta = positionDelta * scale;
-            Vector3 transformedDelta = worldToPortal * scaledPositionDelta;
-
-            target.position = ExitPortal.transform.position + transformedDelta;
-            target.rotation = worldToPortal * reference.rotation;
-            target.localScale = reference.localScale * scale;
+            target.position = ExitPortal.transform.TransformPoint(flip * inversePosition);
+            target.rotation = PortalRotation() * referenceRotation;
+            if (!ignoreScale) {
+                Vector3 scale = PortalScale();
+                target.localScale = new Vector3(
+                    referenceScale.x * scale.x,
+                    referenceScale.y * scale.y,
+                    referenceScale.z * scale.z);
+            }
         }
 
-        public void ApplyWorldToPortalTransform(Transform target, Vector3 referencePosition, Quaternion referenceRotation, Vector3 referenceScale) {
-            Quaternion worldToPortal = WorldToPortalQuaternion();
-
-            // Scale
-            float scale = GetScaleMultiplier();
-
-            // Translate
-            Vector3 positionDelta = referencePosition - this.transform.position;
-            Vector3 scaledPositionDelta = positionDelta * scale;
-            Vector3 transformedDelta = worldToPortal * scaledPositionDelta;
-
-            target.position = ExitPortal.transform.position + transformedDelta;
-            target.rotation = worldToPortal * referenceRotation;
-            target.localScale = referenceScale * scale;
-        }
-
-        public Camera GetChildCamera(Camera camera) {
-            Camera cam;
-            _camToPortalCam.TryGetValue(camera, out cam);
-            return cam;
+        public void ApplyWorldToPortalTransform(Transform target, Transform reference, bool ignoreScale = false) {
+            ApplyWorldToPortalTransform(target, reference.position, reference.rotation, reference.lossyScale, ignoreScale);
         }
 
         void CreatePortalObjects(Camera currentCamera, out Camera portalCamera) {
@@ -441,8 +421,8 @@ namespace Portals {
             ApplyWorldToPortalTransform(collider.gameObject.transform, collider.gameObject.transform);
 
             if (rigidbody != null) {
-                float scaleDelta = this.GetScaleMultiplier();
-                rigidbody.velocity = WorldToPortalQuaternion() * rigidbody.velocity * scaleDelta;
+                float scaleDelta = this.PortalScaleAverage();
+                rigidbody.velocity = PortalRotation() * rigidbody.velocity * scaleDelta;
                 rigidbody.mass *= scaleDelta * scaleDelta * scaleDelta;
             }
             collider.gameObject.SendMessage("OnPortalExit", this, SendMessageOptions.DontRequireReceiver);

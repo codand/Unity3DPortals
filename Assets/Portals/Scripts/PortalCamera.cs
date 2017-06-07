@@ -160,6 +160,7 @@ namespace Portals {
                 case Camera.MonoOrStereoscopicEye.Left:
                     _leftEyeRenderTexture = texture;
                     _camera.stereoTargetEye = StereoTargetEyeMask.Left;
+                    // TODO: Determine if GetStereoRotation is necessary
                     parentEyePosition = GetStereoPosition(_parent, VRNode.LeftEye);
                     parentEyeRotation = GetStereoRotation(_parent, VRNode.LeftEye);
                     break;
@@ -182,7 +183,8 @@ namespace Portals {
             UpdateCameraModes(_parent, _camera);
 
             // Adjust camera transform
-            _portal.ApplyWorldToPortalTransform(this.transform, parentEyePosition, parentEyeRotation, _parent.transform.lossyScale);
+            //_portal.ApplyWorldToPortalTransform(this.transform, parentEyePosition, parentEyeRotation, _parent.transform.lossyScale);
+            _portal.ApplyWorldToPortalTransform(this.transform, parentEyePosition, parentEyeRotation, Vector3.zero, true);
 
             if (_portal.UseProjectionMatrix) {
                 _camera.projectionMatrix = CalculateProjectionMatrix(eye);

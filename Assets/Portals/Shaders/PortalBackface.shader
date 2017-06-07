@@ -22,6 +22,7 @@ Shader "Portal/PortalBackface"
 			ZWrite Off
 			Lighting Off
 			//Cull Back
+			Offset -0.001, -100
 
 			CGPROGRAM
 			#pragma vertex vert

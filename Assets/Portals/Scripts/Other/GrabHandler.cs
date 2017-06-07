@@ -77,7 +77,7 @@ namespace Portals {
                 }
 
                 // Multiply joint values by portal scale
-                float scaleMultiplier = portal.GetScaleMultiplier();
+                float scaleMultiplier = portal.PortalScaleAverage();
 
                 SoftJointLimit softJointLimit = _joint.linearLimit;
                 softJointLimit.limit *= scaleMultiplier;
@@ -164,7 +164,7 @@ namespace Portals {
         }
 
         void OnPortalExit(Portal portal) {
-            _pickupRange *= portal.GetScaleMultiplier();
+            _pickupRange *= portal.PortalScaleAverage();
         }
 
         void Update() {
