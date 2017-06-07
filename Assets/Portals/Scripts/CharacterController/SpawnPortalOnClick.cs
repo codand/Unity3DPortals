@@ -11,6 +11,10 @@ public class SpawnPortalOnClick : MonoBehaviour {
     Portal _rightPortal;
 
     void Awake() {
+        if (!isActiveAndEnabled) {
+            return;
+        }
+
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
         _leftPortal = SpawnPortal(Vector3.zero, Quaternion.identity);
@@ -18,7 +22,9 @@ public class SpawnPortalOnClick : MonoBehaviour {
     }
 
     void Start() {
-
+        if (!isActiveAndEnabled) {
+            return;
+        }
 
         _leftPortal.ExitPortal = _rightPortal;
         _rightPortal.ExitPortal = _leftPortal;

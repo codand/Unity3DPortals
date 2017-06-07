@@ -87,6 +87,14 @@ namespace Portals {
             _camera = GetComponent<Camera>();
         }
 
+        private int _framesSinceLastUse = 0;
+        void Update() {
+            if (_framesSinceLastUse > 0) {
+                Destroy(this.gameObject);
+            }
+            _framesSinceLastUse++;
+        }
+
         void ReleaseTemporaryRenderTextureDelayed(RenderTexture texture) {
             StartCoroutine(ReleaseTemporaryRenderTextureDelayedRoutine(texture));
         }
@@ -136,6 +144,8 @@ namespace Portals {
         }
 
         public RenderTexture RenderToTexture(Camera.MonoOrStereoscopicEye eye) {
+            _framesSinceLastUse = 0;
+
             lastFrameWorldToCameraMatrix = _camera.worldToCameraMatrix;
             lastFrameProjectionMatrix = _camera.projectionMatrix;
             lastFrameRenderTexture = _camera.targetTexture;
