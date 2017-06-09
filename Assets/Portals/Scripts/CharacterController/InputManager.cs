@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Portals;
@@ -37,10 +37,14 @@ public class InputManager : MonoBehaviour {
 #else
         // In game actions
         float rotationX = Input.GetAxis("Mouse X") * _mouseSensitivity;
-        _playerController.Rotate(rotationX);
+        if (rotationX != 0) {
+            _playerController.Rotate(rotationX);
+        }
 
         float rotationY = Input.GetAxis("Mouse Y") * _mouseSensitivity;
-        _playerController.RotateHead(rotationY);
+        if (rotationY != 0) {
+            _playerController.RotateHead(rotationY);
+        }
 
         if (Input.GetKeyDown(KeyCode.Space)) {
             _playerController.Jump();

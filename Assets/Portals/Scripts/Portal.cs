@@ -17,6 +17,7 @@ namespace Portals {
         // TODO: Make this only appear when useProjectionMatrix is enabled
         [SerializeField] private float _clippingOffset = 0.25f;
         [SerializeField] private bool _copyGI = false;
+        [SerializeField] private Collider _attachedCollider;
 
         public Portal ExitPortal {
             get { return _exitPortal; }
@@ -60,7 +61,14 @@ namespace Portals {
             set { _copyGI = value; }
         }
 
-        public List<Collider> ignoredColliders = new List<Collider>();
+        public Collider AttachedCollider {
+            get { return _attachedCollider; }
+            set {
+                _attachedCollider = value;
+            }
+        }
+
+        //public List<Collider> ignoredColliders = new List<Collider>();
 
         public delegate void PortalEvent(Portal portal, GameObject obj);
         //public static event PortalEvent onPortalEnter;
@@ -362,31 +370,22 @@ namespace Portals {
             }
         }
 
+        void IgnoreCollisions(Collider collider, bool ignore) {
+            if (AttachedCollider) {
+                Physics.IgnoreCollision(collider, AttachedCollider, ignore);
+            }
+            //if (ExitPortal && ExitPortal.AttachedCollider) {
+            //    Physics.IgnoreCollision(collider, ExitPortal.AttachedCollider, ignore);
+            //}
+        }
 
         void OnTriggerEnter(Collider collider) {
             if (!ExitPortal) {
                 return;
             }
 
-            foreach (Collider other in ignoredColliders) {
-                Physics.IgnoreCollision(collider, other, true);
-            }
-            foreach (Collider other in ExitPortal.ignoredColliders) {
-                Physics.IgnoreCollision(collider, other, true);
-            }
-            //SpawnClone(collider.gameObject);
-        }
-
-        void OnTriggerStay(Collider collider) {
-            if (!ExitPortal) {
-                return;
-            }
-
-            Vector3 normal = transform.forward;
-            float d = -1 * Vector3.Dot(normal, transform.position);
-            bool throughPortal = new Plane(normal, d).GetSide(collider.transform.position);
-            if (throughPortal) {
-                OnPortalExit(collider);
+            if (AttachedCollider) {
+                Physics.IgnoreCollision(collider, AttachedCollider, true);
             }
         }
 
@@ -395,17 +394,25 @@ namespace Portals {
                 return;
             }
 
-            // Restore collisions with the back of the portal doorway
-            foreach (Collider other in ignoredColliders) {
-                Physics.IgnoreCollision(collider, other, false);
+            if (AttachedCollider) {
+                Physics.IgnoreCollision(collider, AttachedCollider, false);
             }
-            foreach (Collider other in ExitPortal.ignoredColliders) {
-                Physics.IgnoreCollision(collider, other, false);
-            }
-            //DestroyClone(collider.gameObject);
         }
 
-        void OnPortalExit(Collider collider) {
+        void OnTriggerStay(Collider collider) {
+            if (!ExitPortal) {
+                return;
+            }
+            //Debug.Log(collider.name + " stayed " + this.name);
+            Vector3 normal = transform.forward;
+            float d = -1 * Vector3.Dot(normal, transform.position);
+            bool throughPortal = new Plane(normal, d).GetSide(collider.transform.position);
+            if (throughPortal) {
+                OnPortalExit(collider);
+            }
+        }
+
+        public void OnPortalExit(Collider collider) {
             PortalLight light = collider.GetComponent<PortalLight>();
             if(light) {
                 return;
@@ -416,6 +423,10 @@ namespace Portals {
             if (controller == null && rigidbody == null) {
                 Debug.LogError("Object must have a Rigidbody or CharacterController to pass through the portal");
                 return;
+            }
+
+            if (ExitPortal.AttachedCollider) {
+                Physics.IgnoreCollision(collider, ExitPortal.AttachedCollider, true);
             }
 
             ApplyWorldToPortalTransform(collider.gameObject.transform, collider.gameObject.transform);

@@ -66,8 +66,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
             if (Physics.Raycast(ray, out hit, Mathf.Infinity, _canHit)) {
                 Portal portal = leftClick ? _leftPortal : _rightPortal;
 
-                portal.ignoredColliders.Clear();
-                portal.ignoredColliders.Add(hit.collider);
+                portal.AttachedCollider = hit.collider;
 
                 Quaternion rotation = CalculateRotation(Camera.main.transform.forward, hit.normal);
                 portal.transform.position = hit.point;
