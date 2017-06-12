@@ -2,11 +2,11 @@ using System;
 using UnityEngine;
 using UnityStandardAssets.CrossPlatformInput;
 
-namespace UnityStandardAssets.Characters.FirstPerson
+namespace Portals.Characters.FirstPerson
 {
     [RequireComponent(typeof (Rigidbody))]
     [RequireComponent(typeof (CapsuleCollider))]
-    public class RigidbodyFirstPersonController : MonoBehaviour
+    public class PortalRigidbodyFirstPersonController : MonoBehaviour
     {
         [Serializable]
         public class MovementSettings
@@ -92,7 +92,7 @@ namespace UnityStandardAssets.Characters.FirstPerson
 
         public Vector3 Velocity
         {
-            get { Debug.Log(this.gameObject);  return m_RigidBody.velocity; }
+            get { return m_RigidBody.velocity; }
         }
 
         public bool Grounded

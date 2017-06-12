@@ -387,6 +387,8 @@ namespace Portals {
             if (AttachedCollider) {
                 Physics.IgnoreCollision(collider, AttachedCollider, true);
             }
+
+            collider.gameObject.SendMessage("OnPortalTriggered", this, SendMessageOptions.DontRequireReceiver);
         }
 
         void OnTriggerExit(Collider collider) {
@@ -418,9 +420,9 @@ namespace Portals {
                 return;
             }
 
-            CharacterController controller = collider.GetComponent<CharacterController>();
+            CharacterController characterController = collider.GetComponent<CharacterController>();
             Rigidbody rigidbody = collider.GetComponent<Rigidbody>();
-            if (controller == null && rigidbody == null) {
+            if (characterController == null && rigidbody == null) {
                 Debug.LogError("Object must have a Rigidbody or CharacterController to pass through the portal");
                 return;
             }
@@ -436,6 +438,7 @@ namespace Portals {
                 rigidbody.velocity = PortalRotation() * rigidbody.velocity * scaleDelta;
                 rigidbody.mass *= scaleDelta * scaleDelta * scaleDelta;
             }
+
             collider.gameObject.SendMessage("OnPortalExit", this, SendMessageOptions.DontRequireReceiver);
             if (onPortalExit != null)
                 onPortalExit(this, collider.gameObject);
