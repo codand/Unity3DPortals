@@ -64,6 +64,7 @@ namespace Portals {
         public Collider AttachedCollider {
             get { return _attachedCollider; }
             set {
+                _portalColliderTrigger.ResetIgnoredCollisions();
                 _attachedCollider = value;
             }
         }
@@ -99,11 +100,18 @@ namespace Portals {
         private Dictionary<Camera, bool> _wasRenderedByCamera = new Dictionary<Camera, bool>();
         private Stack<Texture> _savedTextures = new Stack<Texture>();
 
+        private PortalColliderTrigger _portalColliderTrigger;
+
         void Awake() {
+            _portalColliderTrigger = GetComponentInChildren<PortalColliderTrigger>();
+            if (!_portalColliderTrigger) {
+                throw new System.Exception("Can't find PortalColliderTrigger on child object");
+            }
+
+
             if (!_mesh) {
                 _mesh = MakeMesh();
             }
-
             GetComponent<MeshFilter>().sharedMesh = _mesh;
 
             if (!_portalMaterial || !_backFaceMaterial) {
@@ -367,37 +375,6 @@ namespace Portals {
             _objectToClone.TryGetValue(obj, out clone);
             if (clone) {
                 Destroy(clone);
-            }
-        }
-
-        void IgnoreCollisions(Collider collider, bool ignore) {
-            if (AttachedCollider) {
-                Physics.IgnoreCollision(collider, AttachedCollider, ignore);
-            }
-            //if (ExitPortal && ExitPortal.AttachedCollider) {
-            //    Physics.IgnoreCollision(collider, ExitPortal.AttachedCollider, ignore);
-            //}
-        }
-
-        void OnTriggerEnter(Collider collider) {
-            if (!ExitPortal) {
-                return;
-            }
-
-            if (AttachedCollider) {
-                Physics.IgnoreCollision(collider, AttachedCollider, true);
-            }
-
-            collider.gameObject.SendMessage("OnPortalTriggered", this, SendMessageOptions.DontRequireReceiver);
-        }
-
-        void OnTriggerExit(Collider collider) {
-            if (!ExitPortal) {
-                return;
-            }
-
-            if (AttachedCollider) {
-                Physics.IgnoreCollision(collider, AttachedCollider, false);
             }
         }
 

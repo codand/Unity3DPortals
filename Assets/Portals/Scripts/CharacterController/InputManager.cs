@@ -10,6 +10,9 @@ public class InputManager : MonoBehaviour {
 
     void Awake() {
         _playerController = GetComponent<RigidbodyCharacterController>();
+
+        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Locked;
     }
 
 
@@ -56,6 +59,15 @@ public class InputManager : MonoBehaviour {
 
         if (Input.GetMouseButtonDown(0)) {
             //GetComponent<PowerKinesis>().Fire(Camera.main);
+        }
+
+        if (Input.GetKeyUp(KeyCode.Escape)) {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+        if (Input.GetMouseButtonDown(0)) {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
 #endif
     }

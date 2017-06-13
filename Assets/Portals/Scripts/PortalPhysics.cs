@@ -7,9 +7,9 @@ namespace Portals {
         // TODO: Figure this shit out
         public static int PortalLayer = 1 << 8;
 
-        private const float Epsilon = 0.0001f;
+        private const float Epsilon = 0.001f;
 
-        private static bool RecursiveRaycast(Vector3 origin, Vector3 direction, out RaycastHit hitInfo, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction, int recursiveDepth) {
+        private static bool RecursiveRaycast(Vector3 origin, Vector3 direction, out RaycastHit hitInfo, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction, int recursiveDepth, Portal fromPortal=null) {
             layerMask &= ~PortalLayer; // Don't allow raycasting for portals
 
             // Need to raycast twice because portals and objects can share the same location which would cause fighting
@@ -19,7 +19,6 @@ namespace Portals {
 
             // Recurse we hit a portal and we did not hit an object OR if we hit both, but the portal is closer
             bool recurse = (portalHit && !objectHit) || (portalHit && objectHit && portalHitInfo.distance <= objectHitInfo.distance + Epsilon);
-
             if (recurse) {
                 // We hit a portal
                 Portal portal = portalHitInfo.collider.GetComponent<Portal>();
@@ -35,11 +34,12 @@ namespace Portals {
                 }
 
                 Matrix4x4 portalMatrix = portal.PortalMatrix();
-                Vector3 newOrigin = portalMatrix.MultiplyPoint3x4(portalHitInfo.point);
                 Vector3 newDirection = portalMatrix.MultiplyVector(direction);
-                float newDistance = maxDistance - portalHitInfo.distance;
+                // Offset by Epsilon so we can't hit the exit portal on our way out
+                Vector3 newOrigin = portalMatrix.MultiplyPoint3x4(portalHitInfo.point) + newDirection * Epsilon;
+                float newDistance = maxDistance - portalHitInfo.distance - Epsilon;
 
-                return RecursiveRaycast(newOrigin, newDirection, out hitInfo, newDistance, layerMask, queryTriggerInteraction, recursiveDepth+1);
+                return RecursiveRaycast(newOrigin, newDirection, out hitInfo, newDistance, layerMask, queryTriggerInteraction, recursiveDepth+1, portal);
             } else {
                 // We hit an object
                 hitInfo = objectHitInfo;

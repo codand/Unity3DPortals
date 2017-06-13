@@ -7,16 +7,35 @@ namespace Portals {
     public class PortalColliderTrigger : MonoBehaviour {
         [SerializeField] private Portal _portal;
 
+        private int _triggerCount = 0;
+        private List<Collider> _ignoredColliders = new List<Collider>();
+
+        public void ResetIgnoredCollisions() {
+            for(int i = 0; i < _ignoredColliders.Count; i++) {
+                Collider collider = _ignoredColliders[i];
+                if (collider) {
+                    IgnoreCollisions(collider, false);
+                }
+            }
+        }
+
         void IgnoreCollisions(Collider collider, bool ignore) {
             if (_portal.AttachedCollider) {
+                if (ignore) {
+                    _ignoredColliders.Add(collider);
+                } else {
+                    _ignoredColliders.Remove(collider);
+                }
                 Physics.IgnoreCollision(collider, _portal.AttachedCollider, ignore);
-            }
-            if (_portal.ExitPortal && _portal.ExitPortal.AttachedCollider) {
-                Physics.IgnoreCollision(collider, _portal.ExitPortal.AttachedCollider, ignore);
             }
         }
 
         void OnTriggerEnter(Collider collider) {
+            _triggerCount += 1;
+            if (_triggerCount > 1) {
+                return;
+            }
+
             if (!_portal.ExitPortal) {
                 return;
             }
@@ -25,6 +44,11 @@ namespace Portals {
         }
 
         void OnTriggerExit(Collider collider) {
+            _triggerCount -= 1;
+            if (_triggerCount > 0) {
+                return;
+            }
+
             if (!_portal.ExitPortal) {
                 return;
             }

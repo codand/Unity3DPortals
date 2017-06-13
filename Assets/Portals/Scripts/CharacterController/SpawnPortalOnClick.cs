@@ -15,8 +15,6 @@ public class SpawnPortalOnClick : MonoBehaviour {
             return;
         }
 
-        Cursor.visible = false;
-        Cursor.lockState = CursorLockMode.Locked;
         _leftPortal = SpawnPortal(Vector3.zero, Quaternion.identity);
         _rightPortal = SpawnPortal(Vector3.zero, Quaternion.identity);
     }
@@ -52,7 +50,6 @@ public class SpawnPortalOnClick : MonoBehaviour {
         }
         Quaternion alongNormal = Quaternion.LookRotation(-normal);
         Quaternion rotation = faceCamera * alongNormal;
-
         return rotation;
     }
 
@@ -64,13 +61,15 @@ public class SpawnPortalOnClick : MonoBehaviour {
             Ray ray = new Ray(Camera.main.transform.position, Camera.main.transform.forward);
             RaycastHit hit;
             if (PortalPhysics.Raycast(ray, out hit, Mathf.Infinity, _canHit)) {
+                
                 Portal portal = leftClick ? _leftPortal : _rightPortal;
 
-                portal.AttachedCollider = hit.collider;
 
                 Quaternion rotation = CalculateRotation(Camera.main.transform.forward, hit.normal);
                 portal.transform.position = hit.point;
                 portal.transform.rotation = rotation;
+
+                portal.AttachedCollider = hit.collider;
 
                 portal.gameObject.SetActive(true);
             }
