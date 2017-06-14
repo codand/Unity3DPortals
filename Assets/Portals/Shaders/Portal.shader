@@ -25,7 +25,7 @@ Shader "Portal/Portal"
 			//	Pass Replace
 			//}
 			Blend SrcAlpha OneMinusSrcAlpha
-			Offset -1.0, -0.1
+			Offset -0.01, -0.1
 			ZWrite Off
 			Lighting Off
 			//ColorMask 0

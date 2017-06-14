@@ -1,7 +1,9 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Portals;
+using System;
+using System.Reflection;
 
 public class PortalClone : MonoBehaviour {
     public Transform target;

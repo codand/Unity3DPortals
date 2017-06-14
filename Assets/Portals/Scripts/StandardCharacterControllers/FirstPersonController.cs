@@ -266,7 +266,7 @@ namespace Portals.Characters.FirstPerson
         }
 
 
-        private void OnPortalExit(Portal portal) {
+        private void OnPortalTeleport(Portal portal) {
             m_MoveDir = portal.PortalMatrix().MultiplyVector(m_MoveDir);
             if (m_TeleportRoutine != null) {
                 StopCoroutine(m_TeleportRoutine);

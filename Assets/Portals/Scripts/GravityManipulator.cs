@@ -25,7 +25,7 @@ namespace Portals {
             }
         }
 
-        private void OnPortalExit(Portal portal) {
+        private void OnPortalTeleport(Portal portal) {
             Vector3 newUp = portal.PortalRotation() * upVector;
             upVector = newUp.normalized;
         }

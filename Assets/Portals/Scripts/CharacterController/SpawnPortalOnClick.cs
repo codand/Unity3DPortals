@@ -60,7 +60,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
         if (leftClick || rightClick) {
             Ray ray = new Ray(Camera.main.transform.position, Camera.main.transform.forward);
             RaycastHit hit;
-            if (PortalPhysics.Raycast(ray, out hit, Mathf.Infinity, _canHit)) {
+            if (Physics.Raycast(ray, out hit, Mathf.Infinity, _canHit)) {
                 
                 Portal portal = leftClick ? _leftPortal : _rightPortal;
 

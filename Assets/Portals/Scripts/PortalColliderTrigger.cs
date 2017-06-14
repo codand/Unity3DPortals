@@ -66,7 +66,7 @@ namespace Portals {
         //    float d = -1 * Vector3.Dot(normal, transform.position);
         //    bool throughPortal = new Plane(normal, d).GetSide(collider.transform.position);
         //    if (throughPortal) {
-        //        _portal.OnPortalExit(collider);
+        //        _portal.OnPortalTeleport(collider);
         //    }
         //}
     }

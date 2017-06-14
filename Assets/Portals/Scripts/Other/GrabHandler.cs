@@ -49,11 +49,11 @@ namespace Portals {
         }
 
         void OnEnable() {
-            Portal.onPortalExit += HandleObjectCarriedThroughPortal;
+            Portal.onPortalTeleportGlobal += HandleObjectCarriedThroughPortal;
         }
 
         void OnDisable() {
-            Portal.onPortalExit -= HandleObjectCarriedThroughPortal;
+            Portal.onPortalTeleportGlobal -= HandleObjectCarriedThroughPortal;
         }
 
         void HandleObjectCarriedThroughPortal(Portal portal, GameObject obj) {
@@ -163,7 +163,7 @@ namespace Portals {
             }
         }
 
-        void OnPortalExit(Portal portal) {
+        void OnPortalTeleport(Portal portal) {
             _pickupRange *= portal.PortalScaleAverage();
         }
 

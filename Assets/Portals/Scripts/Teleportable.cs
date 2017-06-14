@@ -4,9 +4,19 @@ using UnityEngine;
 
 namespace Portals {
     public class Teleportable : MonoBehaviour {
+        //private GameObject _clone;
 
-        void OnPortalEnter(Portal portal) {
-            Debug.Log("Entered portal " + portal.name);
-        }
+        //void Start() {
+        //    _clone = PortalClone.Clone(this.gameObject);
+        //    _clone.SetActive(false);
+        //}
+
+        //void OnPortalEnter(Portal portal) {
+        //    _clone.SetActive(true);
+        //}
+
+        //void OnPortalExit(Portal portal) {
+        //    _clone.SetActive(false);
+        //}
     }
 }

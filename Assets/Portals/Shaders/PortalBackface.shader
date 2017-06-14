@@ -18,7 +18,7 @@ Shader "Portal/PortalBackface"
 			//	Ref 10
 			//	Comp NotEqual
 			//}
-			Blend One Zero
+			Blend SrcAlpha OneMinusSrcAlpha
 			ZWrite Off
 			Lighting Off
 			//Cull Back
@@ -28,6 +28,7 @@ Shader "Portal/PortalBackface"
 			#pragma vertex vert
 			#pragma fragment frag
 			#pragma multi_compile_fog
+			#pragma multi_compile __ VISIBLE
 			#pragma multi_compile __ STEREO_RENDER
 
 			#include "UnityCG.cginc"
@@ -47,6 +48,7 @@ Shader "Portal/PortalBackface"
 
 			sampler2D _LeftEyeTexture;
 			sampler2D _RightEyeTexture;
+			float4 _Color;
 
 			v2f vert(appdata v)
 			{
@@ -99,7 +101,10 @@ Shader "Portal/PortalBackface"
 #endif
 
 				UNITY_APPLY_FOG(i.fogCoord, col);
-				//return float4(0, 0, 0, 1);
+				
+#ifndef VISIBLE
+				col.a = 0;
+#endif
 				return col;
 			}
 			ENDCG

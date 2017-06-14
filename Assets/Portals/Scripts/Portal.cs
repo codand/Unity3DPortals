@@ -69,11 +69,15 @@ namespace Portals {
             }
         }
 
-        //public List<Collider> ignoredColliders = new List<Collider>();
+        public delegate void StaticPortalEvent(Portal portal, GameObject obj);
+        public static event StaticPortalEvent onPortalEnterGlobal;
+        public static event StaticPortalEvent onPortalExitGlobal;
+        public static event StaticPortalEvent onPortalTeleportGlobal;
 
-        public delegate void PortalEvent(Portal portal, GameObject obj);
-        //public static event PortalEvent onPortalEnter;
-        public static event PortalEvent onPortalExit;
+        public delegate void PortalEvent(GameObject obj);
+        public event PortalEvent onPortalEnter;
+        public event PortalEvent onPortalExit;
+        public event PortalEvent onPortalTeleport;
 
         // Maps cameras to their children
         private Dictionary<Camera, Camera> _camToPortalCam = new Dictionary<Camera, Camera>();
@@ -94,13 +98,12 @@ namespace Portals {
         // Instanced backface material
         private Material _backFaceMaterial;
 
-        // Dictionary mapping objects to their clones on the other side of a portal
-        private Dictionary<GameObject, GameObject> _objectToClone = new Dictionary<GameObject, GameObject>();
-
         private Dictionary<Camera, bool> _wasRenderedByCamera = new Dictionary<Camera, bool>();
         private Stack<Texture> _savedTextures = new Stack<Texture>();
 
         private PortalColliderTrigger _portalColliderTrigger;
+
+        private bool _inPortal = false;
 
         void Awake() {
             _portalColliderTrigger = GetComponentInChildren<PortalColliderTrigger>();
@@ -154,11 +157,19 @@ namespace Portals {
         }
 
         void PopCurrentTexture() {
+            _wasRenderedByCamera[Camera.current] = false;
+
             Texture tex = _savedTextures.Pop();
             _portalMaterial.SetTexture("_RightEyeTexture", tex);
+            _backFaceMaterial.SetTexture("_RightEyeTexture", tex);
             _portalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
             _portalMaterial.DisableKeyword("DONT_SAMPLE");
-            _wasRenderedByCamera[Camera.current] = false;
+
+            if (s_depth == 1 && _inPortal) {
+                _backFaceMaterial.EnableKeyword("VISIBLE");
+            } else {
+                _backFaceMaterial.DisableKeyword("VISIBLE");
+            }
         }
 
         void OnRenderObject() {
@@ -231,6 +242,8 @@ namespace Portals {
 
                 // Exit. We don't need to process any further depths.
                 return;
+            } else if (s_depth == 0 && _inPortal) {
+                _backFaceMaterial.EnableKeyword("VISIBLE");
             }
 
             // Initialize or get anything needed for this depth level
@@ -337,8 +350,8 @@ namespace Portals {
                 portalCamera.transform.rotation = transform.rotation;
                 //portalCamera.depthTextureMode = DepthTextureMode.DepthNormals;
                 portalCamera.gameObject.AddComponent<FlareLayer>();
-                //go.hideFlags = HideFlags.HideAndDontSave;
-                go.hideFlags = HideFlags.DontSave;
+                go.hideFlags = HideFlags.HideAndDontSave;
+                //go.hideFlags = HideFlags.DontSave;
 
                 PortalCamera pc = go.AddComponent<PortalCamera>();
                 // TODO: Awake doesn't get called when using ExecuteInEditMode
@@ -357,41 +370,47 @@ namespace Portals {
             }
         }
 
-        void SpawnClone(GameObject obj) {
-            // Create a clone on the other side
-            if (obj.tag == "Player")
-                return;
-            GameObject clone = Instantiate(obj);
-            PortalClone cloneScript = clone.AddComponent<PortalClone>();
-            cloneScript.target = obj.transform;
-            cloneScript.portal = this;
 
-            _objectToClone[obj] = clone;
+        void OnTriggerEnter(Collider collider) {
+            // TODO: Make this only apply to cameras
+            _inPortal = true;
+            if (ExitPortal) {
+                ExitPortal._inPortal = true;
+            }
+
+            collider.gameObject.SendMessage("OnPortalEnter", this, SendMessageOptions.DontRequireReceiver);
+            if (onPortalEnterGlobal != null)
+                onPortalEnterGlobal(this, collider.gameObject);
+            if (onPortalEnter != null)
+                onPortalEnter(collider.gameObject);
         }
 
-        void DestroyClone(GameObject obj) {
-            // Destroy clone if exists
-            GameObject clone;
-            _objectToClone.TryGetValue(obj, out clone);
-            if (clone) {
-                Destroy(clone);
+        void OnTriggerExit(Collider collider) {
+            _inPortal = false;
+            if (ExitPortal) {
+                ExitPortal._inPortal = false;
             }
+
+            collider.gameObject.SendMessage("OnPortalExit", this, SendMessageOptions.DontRequireReceiver);
+            if (onPortalExitGlobal != null)
+                onPortalExitGlobal(this, collider.gameObject);
+            if (onPortalExit != null)
+                onPortalExit(collider.gameObject);
         }
 
         void OnTriggerStay(Collider collider) {
             if (!ExitPortal) {
                 return;
             }
-            //Debug.Log(collider.name + " stayed " + this.name);
             Vector3 normal = transform.forward;
             float d = -1 * Vector3.Dot(normal, transform.position);
             bool throughPortal = new Plane(normal, d).GetSide(collider.transform.position);
             if (throughPortal) {
-                OnPortalExit(collider);
+                OnPortalTeleport(collider);
             }
         }
 
-        public void OnPortalExit(Collider collider) {
+        public void OnPortalTeleport(Collider collider) {
             PortalLight light = collider.GetComponent<PortalLight>();
             if(light) {
                 return;
@@ -416,9 +435,11 @@ namespace Portals {
                 rigidbody.mass *= scaleDelta * scaleDelta * scaleDelta;
             }
 
-            collider.gameObject.SendMessage("OnPortalExit", this, SendMessageOptions.DontRequireReceiver);
-            if (onPortalExit != null)
-                onPortalExit(this, collider.gameObject);
+            collider.gameObject.SendMessage("OnPortalTeleport", this, SendMessageOptions.DontRequireReceiver);
+            if (onPortalTeleportGlobal != null)
+                onPortalTeleportGlobal(this, collider.gameObject);
+            if (onPortalTeleport != null)
+                onPortalTeleport(collider.gameObject);
 
             //UnityEditor.EditorApplication.isPaused = true;
         }

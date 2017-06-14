@@ -95,7 +95,7 @@ namespace Portals {
             _portal.ExitPortal = null;
         }
 
-        void OnPortalExit(Portal portal, GameObject obj) {
+        void OnPortalTeleport(Portal portal, GameObject obj) {
             if (_portal == portal) {
                 SceneManager.SetActiveScene(portal.ExitPortal.gameObject.scene);
                 _exitPortalSceneLoader._inTrigger = true;
@@ -114,13 +114,13 @@ namespace Portals {
         }
 
         void OnEnable() {
-            Portal.onPortalExit += OnPortalExit; ;
+            Portal.onPortalTeleportGlobal += OnPortalTeleport;
             SceneManager.sceneLoaded += OnSceneLoaded;
             SceneManager.sceneUnloaded += OnSceneUnloaded;
         }
 
         void OnDisable() {
-            Portal.onPortalExit -= OnPortalExit;
+            Portal.onPortalTeleportGlobal -= OnPortalTeleport;
             SceneManager.sceneLoaded -= OnSceneLoaded;
             SceneManager.sceneUnloaded -= OnSceneUnloaded;
         }

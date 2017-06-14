@@ -54,12 +54,14 @@ namespace Portals {
                 _collisionMask.value,
                 QueryTriggerInteraction.Ignore);
 
-            if (_grounded) {
-                Vector3 horizontalVelocity = Vector3.ProjectOnPlane(_rigidbody.velocity, Vector3.up);
-                _rigidbody.AddForce(-1 * horizontalVelocity * _movementInfo.dragGrounded, ForceMode.VelocityChange);
-            } else {
-                _rigidbody.AddForce(-1 * _rigidbody.velocity * _movementInfo.dragAerial, ForceMode.VelocityChange);
-            }
+            Vector3 horizontalVelocity = Vector3.ProjectOnPlane(_rigidbody.velocity, Vector3.up);
+            Vector3 verticalVelocity = _rigidbody.velocity - horizontalVelocity;
+            _rigidbody.AddForce(-1 * horizontalVelocity * (_grounded ? _movementInfo.dragGrounded : _movementInfo.dragAerial), ForceMode.VelocityChange);
+
+            //horizontalVelocity = Vector3.ClampMagnitude(horizontalVelocity, _movementInfo.maxSpeedHorizontal);
+            verticalVelocity = Vector3.ClampMagnitude(verticalVelocity, _movementInfo.maxSpeedVertical);
+
+            _rigidbody.velocity = horizontalVelocity + verticalVelocity;
         }
 
         public void ToggleNoClip() {
@@ -122,11 +124,11 @@ namespace Portals {
         }
 
         Coroutine correctRotation = null;
-        void OnPortalExit(Portal portal) {
+        void OnPortalTeleport(Portal portal) {
             if (correctRotation != null) {
                 StopCoroutine(correctRotation);
             }
-            correctRotation = StartCoroutine(CorrectionRotation(15.0f));
+            correctRotation = StartCoroutine(CorrectionRotation(0.5f));
         }
 
         public Transform axis1, axis2;
