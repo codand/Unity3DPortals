@@ -14,10 +14,11 @@ Shader "Portal/PortalBackface"
 
 		Pass
 		{
-			//Stencil {
-			//	Ref 10
-			//	Comp NotEqual
-			//}
+			// Stencil masks out the backface if we can see the frontface
+			Stencil {
+				Ref 1
+				Comp NotEqual
+			}
 			Blend SrcAlpha OneMinusSrcAlpha
 			ZWrite Off
 			Lighting Off

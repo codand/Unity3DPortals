@@ -2,25 +2,39 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System;
+using System.Reflection;
 
 namespace Portals {
     public class PortalCloneSpawner : MonoBehaviour {
         [SerializeField]
         private Portal _portal;
 
-        private static readonly Dictionary<Type, Action<Component, Component>> _componentCopyFuncs = new Dictionary<Type, Action<Component, Component>>() {
-            { typeof(MeshFilter), CopyMeshFilter },
-            { typeof(MeshRenderer), CopyMeshRenderer },
-            { typeof(Rigidbody), null },
-            { typeof(CapsuleCollider), null },
+        private static List<Type> _validBehaviours = new List<Type>(){
+            typeof(Animator),
+            typeof(MeshFilter),
+            typeof(MeshRenderer),
+            typeof(SkinnedMeshRenderer),
         };
+
+        // Dictionary mapping objects to their clones on the other side of a portal
+        private Dictionary<GameObject, GameObject> _objectToClone = new Dictionary<GameObject, GameObject>();
+        private Dictionary<GameObject, GameObject> _objectToDepthMask = new Dictionary<GameObject, GameObject>();
+
+        private Material _depthMaskMaterial;
 
         private void Awake() {
             _portal.onPortalTeleport += OnPortalTeleport;
         }
 
+        private void Start() {
+            _depthMaskMaterial = new Material(Shader.Find("Portal/DepthMaskClipped"));
+            _depthMaskMaterial.SetVector("_ClippingPlane", _portal.VectorPlane);
+            _depthMaskMaterial.renderQueue = 2010; // Geometry + 10
+        }
+
         private void OnTriggerEnter(Collider collider) {
             SpawnClone(collider.gameObject);
+            SpawnDepthMask(collider.gameObject);
         }
 
         private void OnTriggerExit(Collider collider) {
@@ -32,21 +46,20 @@ namespace Portals {
             DespawnClone(obj);
         }
 
-        // Dictionary mapping objects to their clones on the other side of a portal
-        private Dictionary<GameObject, GameObject> _objectToClone = new Dictionary<GameObject, GameObject>();
-
         private GameObject SpawnClone(GameObject obj) {
             GameObject clone;
             _objectToClone.TryGetValue(obj, out clone);
             if (clone) {
                 clone.SetActive(true);
             } else {
-                clone = RecursiveClone(null, obj.transform);
+                RenderQueueThing(obj);
+
+                clone = CloneObject(obj);
                 PortalClone script = clone.AddComponent<PortalClone>();
                 script.target = obj.transform;
                 script.portal = _portal;
+                script.isDepthMasker = false;
 
-                //clone.hideFlags = HideFlags.HideAndDontSave;
                 _objectToClone[obj] = clone;
             }
             return clone;
@@ -64,62 +77,72 @@ namespace Portals {
             }
         }
 
-        private static GameObject RecursiveClone(Transform cloneParent, Transform toCopy) {
-            Transform clone = new GameObject("Clone of " + toCopy.name).transform;
-            clone.parent = cloneParent;
-            clone.localPosition = toCopy.localPosition;
-            clone.localRotation = toCopy.localRotation;
-            clone.localScale = toCopy.localScale;
+        private GameObject SpawnDepthMask(GameObject obj) {
+            GameObject clone;
+            _objectToDepthMask.TryGetValue(obj, out clone);
+            if (clone) {
+                clone.SetActive(true);
+            } else {
+                clone = CloneObject(obj);
+                PortalClone script = clone.AddComponent<PortalClone>();
+                script.target = obj.transform;
+                script.portal = _portal;
+                script.isDepthMasker = true;
 
-            CopyComponents(toCopy.gameObject, clone.gameObject);
-
-            foreach (Transform child in toCopy.transform) {
-                RecursiveClone(clone.transform, child);
+                SwapMaterial(clone);
+                _objectToDepthMask[obj] = clone;
             }
-
-            return clone.gameObject;
+            return clone;
         }
 
-        private static void CopyComponents(GameObject from, GameObject to) {
-            foreach (KeyValuePair<Type, Action<Component, Component>> kvp in _componentCopyFuncs) {
-                Type type = kvp.Key;
-                Action<Component, Component> copyFunc = kvp.Value;
-                if (type == null || copyFunc == null) {
-                    continue;
-                }
-
-                Component fromComp = from.GetComponent(type);
-                if (fromComp) {
-                    Component toComp = to.AddComponent(type);
-                    copyFunc(fromComp, toComp);
+        private void DespawnDepthMask(GameObject obj, bool destroy = false) {
+            GameObject clone;
+            _objectToDepthMask.TryGetValue(obj, out clone);
+            if (clone) {
+                if (destroy) {
+                    GameObject.Destroy(clone);
+                } else {
+                    clone.SetActive(false);
                 }
             }
         }
 
-
-        private static void CopyMeshFilter(Component from, Component to) {
-            MeshFilter f = from as MeshFilter;
-            MeshFilter t = to as MeshFilter;
-
-            t.sharedMesh = f.sharedMesh;
+        private static GameObject CloneObject(GameObject obj) {
+            GameObject clone = Instantiate(obj);
+            DisableInvalidComponentsRecursively(clone);
+            return clone;
         }
 
-        private static void CopyMeshRenderer(Component from, Component to) {
-            MeshRenderer f = from as MeshRenderer;
-            MeshRenderer t = to as MeshRenderer;
+        private static void DisableInvalidComponentsRecursively(GameObject obj) {
+            Behaviour[] allBehaviours = obj.GetComponents<Behaviour>();
+            foreach (Behaviour behaviour in allBehaviours) {
+                if (!_validBehaviours.Contains(behaviour.GetType())) {
+                    behaviour.enabled = false;
+                }
+            }
+            foreach (Transform child in obj.transform) {
+                DisableInvalidComponentsRecursively(child.gameObject);
+            }
+        }
 
-            t.enabled = f.enabled;
+        private void SwapMaterial(GameObject obj) {
+            Renderer renderer = obj.GetComponent<Renderer>();
+            if (renderer) { 
+                renderer.sharedMaterial = _depthMaskMaterial;
+            }
+            foreach(Transform child in obj.transform) {
+                SwapMaterial(child.gameObject);
+            }
+        }
 
-            t.additionalVertexStreams = f.additionalVertexStreams;
-            t.lightProbeUsage = f.lightProbeUsage;
-            t.lightProbeProxyVolumeOverride = f.lightProbeProxyVolumeOverride;
-            t.reflectionProbeUsage = f.reflectionProbeUsage;
-            t.probeAnchor = f.probeAnchor;
-            t.shadowCastingMode = f.shadowCastingMode;
-            t.receiveShadows = f.receiveShadows;
-            t.motionVectorGenerationMode = f.motionVectorGenerationMode;
-
-            t.sharedMaterials = f.sharedMaterials;
+        private void RenderQueueThing(GameObject obj) {
+            Renderer renderer = obj.GetComponent<Renderer>();
+            if (renderer) {
+                renderer.sharedMaterial.renderQueue += 20;
+            }
+            foreach (Transform child in obj.transform) {
+                RenderQueueThing(child.gameObject);
+            }
         }
     }
 }

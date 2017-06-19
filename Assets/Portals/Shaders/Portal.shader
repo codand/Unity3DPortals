@@ -19,13 +19,13 @@ Shader "Portal/Portal"
 
 		Pass
 		{
-			//Stencil {
-			//	Ref 10
-			//	Comp Always
-			//	Pass Replace
-			//}
+			Stencil {
+				Ref 1
+				Comp Always
+				Pass Replace
+			}
 			Blend SrcAlpha OneMinusSrcAlpha
-			Offset -0.01, -0.1
+			Offset -1.0, -0.1
 			ZWrite Off
 			Lighting Off
 			//ColorMask 0

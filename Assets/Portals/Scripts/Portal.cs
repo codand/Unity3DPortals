@@ -69,6 +69,24 @@ namespace Portals {
             }
         }
 
+        public Plane Plane {
+            get {
+                Vector3 normal = transform.forward;
+                Vector3 position = transform.position;
+                float d = -Vector3.Dot(normal, position);
+                return new Plane(normal, d);
+            }
+        }
+
+        public Vector4 VectorPlane {
+            get {
+                Vector3 normal = transform.forward;
+                Vector3 position = transform.position;
+                float d = -Vector3.Dot(normal, position);
+                return new Vector4(normal.x, normal.y, normal.z, d);
+            }
+        }
+
         public delegate void StaticPortalEvent(Portal portal, GameObject obj);
         public static event StaticPortalEvent onPortalEnterGlobal;
         public static event StaticPortalEvent onPortalExitGlobal;
@@ -198,8 +216,11 @@ namespace Portals {
                 return;
             }
 
+
             if (Camera.current.name == "SceneCamera" || Camera.current.name == "Reflection Probes Camera" || Camera.current.name == "Preview Camera")
                 return;
+
+
 
             PortalCamera currentPortalCam = Camera.current.GetComponent<PortalCamera>();
 
@@ -209,10 +230,12 @@ namespace Portals {
             }
 
             // TODO: set these only once
+            //return;
             _portalMaterial.SetTexture("_TransparencyMask", _transparencyMask);
             _portalMaterial.SetTexture("_DefaultTexture", _defaultTexture);
 
             PushCurrentTexture();
+
 
             // Stop recursion when we reach maximum depth
             if (s_depth >= _maxRecursiveDepth) {
@@ -402,9 +425,8 @@ namespace Portals {
             if (!ExitPortal) {
                 return;
             }
-            Vector3 normal = transform.forward;
-            float d = -1 * Vector3.Dot(normal, transform.position);
-            bool throughPortal = new Plane(normal, d).GetSide(collider.transform.position);
+
+            bool throughPortal = Plane.GetSide(collider.transform.position);
             if (throughPortal) {
                 OnPortalTeleport(collider);
             }
