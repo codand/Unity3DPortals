@@ -5,6 +5,8 @@
 
 #include "UnityStandardCore.cginc"
 
+#include "PlaneClipping.cginc"
+
 //  Does not support: _PARALLAXMAP, DIRLIGHTMAP_COMBINED
 #define GLOSSMAP (defined(_SPECGLOSSMAP) || defined(_METALLICGLOSSMAP))
 
@@ -193,6 +195,7 @@ half3 BRDF3DirectSimple(half3 diffColor, half3 specColor, half smoothness, half 
 half4 fragForwardBaseSimpleInternal (VertexOutputBaseSimple i)
 {
     FragmentCommonData s = FragmentSetupSimple(i);
+	PLANAR_CLIP(s.posWorld);
 
     UnityLight mainLight = MainLightSimple(i, s);
 
@@ -343,6 +346,7 @@ half3 LightSpaceNormal(VertexOutputForwardAddSimple i, FragmentCommonData s)
 half4 fragForwardAddSimpleInternal (VertexOutputForwardAddSimple i)
 {
     FragmentCommonData s = FragmentSetupSimpleAdd(i);
+	PLANAR_CLIP(s.posWorld);
 
     half3 c = BRDF3DirectSimple(s.diffColor, s.specColor, s.smoothness, dot(REFLECTVEC_FOR_SPECULAR(i, s), i.lightDir));
 

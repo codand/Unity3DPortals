@@ -1,7 +1,9 @@
 #ifndef PLANE_CLIPPING_INCLUDED
 #define PLANE_CLIPPING_INCLUDED
 
-#define UNITY_REQUIRE_FRAG_WORLDPOS
+#ifdef UNITY_REQUIRE_FRAG_WORLDPOS
+	#define UNITY_REQUIRE_FRAG_WORLDPOS 1
+#endif
 
 float3 distanceToPlane(float4 plane, float3 position) {
 	return (dot(plane.xyz, position.xyz) + plane.w) / sqrt(dot(plane.xyz, plane.xyz));

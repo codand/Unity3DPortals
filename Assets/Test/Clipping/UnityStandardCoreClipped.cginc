@@ -12,6 +12,7 @@
 #include "UnityStandardBRDF.cginc"
 
 #include "AutoLight.cginc"
+#include "PlaneClipping.cginc"
 //-------------------------------------------------------------------------------------
 // counterpart for NormalizePerPixelNormal
 // skips normalization per-vertex and expects normalization to happen per-pixel
@@ -407,6 +408,7 @@ VertexOutputForwardBase vertForwardBase (VertexInput v)
 half4 fragForwardBaseInternal (VertexOutputForwardBase i)
 {
     FRAGMENT_SETUP(s)
+	PLANAR_CLIP(s.posWorld);
 
     UNITY_SETUP_INSTANCE_ID(i);
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
@@ -499,6 +501,7 @@ VertexOutputForwardAdd vertForwardAdd (VertexInput v)
 half4 fragForwardAddInternal (VertexOutputForwardAdd i)
 {
     FRAGMENT_SETUP_FWDADD(s)
+	PLANAR_CLIP(s.posWorld);
 
     UNITY_LIGHT_ATTENUATION(atten, i, s.posWorld)
     UnityLight light = AdditiveLight (IN_LIGHTDIR_FWDADD(i), atten);
@@ -613,6 +616,7 @@ void fragDeferred (
     #endif
 
     FRAGMENT_SETUP(s)
+    PLANAR_CLIP(s.posWorld);
 
     // no analytic lights in this pass
     UnityLight dummyLight = DummyLight ();
