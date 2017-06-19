@@ -287,27 +287,27 @@ Shader "StandardClipped"
 		}
 		// ------------------------------------------------------------------
 		//  Shadow rendering pass
-		//Pass {
-		//	Name "ShadowCaster"
-		//	Tags { "LightMode" = "ShadowCaster" }
-		//	
-		//	ZWrite On ZTest LEqual
+		Pass {
+			Name "ShadowCaster"
+			Tags { "LightMode" = "ShadowCaster" }
+			
+			ZWrite On ZTest LEqual
 
-		//	CGPROGRAM
-		//	#pragma target 2.0
+			CGPROGRAM
+			#pragma target 2.0
 
-		//	#pragma shader_feature _ _ALPHATEST_ON _ALPHABLEND_ON _ALPHAPREMULTIPLY_ON
-		//	#pragma shader_feature _METALLICGLOSSMAP
-		//	#pragma skip_variants SHADOWS_SOFT
-		//	#pragma multi_compile_shadowcaster
+			#pragma shader_feature _ _ALPHATEST_ON _ALPHABLEND_ON _ALPHAPREMULTIPLY_ON
+			#pragma shader_feature _METALLICGLOSSMAP
+			#pragma skip_variants SHADOWS_SOFT
+			#pragma multi_compile_shadowcaster
 
-		//	#pragma vertex vertShadowCaster
-		//	#pragma fragment fragShadowCaster
+			#pragma vertex vertShadowCaster
+			#pragma fragment fragShadowCaster
 
-		//	#include "UnityStandardShadowClipped.cginc"
+			#include "UnityStandardShadowClipped.cginc"
 
-		//	ENDCG
-		//}
+			ENDCG
+		}
 
 		// ------------------------------------------------------------------
 		// Extracts information for lightmapping, GI (emission, albedo, ...)
