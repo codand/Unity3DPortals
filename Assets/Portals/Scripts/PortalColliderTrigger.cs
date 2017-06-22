@@ -7,7 +7,7 @@ namespace Portals {
     public class PortalColliderTrigger : MonoBehaviour {
         [SerializeField] private Portal _portal;
 
-        private int _triggerCount = 0;
+        private Dictionary<Teleportable, int> _triggerCounts = new Dictionary<Teleportable, int>();
         private List<Collider> _ignoredColliders = new List<Collider>();
 
         public void ResetIgnoredCollisions() {
@@ -30,9 +30,40 @@ namespace Portals {
             }
         }
 
+        int IncrementTriggerCount(Teleportable teleportable) {
+            int triggerCount = 0;
+            if (!_triggerCounts.TryGetValue(teleportable, out triggerCount)) {
+                triggerCount = 1;
+            } else {
+                triggerCount += 1;
+            }
+            _triggerCounts[teleportable] = triggerCount;
+            return triggerCount;
+        }
+
+        int DecrementTriggerCount(Teleportable teleportable) {
+            int triggerCount = 0;
+            if (!_triggerCounts.TryGetValue(teleportable, out triggerCount)) {
+                throw new System.Exception("Attempted to decrement trigger count below zero. This should never happen");
+            } else {
+                triggerCount -= 1;
+                if (triggerCount == 0) {
+                    _triggerCounts.Remove(teleportable);
+                } else {
+                    _triggerCounts[teleportable] = triggerCount;
+                }
+            }
+            return triggerCount;
+        }
+
         void OnTriggerEnter(Collider collider) {
-            _triggerCount += 1;
-            if (_triggerCount > 1) {
+            Teleportable teleportable = collider.GetComponent<Teleportable>();
+            if (!teleportable) {
+                return;
+            }
+            int triggerCount = IncrementTriggerCount(teleportable);
+            //Debug.Log(collider.gameObject.name + " " + triggerCount);
+            if (triggerCount > 1) {
                 return;
             }
 
@@ -44,8 +75,12 @@ namespace Portals {
         }
 
         void OnTriggerExit(Collider collider) {
-            _triggerCount -= 1;
-            if (_triggerCount > 0) {
+            Teleportable teleportable = collider.GetComponent<Teleportable>();
+            if (!teleportable) {
+                return;
+            }
+            int triggerCount = DecrementTriggerCount(teleportable);
+            if (triggerCount > 0) {
                 return;
             }
 
@@ -55,19 +90,5 @@ namespace Portals {
 
             IgnoreCollisions(collider, false);
         }
-
-
-        //void OnTriggerStay(Collider collider) {
-        //    if (!_portal.ExitPortal) {
-        //        return;
-        //    }
-
-        //    Vector3 normal = transform.forward;
-        //    float d = -1 * Vector3.Dot(normal, transform.position);
-        //    bool throughPortal = new Plane(normal, d).GetSide(collider.transform.position);
-        //    if (throughPortal) {
-        //        _portal.OnPortalTeleport(collider);
-        //    }
-        //}
     }
 }

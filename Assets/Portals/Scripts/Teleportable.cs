@@ -5,16 +5,6 @@ using System;
 
 namespace Portals {
     public class Teleportable : MonoBehaviour {
-        [SerializeField]
-        private bool _hasFirstPersonCamera;
-
-        [SerializeField]
-        private Camera _camera;
-
-        public Camera Camera {
-            get { return _camera; }
-        }
-
         private static List<Type> _validBehaviours = new List<Type>(){
             typeof(Animator),
             typeof(MeshFilter),
@@ -22,76 +12,172 @@ namespace Portals {
             typeof(SkinnedMeshRenderer),
         };
 
+        [SerializeField]
+        private bool _hasFirstPersonCamera;
+
+        [SerializeField]
+        private Camera _camera;
+
+        private bool _isClone;
+
         // Shader that will be applied when passing through the portal
         private Shader _clippedShader;
         private int _clippedShaderPlaneHash;
+        private Material _clippedMaterial;
 
         // Stores this object's original shaders so that they can be restored
-        private Dictionary<Renderer, Shader> _rendererToShader = new Dictionary<Renderer, Shader>();
-        
+        private Dictionary<Renderer, Shader> _rendererToShader;
+
         // Stores one doppleganger for each portal that we're currently in.
-        private Dictionary<Portal, GameObject> _portalToClone = new Dictionary<Portal, GameObject>();
+        private Dictionary<Portal, Teleportable> _portalToClone;
+
+        private ObjectPool<Teleportable> _clonePool;
 
         private GameObject _clone;
 
-        void Start() {
-            _clippedShader = Shader.Find("Portals/StandardClipped");
-            _clippedShaderPlaneHash = Shader.PropertyToID("_ClippingPlane");
+        private HashSet<Portal> _occupiedPortals;
+        public HashSet<Portal> _receivedOnTriggerEnterFrom;
+
+        private Rigidbody _rigidbody;
+
+        private Teleportable _mainBody;
+
+        public Camera Camera {
+            get { return _camera; }
         }
 
-        void LateUpdate() {
-            foreach(KeyValuePair<Portal, GameObject> kvp in _portalToClone) {
-                Portal portal = kvp.Key;
-                GameObject clone = kvp.Value;
+        public bool IsClone {
+            get { return _isClone; }
+        }
 
-                portal.ApplyWorldToPortalTransform(clone.transform, this.transform);
+        public bool IsInsidePortal(Portal portal) {
+            return _occupiedPortals.Contains(portal);
+        }
+
+        void Awake() {
+            // Awake is called on all clones
+            _rigidbody = GetComponent<Rigidbody>();
+        }
+
+        void Start() {
+            // Start is not called on clones
+            _mainBody = this;
+
+            _isClone = false;
+
+            _clippedShader = Shader.Find("Portals/StandardClipped");
+            _clippedShaderPlaneHash = Shader.PropertyToID("_ClippingPlane");
+            
+
+            _rendererToShader = new Dictionary<Renderer, Shader>();
+            _portalToClone = new Dictionary<Portal, Teleportable>();
+            _clonePool =  new ObjectPool<Teleportable>(1, CreateClone);
+            _occupiedPortals = new HashSet<Portal>();
+            _receivedOnTriggerEnterFrom = new HashSet<Portal>();
+
+            SaveShaders(this.gameObject);
+        }
+
+        void OnCollisionEnter(Collision collision) {
+            if (_rigidbody && IsClone) {
+                _mainBody._rigidbody.AddForce(collision.impulse);
             }
         }
 
-        //void OnPortalEnter(Portal portal) {
-        //    GameObject clone = SpawnClone(portal);
-        //    ReplaceShaders(this.gameObject, portal);
-        //    ReplaceShaders(clone, portal.ExitPortal);
-        //}
+        void FixedUpdate() {
+            _receivedOnTriggerEnterFrom.Clear();
+        }
 
-        //void OnPortalExit(Portal portal) {
-        //    DespawnClone(portal);
-        //    RestoreShaders();
-        //}
+        void LateUpdate() {
+            foreach(KeyValuePair<Portal, Teleportable> kvp in _portalToClone) {
+                Portal portal = kvp.Key;
+                Teleportable clone = kvp.Value;
 
-        private GameObject SpawnClone(Portal portal) {
-            GameObject clone;
+                //Rigidbody rigidbody = clone.GetComponent<Rigidbody>();
+                //if (rigidbody) {
+                //    Vector3 newPosition = portal.PortalMatrix().MultiplyPoint3x4(this._rigidbody.position);
+                //    Quaternion newRotation = portal.PortalRotation() * this._rigidbody.rotation;
+                //    rigidbody.MovePosition(newPosition);
+                //    rigidbody.transform.rotation = newRotation;
+                //} else {
+                    portal.ApplyWorldToPortalTransform(clone.transform, this.transform);
+                //}
+            }
+        }
+
+        void OnPortalEnter(Portal portal) {
+            _occupiedPortals.Add(portal);
+
+            Debug.Log("Enter " + portal.name);
+            Teleportable clone = GetClone(portal);
+            if (!clone) {
+                clone = SpawnClone(portal);
+            }
+            ReplaceShaders(this.gameObject, portal);
+            ReplaceShaders(clone.gameObject, portal.ExitPortal);
+        }
+
+        void OnPortalTeleport(Portal portal) {
+            _occupiedPortals.Remove(portal);
+            _occupiedPortals.Add(portal.ExitPortal);
+
+            Debug.Log("Teleport " + portal.name);
+            Teleportable clone = GetClone(portal);
+            ReplaceShaders(this.gameObject, portal.ExitPortal);
+            ReplaceShaders(clone.gameObject, portal);
+
+            _portalToClone.Remove(portal);
+            _portalToClone.Add(portal.ExitPortal, clone);
+        }
+
+        void OnPortalExit(Portal portal) {
+            _occupiedPortals.Remove(portal);
+            Debug.Log("Exit " + portal.name);
+
+            DespawnClone(portal);
+            RestoreShaders();
+        }
+
+        private Teleportable GetClone(Portal portal) {
+            Teleportable clone;
             _portalToClone.TryGetValue(portal, out clone);
+            return clone;
+        }
+
+        private Teleportable SpawnClone(Portal portal) {
+            Teleportable clone = GetClone(portal);
             if (clone) {
-                clone.SetActive(true);
+                clone.gameObject.SetActive(true);
             } else {
-                clone = CloneObject(this.gameObject);
+                clone = _clonePool.Take();
+                clone.gameObject.SetActive(true);
+
                 _portalToClone[portal] = clone;
             }
             return clone;
         }
 
         private void DespawnClone(Portal portal, bool destroy = false) {
-            GameObject clone;
-            _portalToClone.TryGetValue(portal, out clone);
+            Teleportable clone = GetClone(portal);
             if (clone) {
                 if (destroy) {
-                    GameObject.Destroy(clone);
+                    Destroy(clone.gameObject);
                 } else {
-                    clone.SetActive(false);
+                    clone.gameObject.SetActive(false);
+
+                    _portalToClone.Remove(portal);
+                    _clonePool.Give(clone);
                 }
             }
         }
 
-        private static GameObject CloneObject(GameObject obj) {
-            GameObject clone = Instantiate(obj);
-            DisableInvalidComponentsRecursively(clone);
+        private Teleportable CreateClone() {
+            Teleportable clone = Instantiate(this);
+            DisableInvalidComponentsRecursively(clone.gameObject);
+            clone.gameObject.SetActive(false);
+            clone._isClone = true;
+            clone._mainBody = this;
 
-            Teleportable teleportable = clone.GetComponent<Teleportable>();
-            if (teleportable) {
-                // Should always be true
-                Destroy(teleportable);
-            }
             return clone;
         }
 
@@ -107,12 +193,24 @@ namespace Portals {
             }
         }
 
-        void ReplaceShaders(GameObject obj, Portal portal) {
+        void SaveShaders(GameObject obj) {
             Renderer renderer = obj.GetComponent<Renderer>();
             if (renderer) {
                 _rendererToShader[renderer] = renderer.material.shader;
+            }
+
+            foreach (Transform child in obj.transform) {
+                SaveShaders(child.gameObject);
+            }
+        }
+
+        void ReplaceShaders(GameObject obj, Portal portal) {
+            Renderer renderer = obj.GetComponent<Renderer>();
+            if (renderer) {
+                Vector4 clippingPlane = portal.VectorPlane;
+                clippingPlane.w -= portal.ClippingOffset;
                 renderer.material.shader = _clippedShader;
-                renderer.material.SetVector(_clippedShaderPlaneHash, portal.VectorPlane);
+                renderer.material.SetVector(_clippedShaderPlaneHash, clippingPlane);
             }
 
             foreach (Transform child in obj.transform) {

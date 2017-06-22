@@ -249,29 +249,6 @@ namespace Portals {
         //    Debug.Log("right: " + right);
         //}
 
-        void MakeProjectionMatrixOblique(ref Matrix4x4 projection, Vector4 clipPlane) {
-            Vector4 q = projection.inverse * new Vector4(
-                Mathf.Sign(clipPlane.x),
-                Mathf.Sign(clipPlane.y),
-                1.0f,
-                1.0f
-            );
-            Vector4 c = clipPlane * (2.0F / (Vector4.Dot(clipPlane, q)));
-            // third row = clip plane - fourth row
-            projection[2] = c.x - projection[3];
-            projection[6] = c.y - projection[7];
-            projection[10] = c.z - projection[11];
-            projection[14] = c.w - projection[15];
-        }
-
-        Vector4 CalculatePlaneFromTransform(Transform t) {
-            Vector3 normal = t.transform.forward;
-            Vector3 position = t.transform.position;
-            float d = Vector3.Dot(normal, position);
-            Vector4 plane = new Vector4(normal.x, normal.y, normal.z, d);
-            return plane;
-        }
-
         Matrix4x4 CalculateProjectionMatrix(Camera.MonoOrStereoscopicEye eye) {
             // Set targetTexture to null because GetStereoProjectionMatrix won't return a valid matrix otherwise.
             RenderTexture savedTargetTexture = _camera.targetTexture;
@@ -296,36 +273,55 @@ namespace Portals {
             _camera.targetTexture = savedTargetTexture;
 
             // Calculate plane made from the exit portal's trnasform
-            Vector4 exitPortalPlane = CalculatePlaneFromTransform(_portal.ExitPortal.transform);
+            Plane exitPortalPlane = _portal.ExitPortal.Plane;
 
             // Determine whether or not we've crossed the plane already. If we have, we don't need to apply
             // oblique frustum clipping. Offset the value by our portal's ClippingOffset to reduce the effects
             // so that it swaps over slightly early. This helps reduce artifacts caused by loss of depth accuracy.
-            bool onFarSide = new Plane(-1 * exitPortalPlane, exitPortalPlane.w + _portal.ClippingOffset).GetSide(transform.position);
+            bool onFarSide = !new Plane(exitPortalPlane.normal, exitPortalPlane.distance - _portal.ClippingOffset).GetSide(transform.position);
             if (onFarSide) {
                 return projectionMatrix;
             }
 
+            // Offset the clipping plane itself so that a character walking through a portal has no seams
+            exitPortalPlane.distance -= _portal.ClippingOffset / 2;
+
             // Project our world space clipping plane to the camera's local coordinates
             // e.g. normal (0, 0, 1) becomes (1, 0, 0) if we're looking left parallel to the plane
-            Vector4 cameraSpaceNormal = _camera.transform.InverseTransformDirection(exitPortalPlane).normalized;
-            Vector4 cameraSpacePoint = _camera.transform.InverseTransformPoint(exitPortalPlane.w * exitPortalPlane);
+            Vector4 cameraSpaceNormal = _camera.transform.InverseTransformDirection(exitPortalPlane.normal);
+            Vector4 cameraSpacePoint = _camera.transform.InverseTransformPoint(exitPortalPlane.normal * -exitPortalPlane.distance);
 
             // Calculate the d value for our plane by projecting our transformed point
             // onto our transformed normal vector.
             float distanceFromPlane = Vector4.Dot(cameraSpaceNormal, cameraSpacePoint);
 
-            // Not sure why x and y have to be negative. 
+            // Not sure why x and y have to be negative.
             Vector4 cameraSpacePlane = new Vector4(-cameraSpaceNormal.x, -cameraSpaceNormal.y, cameraSpaceNormal.z, distanceFromPlane);
-
-            // Reassign to camera
-            //return _camera.CalculateObliqueMatrix(transformedPlane);
 
             //DecomposeMatrix4x4(projectionMatrix);
             //Valve.VR.EVREye evrEye = eye == Camera.MonoOrStereoscopicEye.Left ? Valve.VR.EVREye.Eye_Left : Valve.VR.EVREye.Eye_Right;
             //projectionMatrix = HMDMatrix4x4ToMatrix4x4(SteamVR.instance.hmd.GetProjectionMatrix(Valve.VR.EVREye.Eye_Left, _camera.nearClipPlane, _camera.farClipPlane, Valve.VR.EGraphicsAPIConvention.API_DirectX));
+
+            //cameraSpacePlane = new Vector4(1, 0, -1, -3);
+
             MakeProjectionMatrixOblique(ref projectionMatrix, cameraSpacePlane);
             return projectionMatrix;
+        }
+
+        void MakeProjectionMatrixOblique(ref Matrix4x4 projection, Vector4 clipPlane) {
+            // Source: http://aras-p.info/texts/obliqueortho.html
+            Vector4 q = projection.inverse * new Vector4(
+                Mathf.Sign(clipPlane.x),
+                Mathf.Sign(clipPlane.y),
+                1.0f,
+                1.0f
+            );
+            Vector4 c = clipPlane * (2.0F / (Vector4.Dot(clipPlane, q)));
+            // third row = clip plane - fourth row
+            projection[2] = c.x - projection[3];
+            projection[6] = c.y - projection[7];
+            projection[10] = c.z - projection[11];
+            projection[14] = c.w - projection[15];
         }
 
         //Matrix4x4 HMDMatrix4x4ToMatrix4x4(Valve.VR.HmdMatrix44_t input) {

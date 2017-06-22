@@ -5,9 +5,13 @@ namespace Portals {
     public class ObjectPool<T> {
         private Queue<T> _available;
         private Func<T> _createObjectFunc;
-        public ObjectPool(Func<T> createObjectFunc = null) {
+        public ObjectPool(int numPreallocated = 0, Func<T> createObjectFunc = null) {
             _available = new Queue<T>();
             _createObjectFunc = createObjectFunc;
+
+            if (numPreallocated > 0) {
+                this.Give(MakeObject());
+            }
         }
 
         public T Take() {

@@ -26,16 +26,11 @@ Shader "Portal/Portal"
 
 		Pass
 		{
-			//Stencil {
-			//	Ref 1
-			//	Comp Always
-			//	Pass Replace
-			//}
 			Blend SrcAlpha OneMinusSrcAlpha
-			Offset -1.0, -0.1
+			//Offset -0.1, -10.0
+			Offset -0.1, -1000.0
 			ZWrite Off
 			Lighting Off
-			//ColorMask 0
 
 			CGPROGRAM
 			#pragma vertex vert
