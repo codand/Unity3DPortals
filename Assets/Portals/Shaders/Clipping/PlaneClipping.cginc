@@ -12,7 +12,7 @@ float3 distanceToPlane(float4 plane, float3 position) {
 float4 _ClippingPlane;
 
 void planarClip(float3 position) {
-	clip(distanceToPlane(_ClippingPlane, position));
+	clip(-distanceToPlane(_ClippingPlane, position));
 }
 
 #define PLANAR_CLIP(worldPos) planarClip(worldPos);

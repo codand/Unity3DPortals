@@ -19,25 +19,31 @@ namespace Portals {
 
         public Matrix4x4 lastFrameWorldToCameraMatrix;
         public Matrix4x4 lastFrameProjectionMatrix;
-        public Texture lastFrameRenderTexture;
+        public RenderTexture lastFrameRenderTexture;
+
+        public static Dictionary<Camera, PortalCamera> cameraMap = new Dictionary<Camera, PortalCamera>();
+
+        public static PortalCamera current {
+            get {
+                PortalCamera c = null;
+                cameraMap.TryGetValue(Camera.current, out c);
+                return c;
+            }
+        }
 
         public Camera parent {
-            get {
-                return _parent;
-            }
-            set {
-                _parent = value;
-            }
+            get { return _parent; }
+            set { _parent = value; }
+        }
+
+        public new Camera camera {
+            get { return _camera;}
         }
 
 
         public Portal portal {
-            get {
-                return _portal;
-            }
-            set {
-                _portal = value;
-            }
+            get { return _portal; }
+            set { _portal = value; }
         }
 
         public Scene enterScene {
@@ -85,7 +91,19 @@ namespace Portals {
 
         public void Awake() {
             _camera = GetComponent<Camera>();
+            cameraMap[_camera] = this;
         }
+
+        private void OnDestroy() {
+            cameraMap.Remove(_camera);
+            if (lastFrameRenderTexture) {
+                RenderTexture.ReleaseTemporary(lastFrameRenderTexture);
+            }
+            if (_camera.targetTexture) {
+                RenderTexture.ReleaseTemporary(_camera.targetTexture);
+            }
+        }
+
 
         private int _framesSinceLastUse = 0;
         void Update() {
@@ -93,20 +111,6 @@ namespace Portals {
                 Destroy(this.gameObject);
             }
             _framesSinceLastUse++;
-        }
-
-        void ReleaseTemporaryRenderTextureDelayed(RenderTexture texture) {
-            StartCoroutine(ReleaseTemporaryRenderTextureDelayedRoutine(texture));
-        }
-
-        IEnumerator ReleaseTemporaryRenderTextureDelayedRoutine(RenderTexture texture) {
-            // Don't do anything this current frame
-            yield return null;
-
-            // Wait until the next frame is done rendering
-            yield return new WaitForEndOfFrame();
-
-            RenderTexture.ReleaseTemporary(texture);
         }
 
         Vector3 GetStereoPosition(Camera camera, VRNode node) {
@@ -145,13 +149,14 @@ namespace Portals {
 
         public RenderTexture RenderToTexture(Camera.MonoOrStereoscopicEye eye) {
             _framesSinceLastUse = 0;
-
+            if (lastFrameRenderTexture) {
+                RenderTexture.ReleaseTemporary(lastFrameRenderTexture);
+            }
+            lastFrameRenderTexture = _camera.targetTexture;
             lastFrameWorldToCameraMatrix = _camera.worldToCameraMatrix;
             lastFrameProjectionMatrix = _camera.projectionMatrix;
-            lastFrameRenderTexture = _camera.targetTexture;
 
             RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
-            ReleaseTemporaryRenderTextureDelayed(texture);
 
             Vector3 parentEyePosition = Vector3.zero;
             Quaternion parentEyeRotation = Quaternion.identity;

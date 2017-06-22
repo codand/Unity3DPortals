@@ -10,20 +10,27 @@ Shader "Portal/Portal"
 
 	SubShader
 	{
-	    // Render after Geometry so we can 
 		Tags{
 			"RenderType" = "Transparent"
 			"Queue" = "Transparent"
 			"IgnoreProjector" = "True"
 		}
 
+		// Mask off the entire shape so we can't see the backface if the frontface is visible
+		// For some reason, ZWrite doesn't appear to work if we use it in our main pass, so
+		// we need to use this priming pass.
+		Pass {
+			ZWrite On
+			ColorMask 0
+		}
+
 		Pass
 		{
-			Stencil {
-				Ref 1
-				Comp Always
-				Pass Replace
-			}
+			//Stencil {
+			//	Ref 1
+			//	Comp Always
+			//	Pass Replace
+			//}
 			Blend SrcAlpha OneMinusSrcAlpha
 			Offset -1.0, -0.1
 			ZWrite Off
@@ -83,10 +90,6 @@ Shader "Portal/Portal"
 
 			fixed4 frag(v2f i) : SV_Target
 			{
-				//fixed4 col = PORTAL_VR_CURRENT_EYE == PORTAL_VR_EYE_LEFT ? \
-				//	tex2Dproj(_LeftEyeTexture, UNITY_PROJ_COORD(i.uv)) : \
-				//	tex2Dproj(_RightEyeTexture, UNITY_PROJ_COORD(i.uv));
-
 				float2 screenUV = i.screenUV.xy / i.screenUV.w;
 				fixed4 col;
 

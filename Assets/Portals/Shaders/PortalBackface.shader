@@ -15,14 +15,13 @@ Shader "Portal/PortalBackface"
 		Pass
 		{
 			// Stencil masks out the backface if we can see the frontface
-			Stencil {
-				Ref 1
-				Comp NotEqual
-			}
+			//Stencil {
+			//	Ref 1
+			//	Comp NotEqual
+			//}
 			Blend SrcAlpha OneMinusSrcAlpha
 			ZWrite Off
 			Lighting Off
-			//Cull Back
 			Offset -0.001, -100
 
 			CGPROGRAM
@@ -49,7 +48,7 @@ Shader "Portal/PortalBackface"
 
 			sampler2D _LeftEyeTexture;
 			sampler2D _RightEyeTexture;
-			float4 _Color;
+			float _BackfaceAlpha;
 
 			v2f vert(appdata v)
 			{
@@ -102,10 +101,8 @@ Shader "Portal/PortalBackface"
 #endif
 
 				UNITY_APPLY_FOG(i.fogCoord, col);
-				
-#ifndef VISIBLE
-				col.a = 0;
-#endif
+
+				col.a *= _BackfaceAlpha;
 				return col;
 			}
 			ENDCG

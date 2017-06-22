@@ -14,15 +14,15 @@ public class SpawnPortalOnClick : MonoBehaviour {
         if (!isActiveAndEnabled) {
             return;
         }
-
-        _leftPortal = SpawnPortal(Vector3.zero, Quaternion.identity);
-        _rightPortal = SpawnPortal(Vector3.zero, Quaternion.identity);
     }
 
     void Start() {
         if (!isActiveAndEnabled) {
             return;
         }
+
+        _leftPortal = SpawnPortal(Vector3.zero, Quaternion.identity);
+        _rightPortal = SpawnPortal(Vector3.zero, Quaternion.identity);
 
         _leftPortal.ExitPortal = _rightPortal;
         _rightPortal.ExitPortal = _leftPortal;
@@ -32,6 +32,10 @@ public class SpawnPortalOnClick : MonoBehaviour {
 
         _leftPortal.gameObject.SetActive(false);
         _rightPortal.gameObject.SetActive(false);
+
+        ParticleSystem particles = _leftPortal.GetComponentInChildren<ParticleSystem>();
+        ParticleSystem.MainModule main = particles.main;
+        main.startColor = Color.red;
     }
 
     Portal SpawnPortal(Vector3 location, Quaternion rotation) {
