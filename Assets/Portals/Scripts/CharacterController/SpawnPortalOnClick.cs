@@ -73,7 +73,8 @@ public class SpawnPortalOnClick : MonoBehaviour {
                 portal.transform.position = hit.point;
                 portal.transform.rotation = rotation;
 
-                portal.AttachedCollider = hit.collider;
+                //portal.AttachedCollider = hit.collider;
+                portal.IgnoredColliders = new Collider[] { hit.collider };
 
                 portal.gameObject.SetActive(true);
             }

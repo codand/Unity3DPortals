@@ -5,16 +5,17 @@ using UnityEngine;
 namespace Portals {
     public static class PortalPhysics {
         // TODO: Figure this shit out
-        public static int PortalLayer = 1 << 8;
-
+        public static int PortalLayer = 8;
+        public static int PortalLayerMask = 1 << PortalLayer;
+        
         private const float Epsilon = 0.001f;
 
         private static bool RecursiveRaycast(Vector3 origin, Vector3 direction, out RaycastHit hitInfo, float maxDistance, int layerMask, QueryTriggerInteraction queryTriggerInteraction, int recursiveDepth, Portal fromPortal=null) {
-            layerMask &= ~PortalLayer; // Don't allow raycasting for portals
+            layerMask &= ~PortalLayerMask; // Don't allow raycasting for portals
 
             // Need to raycast twice because portals and objects can share the same location which would cause fighting
             RaycastHit portalHitInfo, objectHitInfo;
-            bool portalHit = Physics.Raycast(origin, direction, out portalHitInfo, maxDistance, PortalLayer, QueryTriggerInteraction.Collide);
+            bool portalHit = Physics.Raycast(origin, direction, out portalHitInfo, maxDistance, PortalLayerMask, QueryTriggerInteraction.Collide);
             bool objectHit = Physics.Raycast(origin, direction, out objectHitInfo, maxDistance, layerMask, queryTriggerInteraction);
 
             // Recurse we hit a portal and we did not hit an object OR if we hit both, but the portal is closer

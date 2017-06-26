@@ -18,7 +18,7 @@ namespace Portals {
         // TODO: Make this only appear when useProjectionMatrix is enabled
         [SerializeField] private float _clippingOffset = 0.25f;
         [SerializeField] private bool _copyGI = false;
-        [SerializeField] private Collider _attachedCollider;
+        [SerializeField] private List<Collider> _ignoredColliders;
 
         public Portal ExitPortal {
             get { return _exitPortal; }
@@ -82,12 +82,14 @@ namespace Portals {
             set { _copyGI = value; }
         }
 
-        public Collider AttachedCollider {
-            get { return _attachedCollider; }
+        public Collider[] IgnoredColliders {
+            get { return _ignoredColliders.ToArray(); }
             set {
-                if (_attachedCollider != value) {
-                    _portalColliderTrigger.ResetIgnoredCollisions();
-                    _attachedCollider = value;
+                Collider[] oldColliders = _ignoredColliders.ToArray();
+                _ignoredColliders = new List<Collider>(value);
+
+                if (onIgnoredCollidersChanged != null) {
+                    onIgnoredCollidersChanged(this, oldColliders);
                 }
             }
         }
@@ -111,10 +113,13 @@ namespace Portals {
         public static event StaticPortalEvent onPortalExitGlobal;
         public static event StaticPortalEvent onPortalTeleportGlobal;
 
-        public delegate void PortalEvent(GameObject obj);
-        public event PortalEvent onPortalEnter;
-        public event PortalEvent onPortalExit;
-        public event PortalEvent onPortalTeleport;
+        public delegate void PortalTriggerEvent(Portal portal, GameObject obj);
+        public event PortalTriggerEvent onPortalEnter;
+        public event PortalTriggerEvent onPortalExit;
+        public event PortalTriggerEvent onPortalTeleport;
+        
+        public delegate void PortalIgnoredCollidersChangedEvent(Portal portal, Collider[] colliders);
+        public event PortalIgnoredCollidersChangedEvent onIgnoredCollidersChanged;
 
         // Maps cameras to their children
         private Dictionary<Camera, PortalCamera> _camToPortalCam = new Dictionary<Camera, PortalCamera>();
@@ -137,8 +142,6 @@ namespace Portals {
 
         private Dictionary<Camera, bool> _wasRenderedByCamera = new Dictionary<Camera, bool>();
         private Stack<Texture> _savedTextures = new Stack<Texture>();
-
-        private PortalColliderTrigger _portalColliderTrigger;
 
         private bool _inPortal = false;
 
@@ -165,11 +168,8 @@ namespace Portals {
             _keywordStack = new Stack<ShaderKeyword>();
             _blockPool = new ObjectPool<MaterialPropertyBlock>(1, () => new MaterialPropertyBlock());
 
-            _portalColliderTrigger = GetComponentInChildren<PortalColliderTrigger>();
-            if (!_portalColliderTrigger) {
-                throw new System.Exception("Can't find PortalColliderTrigger on child object");
-            }
-
+            // TODO
+            //this.gameObject.layer = PortalPhysics.PortalLayer;
 
             if (!_mesh) {
                 _mesh = MakeMesh();
@@ -431,131 +431,139 @@ namespace Portals {
         }
 
 
-        void OnTriggerEnter(Collider collider) {
-            if (!ExitPortal || !ExitPortal.isActiveAndEnabled) {
-                return;
-            }
+        //void OnTriggerEnter(Collider collider) {
+        //    if (!ExitPortal || !ExitPortal.isActiveAndEnabled) {
+        //        return;
+        //    }
 
-            Teleportable teleportable = collider.GetComponent<Teleportable>();
-            if (teleportable && !teleportable.IsClone) {
-                teleportable._receivedOnTriggerEnterFrom.Add(this);
-            }
-            if (!teleportable || teleportable.IsClone || teleportable.IsInsidePortal(this)) {
-                return;
-            }
+        //    Teleportable teleportable = collider.GetComponent<Teleportable>();
+        //    if (teleportable && !teleportable.IsClone) {
+        //        teleportable._receivedOnTriggerEnterFrom.Add(this);
+        //    }
+        //    if (!teleportable || teleportable.IsClone || teleportable.IsInsidePortal(this)) {
+        //        return;
+        //    }
             
-            if (teleportable.Camera) {
-                _camerasInside.Add(teleportable.Camera);
-            }
+        //    if (teleportable.Camera) {
+        //        _camerasInside.Add(teleportable.Camera);
+        //    }
 
-            collider.gameObject.SendMessage("OnPortalEnter", this, SendMessageOptions.DontRequireReceiver);
-            if (onPortalEnterGlobal != null)
-                onPortalEnterGlobal(this, collider.gameObject);
-            if (onPortalEnter != null)
-                onPortalEnter(collider.gameObject);
-        }
+        //    collider.gameObject.SendMessage("OnPortalEnter", this, SendMessageOptions.DontRequireReceiver);
+        //    if (onPortalEnterGlobal != null)
+        //        onPortalEnterGlobal(this, collider.gameObject);
+        //    if (onPortalEnter != null)
+        //        onPortalEnter(this, collider.gameObject);
+        //}
 
-        void OnTriggerExit(Collider collider) {
-            if (!ExitPortal || !ExitPortal.isActiveAndEnabled) {
-                return;
-            }
+        //void OnTriggerExit(Collider collider) {
+        //    if (!ExitPortal || !ExitPortal.isActiveAndEnabled) {
+        //        return;
+        //    }
 
-            Teleportable teleportable = collider.GetComponent<Teleportable>();
-            if (!teleportable || teleportable.IsClone || !teleportable.IsInsidePortal(this)) {
-                return;
-            }
+        //    Teleportable teleportable = collider.GetComponent<Teleportable>();
+        //    if (!teleportable || teleportable.IsClone || !teleportable.IsInsidePortal(this)) {
+        //        return;
+        //    }
 
-            if (teleportable.Camera) {
-                _camerasInside.Remove(teleportable.Camera);
-            }
+        //    if (teleportable.Camera) {
+        //        _camerasInside.Remove(teleportable.Camera);
+        //    }
 
 
-            collider.gameObject.SendMessage("OnPortalExit", this, SendMessageOptions.DontRequireReceiver);
-            if (onPortalExitGlobal != null)
-                onPortalExitGlobal(this, collider.gameObject);
-            if (onPortalExit != null)
-                onPortalExit(collider.gameObject);
-        }
+        //    collider.gameObject.SendMessage("OnPortalExit", this, SendMessageOptions.DontRequireReceiver);
+        //    if (onPortalExitGlobal != null)
+        //        onPortalExitGlobal(this, collider.gameObject);
+        //    if (onPortalExit != null)
+        //        onPortalExit(this, collider.gameObject);
+        //}
 
-        void OnTriggerStay(Collider collider) {
+        //void OnTriggerStay(Collider collider) {
             
-            if (!ExitPortal) {
-                return;
-            }
+        //    if (!ExitPortal) {
+        //        return;
+        //    }
 
-            Teleportable teleportable = collider.GetComponent<Teleportable>();
-            if (!teleportable || teleportable.IsClone || !teleportable.IsInsidePortal(this)) {
-                return;
-            }
+        //    Teleportable teleportable = collider.GetComponent<Teleportable>();
+        //    if (!teleportable || teleportable.IsClone || !teleportable.IsInsidePortal(this)) {
+        //        return;
+        //    }
 
-            Vector3 position = teleportable.Camera ? teleportable.Camera.transform.position : collider.transform.position;
-            bool throughPortal = Plane.GetSide(position);
-            if (throughPortal) {
-                TeleportObject(teleportable, collider);
-            }
+        //    Vector3 position = teleportable.Camera ? teleportable.Camera.transform.position : collider.transform.position;
+        //    bool throughPortal = Plane.GetSide(position);
+        //    if (throughPortal) {
+        //        TeleportObject(teleportable, collider);
+        //    }
+        //}
+
+        //IEnumerator HighSpeedTeleportCheck(Teleportable teleportable, Collider collider) {
+        //    // If we're going too fast, sometimes we can skip past the exit collider even with continuous collision detection.
+        //    // In this case, we should wait to see if we get an OnTriggerEnter event from
+        //    // the exit portal in exactly two frames. If we do not, then call OnTriggerExit manually.
+        //    yield return new WaitForFixedUpdate();
+        //    yield return new WaitForFixedUpdate();
+        //    if (!teleportable._receivedOnTriggerEnterFrom.Contains(ExitPortal)) {
+        //        //Debug.Log("TriggerEnter was NOT seen");
+        //        ExitPortal.OnTriggerExit(collider);
+        //    } else {
+        //        //Debug.Log("TriggerEnter WAS seen");
+        //    }
+        //}
+
+        //public void TeleportObject(Teleportable teleportable, Collider collider) {
+        //    PortalLight light = collider.GetComponent<PortalLight>();
+        //    if(light) {
+        //        return;
+        //    }
+
+        //    if (teleportable.Camera) {
+        //        _camerasInside.Remove(teleportable.Camera);
+        //        ExitPortal._camerasInside.Add(teleportable.Camera);
+        //    }
+        //    StartCoroutine(HighSpeedTeleportCheck(teleportable, collider));
+
+        //    CharacterController characterController = collider.GetComponent<CharacterController>();
+        //    Rigidbody rigidbody = collider.GetComponent<Rigidbody>();
+        //    //if (characterController == null && rigidbody == null) {
+        //    //    Debug.LogError(collider.gameObject.name + " must have a Rigidbody or CharacterController to pass through the portal");
+        //    //    return;
+        //    //}
+
+
+
+        //    //if (ExitPortal.AttachedCollider) {
+        //    //    Physics.IgnoreCollision(collider, ExitPortal.AttachedCollider, true);
+        //    //}
+
+        //    ApplyWorldToPortalTransform(collider.gameObject.transform, collider.gameObject.transform);
+
+        //    if (rigidbody != null) {
+        //        // TODO: Evaluate whether or not using Rigidbody.position is important
+        //        // Currently it messes up the _cameraInside stuff because it happens at the next physics step
+        //        //Vector3 newPosition = PortalMatrix().MultiplyPoint3x4(rigidbody.position);
+        //        //Quaternion newRotation = PortalRotation() * rigidbody.rotation;
+        //        //rigidbody.position = newPosition;
+        //        //rigidbody.transform.rotation = newRotation;
+
+        //        float scaleDelta = this.PortalScaleAverage();
+        //        rigidbody.velocity = PortalRotation() * rigidbody.velocity * scaleDelta;
+        //        rigidbody.mass *= scaleDelta * scaleDelta * scaleDelta;
+        //    }
+
+        //    collider.gameObject.SendMessage("OnPortalTeleport", this, SendMessageOptions.DontRequireReceiver);
+        //    if (onPortalTeleportGlobal != null)
+        //        onPortalTeleportGlobal(this, collider.gameObject);
+        //    if (onPortalTeleport != null)
+        //        onPortalTeleport(this, collider.gameObject);
+
+        //    //UnityEditor.EditorApplication.isPaused = true;
+        //}
+
+        public void RegisterCamera(Camera camera) {
+            _camerasInside.Add(camera);
         }
 
-        IEnumerator HighSpeedTeleportCheck(Teleportable teleportable, Collider collider) {
-            // If we're going too fast, sometimes we can skip past the exit collider even with continuous collision detection.
-            // In this case, we should wait to see if we get an OnTriggerEnter event from
-            // the exit portal in exactly two frames. If we do not, then call OnTriggerExit manually.
-            yield return new WaitForFixedUpdate();
-            yield return new WaitForFixedUpdate();
-            if (!teleportable._receivedOnTriggerEnterFrom.Contains(ExitPortal)) {
-                //Debug.Log("TriggerEnter was NOT seen");
-                ExitPortal.OnTriggerExit(collider);
-            } else {
-                //Debug.Log("TriggerEnter WAS seen");
-            }
-        }
-
-        public void TeleportObject(Teleportable teleportable, Collider collider) {
-            PortalLight light = collider.GetComponent<PortalLight>();
-            if(light) {
-                return;
-            }
-
-            if (teleportable.Camera) {
-                _camerasInside.Remove(teleportable.Camera);
-                ExitPortal._camerasInside.Add(teleportable.Camera);
-            }
-            StartCoroutine(HighSpeedTeleportCheck(teleportable, collider));
-
-            CharacterController characterController = collider.GetComponent<CharacterController>();
-            Rigidbody rigidbody = collider.GetComponent<Rigidbody>();
-            //if (characterController == null && rigidbody == null) {
-            //    Debug.LogError(collider.gameObject.name + " must have a Rigidbody or CharacterController to pass through the portal");
-            //    return;
-            //}
-
-
-
-            if (ExitPortal.AttachedCollider) {
-                Physics.IgnoreCollision(collider, ExitPortal.AttachedCollider, true);
-            }
-
-            ApplyWorldToPortalTransform(collider.gameObject.transform, collider.gameObject.transform);
-
-            if (rigidbody != null) {
-                // TODO: Evaluate whether or not using Rigidbody.position is important
-                // Currently it messes up the _cameraInside stuff because it happens at the next physics step
-                //Vector3 newPosition = PortalMatrix().MultiplyPoint3x4(rigidbody.position);
-                //Quaternion newRotation = PortalRotation() * rigidbody.rotation;
-                //rigidbody.position = newPosition;
-                //rigidbody.transform.rotation = newRotation;
-
-                float scaleDelta = this.PortalScaleAverage();
-                rigidbody.velocity = PortalRotation() * rigidbody.velocity * scaleDelta;
-                rigidbody.mass *= scaleDelta * scaleDelta * scaleDelta;
-            }
-
-            collider.gameObject.SendMessage("OnPortalTeleport", this, SendMessageOptions.DontRequireReceiver);
-            if (onPortalTeleportGlobal != null)
-                onPortalTeleportGlobal(this, collider.gameObject);
-            if (onPortalTeleport != null)
-                onPortalTeleport(collider.gameObject);
-
-            //UnityEditor.EditorApplication.isPaused = true;
+        public void UnregisterCamera(Camera camera) {
+            _camerasInside.Remove(camera);
         }
 
         void OnDrawGizmos() {

@@ -13,12 +13,12 @@ public class PortalColliderRaycaster : MonoBehaviour {
         _portal = GetComponent<Portal>();
     }
 
-	void FixedUpdate () {
-        RaycastHit hit;
-        if(Physics.Raycast(transform.position, transform.forward, out hit, 1.0f, _layerMask, QueryTriggerInteraction.Ignore)) { 
-            _portal.AttachedCollider = hit.collider;
-        } else {
-            _portal.AttachedCollider = null;
-        }
-	}
+	//void FixedUpdate () {
+ //       RaycastHit hit;
+ //       if(Physics.Raycast(transform.position, transform.forward, out hit, 1.0f, _layerMask, QueryTriggerInteraction.Ignore)) { 
+ //           _portal.AttachedCollider = hit.collider;
+ //       } else {
+ //           _portal.AttachedCollider = null;
+ //       }
+	//}
 }
