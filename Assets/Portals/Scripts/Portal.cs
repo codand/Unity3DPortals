@@ -94,6 +94,12 @@ namespace Portals {
             }
         }
 
+        public PortalTrigger[] PortalTriggers {
+            get {
+                return GetComponentsInChildren<PortalTrigger>();
+            }
+        }
+
         public Plane Plane {
             get {
                 return new Plane(transform.forward, transform.position);

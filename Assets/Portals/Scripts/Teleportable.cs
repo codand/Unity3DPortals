@@ -35,7 +35,6 @@ namespace Portals {
 
         private ObjectPool<Teleportable> _clonePool;
 
-        private HashSet<Portal> _occupiedPortals;
         private HashSet<Portal> _enteredPortalsThisFrame;
         private HashSet<PortalTrigger> _occupiedTriggers;
 
@@ -45,10 +44,6 @@ namespace Portals {
 
         private Collider[] _allColliders;
         #endregion
-
-        private void DisableColliders(PortalTrigger trigger) {
-
-        }
 
         #region Initialization
         void Awake() {
@@ -70,7 +65,6 @@ namespace Portals {
                 _rendererToShader = new Dictionary<Renderer, Shader>();
                 _portalToClone = new Dictionary<Portal, Teleportable>();
                 _clonePool = new ObjectPool<Teleportable>(1, CreateClone);
-                _occupiedPortals = new HashSet<Portal>();
                 _occupiedTriggers = new HashSet<PortalTrigger>();
                 _enteredPortalsThisFrame = new HashSet<Portal>();
 
@@ -128,53 +122,105 @@ namespace Portals {
         #endregion
 
         #region Triggers
-        //private void OnCollisionEnter(Collision collision) {
-        //    Debug.Log("Collided with " + collision.collider.name);
-        //    //OnTriggerEnter(collision.collider.transform.parent.GetComponent<Collider>());
-        //}
-
         private void OnTriggerEnter(Collider collider) {
             PortalTrigger trigger = collider.GetComponent<PortalTrigger>();
             if (!trigger) {
                 return;
             }
 
-
             _enteredPortalsThisFrame.Add(trigger.portal);
-            if (_occupiedTriggers.Contains(trigger)) {
+            if (!trigger.portal.ExitPortal || _occupiedTriggers.Contains(trigger)) {
                 return;
             }
-
             _occupiedTriggers.Add(trigger);
-
-            //OnPortalEnter(portal);
+            OnPortalTriggerEnter(trigger);
         }
 
-        private void OnTriggerStay (Collider collider) {
-            if (collider.gameObject.layer != PortalPhysics.PortalLayer) {
-                return;
-            }
-            //Debug.Log("Stay" + collider.name);
-
-            Portal portal = collider.GetComponent<Portal>();
-            if (!portal) {
-                string msg = string.Format("{0} is using Portal layer but does not have a Portal script attached", collider.name);
-                throw new System.Exception(msg);
-            }
-            if (!portal.ExitPortal || !_occupiedPortals.Contains(portal)) {
+        private void OnTriggerStay(Collider collider) {
+            PortalTrigger trigger = collider.GetComponent<PortalTrigger>();
+            if (!trigger) {
                 return;
             }
 
-            Vector3 position = _camera ? _camera.transform.position : transform.position;
-            bool throughPortal = portal.Plane.GetSide(position);
-            if (throughPortal) {
-                Teleport(portal);
+            if (!trigger.portal.ExitPortal || !_occupiedTriggers.Contains(trigger)) {
+                return;
             }
+            OnPortalTriggerStay(trigger);
+        }
+
+        private void OnTriggerExit(Collider collider) {
+            PortalTrigger trigger = collider.GetComponent<PortalTrigger>();
+            if (!trigger) {
+                return;
+            }
+            Portal portal = trigger.portal;
+
+            if (!portal.ExitPortal || !_occupiedTriggers.Contains(trigger)) {
+                return;
+            }
+
+            _occupiedTriggers.Remove(trigger);
+            OnPortalTriggerExit(trigger);
+        }
+
+        private void OnPortalTriggerEnter(PortalTrigger trigger) {
+            Portal portal = trigger.portal;
+            switch (trigger.function) {
+                case PortalTrigger.TriggerFunction.DisableColliders:
+                    IgnoreCollisions(trigger.portal, true);
+                    trigger.portal.onIgnoredCollidersChanged += OnIgnoredCollidersChanged;
+                    break;
+                case PortalTrigger.TriggerFunction.SpawnClone:
+                    break;
+                case PortalTrigger.TriggerFunction.Teleport:
+                    if (_camera) {
+                        portal.RegisterCamera(_camera);
+                    }
+                    break;
+            }
+        }
+
+
+        private void OnPortalTriggerStay(PortalTrigger trigger) {
+            Portal portal = trigger.portal;
+            switch (trigger.function) {
+                case PortalTrigger.TriggerFunction.DisableColliders:
+                    break;
+                case PortalTrigger.TriggerFunction.SpawnClone:
+                    break;
+                case PortalTrigger.TriggerFunction.Teleport:
+                    Vector3 position = _camera ? _camera.transform.position : transform.position;
+                    bool throughPortal = portal.Plane.GetSide(position);
+                    if (throughPortal) {
+                        Teleport(portal);
+                    }
+                    break;
+            }
+        }
+
+        private void OnPortalTriggerExit(PortalTrigger trigger){
+            Portal portal = trigger.portal;
+            switch (trigger.function) {
+                case PortalTrigger.TriggerFunction.DisableColliders:
+                    IgnoreCollisions(trigger.portal, false);
+                    trigger.portal.onIgnoredCollidersChanged -= OnIgnoredCollidersChanged;
+                    break;
+                case PortalTrigger.TriggerFunction.SpawnClone:
+                    break;
+                case PortalTrigger.TriggerFunction.Teleport:
+                    if (_camera) {
+                        portal.UnregisterCamera(_camera);
+                    }
+                    break;
+            }
+            //OnPortalExit(portal);
         }
 
         private void Teleport(Portal portal) {
-            _occupiedPortals.Remove(portal);
-            _occupiedPortals.Add(portal.ExitPortal);
+            IgnoreCollisions(portal.ExitPortal, true);
+            if (_camera) {
+                portal.ExitPortal.RegisterCamera(_camera);
+            }
 
             portal.ApplyWorldToPortalTransform(transform, transform);
             if (_rigidbody != null) {
@@ -191,7 +237,6 @@ namespace Portals {
             }
 
             StartCoroutine(HighSpeedTeleportCheck(portal));
-            OnPortalTeleport(portal);
         }
 
 
@@ -207,26 +252,6 @@ namespace Portals {
             }
         }
 
-        private void OnTriggerExit(Collider collider) {
-            if (collider.gameObject.layer != PortalPhysics.PortalLayer) {
-                return;
-            }
-
-            //Debug.Log("Exit" + collider.name);
-
-            Portal portal = collider.GetComponent<Portal>();
-            if (!portal) {
-                string msg = string.Format("{0} is using Portal layer but does not have a Portal script attached", collider.name);
-                throw new System.Exception(msg);
-            }
-            if (!portal.ExitPortal || !_occupiedPortals.Contains(portal)) {
-                return;
-            }
-
-            _occupiedPortals.Remove(portal);
-
-            OnPortalExit(portal);
-        }
         #endregion
 
         #region Collisions
@@ -308,14 +333,6 @@ namespace Portals {
                 portal.RegisterCamera(_camera);
             }
             Debug.Log("Enter " + portal.name);
-
-            // If we collided with a wall, we need to undo the collision
-            //Debug.Log("Info: " + _rigidbodyInfo.velocity);
-            //Debug.Log("Rigidbody: " + _rigidbody.velocity);
-            //_rigidbodyInfo.SimulatePhysicsStep(_rigidbody);
-            //_rigidbodyInfo.ApplyTo(_rigidbody);
-            //transform.position = _rigidbodyInfo.position;
-            //transform.rotation = _rigidbodyInfo.rotation;
 
             //Teleportable clone = GetClone(portal);
             //if (!clone) {
