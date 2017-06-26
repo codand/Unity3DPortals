@@ -85,8 +85,10 @@ namespace Portals {
         public Collider AttachedCollider {
             get { return _attachedCollider; }
             set {
-                _portalColliderTrigger.ResetIgnoredCollisions();
-                _attachedCollider = value;
+                if (_attachedCollider != value) {
+                    _portalColliderTrigger.ResetIgnoredCollisions();
+                    _attachedCollider = value;
+                }
             }
         }
 

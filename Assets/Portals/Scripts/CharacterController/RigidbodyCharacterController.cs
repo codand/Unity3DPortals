@@ -91,6 +91,7 @@ namespace Portals {
             if (disable_stuff) return;
             Quaternion rotation = Quaternion.AngleAxis(angle, Vector3.up);
             this.transform.localRotation = this.transform.localRotation * rotation;
+            //_rigidbody.MoveRotation(_rigidbody.rotation * rotation);
         }
 
         public void RotateHead(float angle) {

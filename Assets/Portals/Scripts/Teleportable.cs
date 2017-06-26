@@ -6,6 +6,7 @@ using System;
 namespace Portals {
     public class Teleportable : MonoBehaviour {
         private static List<Type> _validBehaviours = new List<Type>(){
+            typeof(Teleportable),
             typeof(Animator),
             typeof(MeshFilter),
             typeof(MeshRenderer),
@@ -33,14 +34,12 @@ namespace Portals {
 
         private ObjectPool<Teleportable> _clonePool;
 
-        private GameObject _clone;
-
         private HashSet<Portal> _occupiedPortals;
         public HashSet<Portal> _receivedOnTriggerEnterFrom;
 
         private Rigidbody _rigidbody;
 
-        private Teleportable _mainBody;
+        private Teleportable _master;
 
         public Camera Camera {
             get { return _camera; }
@@ -54,56 +53,140 @@ namespace Portals {
             return _occupiedPortals.Contains(portal);
         }
 
+        public Portal myPortal;
+
+        private struct Impulse {
+            public Vector3 translational;
+            public Vector3 rotational;
+        }
+
+        private Impulse _frameImpulse;
+
         void Awake() {
             // Awake is called on all clones
             _rigidbody = GetComponent<Rigidbody>();
+
+            if (_isClone) {
+                //StartCoroutine(LateFixedUpdateRoutine());
+            }
         }
 
         void Start() {
-            // Start is not called on clones
-            _mainBody = this;
+            if (!_isClone) {
+                _clippedShader = Shader.Find("Portals/StandardClipped");
+                _clippedShaderPlaneHash = Shader.PropertyToID("_ClippingPlane");
 
-            _isClone = false;
 
-            _clippedShader = Shader.Find("Portals/StandardClipped");
-            _clippedShaderPlaneHash = Shader.PropertyToID("_ClippingPlane");
-            
+                _rendererToShader = new Dictionary<Renderer, Shader>();
+                _portalToClone = new Dictionary<Portal, Teleportable>();
+                _clonePool = new ObjectPool<Teleportable>(1, CreateClone);
+                _occupiedPortals = new HashSet<Portal>();
+                _receivedOnTriggerEnterFrom = new HashSet<Portal>();
 
-            _rendererToShader = new Dictionary<Renderer, Shader>();
-            _portalToClone = new Dictionary<Portal, Teleportable>();
-            _clonePool =  new ObjectPool<Teleportable>(1, CreateClone);
-            _occupiedPortals = new HashSet<Portal>();
-            _receivedOnTriggerEnterFrom = new HashSet<Portal>();
-
-            SaveShaders(this.gameObject);
+                SaveShaders(this.gameObject);
+            }
         }
 
-        void OnCollisionEnter(Collision collision) {
-            if (_rigidbody && IsClone) {
-                _mainBody._rigidbody.AddForce(collision.impulse);
+        //IEnumerator LateFixedUpdateRoutine() {
+        //    while (true) {
+        //        yield return new WaitForFixedUpdate();
+        //        LateFixedUpdate();
+        //    }
+        //}
+
+        void LateUpdate() {
+            if (!_isClone) {
+                //LockClones(true);
             }
         }
 
         void FixedUpdate() {
-            _receivedOnTriggerEnterFrom.Clear();
+            _frameImpulse.rotational = Vector3.zero;
+            _frameImpulse.translational = Vector3.zero;
+
+            if (!_isClone) {
+                LockClones(false);
+                _receivedOnTriggerEnterFrom.Clear();
+            }
         }
 
-        void LateUpdate() {
-            foreach(KeyValuePair<Portal, Teleportable> kvp in _portalToClone) {
+        //void LateFixedUpdate() {
+        //    if (_isClone) {
+        //        _master._rigidbody.velocity += CalculateImpulseTransfer(this._frameImpulse.translational, _master._frameImpulse.translational);
+        //        _master._rigidbody.angularVelocity += CalculateImpulseTransfer(this._frameImpulse.rotational, _master._frameImpulse.rotational);
+        //    }
+        //}
+
+
+        //void OnCollisionEnter(Collision collision) {
+        //    HandleCollision(collision);
+        //}
+
+        //void OnCollisionStay(Collision collision) {
+        //    HandleCollision(collision);
+        //}
+
+        //void HandleCollision(Collision collision) {
+        //    Vector3 positionSum = Vector3.zero;
+        //    Vector3 normalSum = Vector3.zero;
+        //    foreach (ContactPoint contact in collision.contacts) {
+        //        positionSum += contact.point;
+        //        normalSum += contact.normal;
+        //    }
+        //    Vector3 averageContactPoint = positionSum / collision.contacts.Length;
+        //    Vector3 averageNormal = normalSum / collision.contacts.Length;
+
+        //    Vector3 impulse = collision.impulse;
+        //    // Impulse isn't always pointing in the right direction. We have to correct it manually
+        //    if (Vector3.Dot(impulse, averageNormal) < 0) {
+        //        impulse *= -1;
+        //    }
+        //    Vector3 rotationImpulse = Vector3.Cross(averageContactPoint - _rigidbody.worldCenterOfMass, impulse);
+        //    _frameImpulse.translational += impulse;
+        //    _frameImpulse.rotational += rotationImpulse;
+        //}
+
+        //Vector3 CalculateImpulseTransfer(Vector3 imp1, Vector3 imp2) {
+        //    Vector3 impParallel = Vector3.Project(imp1, imp2);
+        //    Vector3 impPerpendicular = imp1 - impParallel;
+        //    Vector3 impTransfer = impPerpendicular;
+        //    float magnitude = Vector3.Dot(imp1, imp2.normalized);
+        //    if (magnitude < 0) {
+        //        impTransfer += impParallel;
+        //    } else if (magnitude > imp2.magnitude) {
+        //        impTransfer += (impParallel - imp2);
+        //    }
+
+        //    return impTransfer;
+        //}
+
+        void LockClones(bool instant=false) {
+            foreach (KeyValuePair<Portal, Teleportable> kvp in _portalToClone) {
                 Portal portal = kvp.Key;
                 Teleportable clone = kvp.Value;
 
-                //Rigidbody rigidbody = clone.GetComponent<Rigidbody>();
-                //if (rigidbody) {
-                //    Vector3 newPosition = portal.PortalMatrix().MultiplyPoint3x4(this._rigidbody.position);
-                //    Quaternion newRotation = portal.PortalRotation() * this._rigidbody.rotation;
-                //    rigidbody.MovePosition(newPosition);
-                //    rigidbody.transform.rotation = newRotation;
-                //} else {
-                    portal.ApplyWorldToPortalTransform(clone.transform, this.transform);
-                //}
+                if (clone.isActiveAndEnabled) {
+
+                    if (instant) {
+                        Vector3 newPosition = portal.PortalMatrix().MultiplyPoint3x4(this.transform.position);
+                        Quaternion newRotation = portal.PortalRotation() * this.transform.rotation;
+                        clone.transform.position = newPosition;
+                        clone.transform.rotation = newRotation;
+                        clone._rigidbody.velocity = _rigidbody.velocity;
+                        clone._rigidbody.angularVelocity = _rigidbody.angularVelocity;
+                    } else {
+                        Vector3 newPosition = portal.PortalMatrix().MultiplyPoint3x4(this._rigidbody.position);
+                        Quaternion newRotation = portal.PortalRotation() * this._rigidbody.rotation;
+                        clone._rigidbody.MovePosition(newPosition);
+                        clone._rigidbody.MoveRotation(newRotation);
+                        clone._rigidbody.velocity = _rigidbody.velocity;
+                        clone._rigidbody.angularVelocity = _rigidbody.angularVelocity;
+                    }
+                }
             }
         }
+
+
 
         void OnPortalEnter(Portal portal) {
             _occupiedPortals.Add(portal);
@@ -112,6 +195,7 @@ namespace Portals {
             Teleportable clone = GetClone(portal);
             if (!clone) {
                 clone = SpawnClone(portal);
+                LockClones(true);
             }
             ReplaceShaders(this.gameObject, portal);
             ReplaceShaders(clone.gameObject, portal.ExitPortal);
@@ -176,7 +260,7 @@ namespace Portals {
             DisableInvalidComponentsRecursively(clone.gameObject);
             clone.gameObject.SetActive(false);
             clone._isClone = true;
-            clone._mainBody = this;
+            clone._master = this;
 
             return clone;
         }

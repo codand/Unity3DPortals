@@ -6,6 +6,7 @@ using System;
 namespace Portals {
     public class PortalColliderTrigger : MonoBehaviour {
         [SerializeField] private Portal _portal;
+        [SerializeField] private GameObject _portalColliders;
 
         private Dictionary<Teleportable, int> _triggerCounts = new Dictionary<Teleportable, int>();
         private List<Collider> _ignoredColliders = new List<Collider>();
@@ -17,6 +18,14 @@ namespace Portals {
                     IgnoreCollisions(collider, false);
                 }
             }
+        }
+
+        void EnablePortalColliders() {
+            _portalColliders.SetActive(true);
+        }
+
+        void DisablePortalColliders() {
+            _portalColliders.SetActive(false);
         }
 
         void IgnoreCollisions(Collider collider, bool ignore) {
@@ -62,7 +71,6 @@ namespace Portals {
                 return;
             }
             int triggerCount = IncrementTriggerCount(teleportable);
-            //Debug.Log(collider.gameObject.name + " " + triggerCount);
             if (triggerCount > 1) {
                 return;
             }
@@ -72,6 +80,7 @@ namespace Portals {
             }
 
             IgnoreCollisions(collider, true);
+            EnablePortalColliders();
         }
 
         void OnTriggerExit(Collider collider) {
@@ -89,6 +98,7 @@ namespace Portals {
             }
 
             IgnoreCollisions(collider, false);
+            DisablePortalColliders();
         }
     }
 }
