@@ -7,125 +7,8 @@ using UnityEngine.VR;
 
 namespace Portals {
     //[ExecuteInEditMode]
-    public class Portal : RenderedBehaviour {
-        [SerializeField] private Portal _exitPortal;
-        [SerializeField] private Texture _defaultTexture;
-        [SerializeField] private Texture _transparencyMask;
-        [SerializeField] private int _maxRecursiveDepth = 2;
-        [SerializeField] private bool _fakeInfiniteRecursion = true;
-        [SerializeField] private bool _useCullingMatrix = true;
-        [SerializeField] private bool _useProjectionMatrix = true;
-        // TODO: Make this only appear when useProjectionMatrix is enabled
-        [SerializeField] private float _clippingOffset = 0.25f;
-        [SerializeField] private bool _copyGI = false;
-        [SerializeField] private List<Collider> _ignoredColliders;
-
-        public Portal ExitPortal {
-            get { return _exitPortal; }
-            set {
-                if (value) {
-                    _portalMaterial.EnableKeyword("DONT_SAMPLE");
-                } else {
-                    _portalMaterial.DisableKeyword("DONT_SAMPLE");
-                }
-                _exitPortal = value;
-            }
-        }
-
-        public Texture DefaultTexture {
-            get {
-                return _defaultTexture;
-            }
-            set {
-                _defaultTexture = value;
-                _portalMaterial.SetTexture("_DefaultTexture", _defaultTexture);
-            }
-        }
-
-        public Texture TransparencyMask {
-            get {
-                return _transparencyMask;
-            }
-            set {
-                _transparencyMask = value;
-                _portalMaterial.SetTexture("_TransparencyMask", _transparencyMask);
-            }
-        }
-
-        public int MaxRecursiveDepth {
-            get { return _maxRecursiveDepth; }
-            set { _maxRecursiveDepth = value; }
-        }
-
-        public bool FakeInfiniteRecursion {
-            get { return _fakeInfiniteRecursion; }
-            set { _fakeInfiniteRecursion = value; }
-        }
-
-        public bool UseCullingMatrix {
-            get { return _useCullingMatrix; }
-            set { _useCullingMatrix = value; }
-        }
-
-        public bool UseProjectionMatrix {
-            get { return _useProjectionMatrix; }
-            set { _useProjectionMatrix = value; }
-        }
-
-        public float ClippingOffset {
-            get { return _clippingOffset; }
-            set { _clippingOffset = value; }
-        }
-
-        public bool CopyGI {
-            get { return _copyGI; }
-            set { _copyGI = value; }
-        }
-
-        public Collider[] IgnoredColliders {
-            get { return _ignoredColliders.ToArray(); }
-            set {
-                Collider[] oldColliders = _ignoredColliders.ToArray();
-                _ignoredColliders = new List<Collider>(value);
-
-                if (onIgnoredCollidersChanged != null) {
-                    onIgnoredCollidersChanged(this, oldColliders);
-                }
-            }
-        }
-
-        public PortalTrigger[] PortalTriggers {
-            get {
-                return GetComponentsInChildren<PortalTrigger>();
-            }
-        }
-
-        public Plane Plane {
-            get {
-                return new Plane(transform.forward, transform.position);
-            }
-        }
-
-        public Vector4 VectorPlane {
-            get {
-                Plane plane = this.Plane;
-                Vector3 normal = plane.normal;
-                return new Vector4(normal.x, normal.y, normal.z, plane.distance);
-            }
-        }
-
-        public delegate void StaticPortalEvent(Portal portal, GameObject obj);
-        public static event StaticPortalEvent onPortalEnterGlobal;
-        public static event StaticPortalEvent onPortalExitGlobal;
-        public static event StaticPortalEvent onPortalTeleportGlobal;
-
-        public delegate void PortalTriggerEvent(Portal portal, GameObject obj);
-        public event PortalTriggerEvent onPortalEnter;
-        public event PortalTriggerEvent onPortalExit;
-        public event PortalTriggerEvent onPortalTeleport;
-        
-        public delegate void PortalIgnoredCollidersChangedEvent(Portal portal, Collider[] colliders);
-        public event PortalIgnoredCollidersChangedEvent onIgnoredCollidersChanged;
+    public class PortalRenderer : RenderedBehaviour {
+        [SerializeField] Portal _portal;
 
         // Maps cameras to their children
         private Dictionary<Camera, PortalCamera> _camToPortalCam = new Dictionary<Camera, PortalCamera>();
@@ -136,7 +19,7 @@ namespace Portals {
 
         // Mesh spawned when walking through a portal so that you can't clip through the portal
         public static Mesh _mesh;
-        
+
         // Per-portal instance of the backface object
         private GameObject _backFace;
 
@@ -169,8 +52,8 @@ namespace Portals {
         private ObjectPool<MaterialPropertyBlock> _blockPool;
 
         void Awake() {
-            _renderer = GetComponent<Renderer>();
-            _meshFilter = GetComponent<MeshFilter>();
+            _renderer = GetComponentInChildren<Renderer>();
+            _meshFilter = GetComponentInChildren<MeshFilter>();
             _blockStack = new Stack<MaterialPropertyBlock>();
             _keywordStack = new Stack<ShaderKeyword>();
             _blockPool = new ObjectPool<MaterialPropertyBlock>(1, () => new MaterialPropertyBlock());
@@ -335,7 +218,7 @@ namespace Portals {
             _renderer.SetPropertyBlock(block);
             _blockPool.Give(block);
         }
-        
+
         public Vector3[] GetCorners() {
             Bounds bounds = _meshFilter.sharedMesh.bounds;
 
@@ -355,7 +238,7 @@ namespace Portals {
         public float PortalScaleAverage() {
             return Helpers.VectorInternalAverage(this.PortalScale());
         }
-        
+
         public Vector3 PortalScale() {
             return new Vector3(
                 ExitPortal.transform.lossyScale.x / this.transform.lossyScale.x,
@@ -450,7 +333,7 @@ namespace Portals {
         //    if (!teleportable || teleportable.IsClone || teleportable.IsInsidePortal(this)) {
         //        return;
         //    }
-            
+
         //    if (teleportable.Camera) {
         //        _camerasInside.Add(teleportable.Camera);
         //    }
@@ -485,7 +368,7 @@ namespace Portals {
         //}
 
         //void OnTriggerStay(Collider collider) {
-            
+
         //    if (!ExitPortal) {
         //        return;
         //    }
@@ -651,7 +534,7 @@ namespace Portals {
             mesh.vertices = vertices;
             mesh.uv = uvs;
             mesh.SetTriangles(frontFaceTriangles, 0);
-           mesh.SetTriangles(backFaceTriangles, 1);
+            mesh.SetTriangles(backFaceTriangles, 1);
 
             return mesh;
         }

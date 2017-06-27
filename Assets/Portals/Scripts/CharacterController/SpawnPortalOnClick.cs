@@ -68,7 +68,6 @@ public class SpawnPortalOnClick : MonoBehaviour {
                 
                 Portal portal = leftClick ? _leftPortal : _rightPortal;
 
-
                 Quaternion rotation = CalculateRotation(Camera.main.transform.forward, hit.normal);
                 portal.transform.position = hit.point;
                 portal.transform.rotation = rotation;

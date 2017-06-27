@@ -111,7 +111,7 @@ namespace Portals {
             //}
 
             _head.localRotation *= Quaternion.Euler(-angle, 0, 0);
-            _head.localRotation = ClampRotationAroundXAxis(_head.localRotation, -89.5f, 89.5f);
+            _head.localRotation = ClampRotationAroundXAxis(_head.localRotation, -_maxLookAngle, _maxLookAngle);
             //Quaternion rotation = Quaternion.AngleAxis(angle, -Vector3.right);
             //Quaternion desiredRotation = _head.localRotation * rotation;
 
