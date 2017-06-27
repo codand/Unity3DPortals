@@ -36,6 +36,7 @@ namespace Portals {
         private ObjectPool<Teleportable> _clonePool;
         
         private HashSet<PortalTrigger> _occupiedTriggers;
+        private HashSet<Portal> _occupiedPortals;
 
         private Rigidbody _rigidbody;
 
@@ -65,6 +66,7 @@ namespace Portals {
                 _portalToClone = new Dictionary<Portal, Teleportable>();
                 _clonePool = new ObjectPool<Teleportable>(1, CreateClone);
                 _occupiedTriggers = new HashSet<PortalTrigger>();
+                _occupiedPortals = new HashSet<Portal>();
 
                 SaveShaders(this.gameObject);
             }
@@ -128,10 +130,10 @@ namespace Portals {
                 return;
             }
             
-            if (!trigger.portal.ExitPortal || _occupiedTriggers.Contains(trigger)) {
+            if (!trigger.portal.ExitPortal || _occupiedPortals.Contains(trigger.portal)) {
                 return;
             }
-            _occupiedTriggers.Add(trigger);
+            _occupiedPortals.Add(trigger.portal);
             OnPortalTriggerEnter(trigger);
         }
 
@@ -144,7 +146,7 @@ namespace Portals {
                 return;
             }
 
-            if (!trigger.portal.ExitPortal || !_occupiedTriggers.Contains(trigger)) {
+            if (!trigger.portal.ExitPortal || !_occupiedPortals.Contains(trigger.portal)) {
                 return;
             }
 
@@ -152,12 +154,8 @@ namespace Portals {
             Vector3 position = _camera ? _camera.transform.position : transform.position;
             bool throughPortal = portal.Plane.GetSide(position);
             if (throughPortal) {
-                foreach (PortalTrigger current in portal.PortalTriggers) {
-                    _occupiedTriggers.Remove(current);
-                }
-                foreach (PortalTrigger next in portal.ExitPortal.PortalTriggers) {
-                    _occupiedTriggers.Add(next);
-                }
+                _occupiedPortals.Remove(portal);
+                _occupiedPortals.Add(portal.ExitPortal);
 
                 Teleport(trigger.portal);
             }
@@ -171,11 +169,11 @@ namespace Portals {
             if (!trigger) {
                 return;
             }
-            if (!trigger.portal.ExitPortal || !_occupiedTriggers.Contains(trigger)) {
+            if (!trigger.portal.ExitPortal || !_occupiedPortals.Contains(trigger.portal)) {
                 return;
             }
 
-            _occupiedTriggers.Remove(trigger);
+            _occupiedPortals.Remove(trigger.portal);
             OnPortalTriggerExit(trigger);
         }
 
@@ -196,11 +194,6 @@ namespace Portals {
                     ReplaceShaders(this.gameObject, portal);
                     ReplaceShaders(clone.gameObject, portal.ExitPortal);
                     clone.IgnoreCollisions(portal.ExitPortal.IgnoredColliders, true);
-                    break;
-                case PortalTrigger.TriggerFunction.Camera:
-                    if (_camera) {
-                        portal.RegisterCamera(_camera);
-                    }
                     break;
             }
         }
@@ -263,14 +256,40 @@ namespace Portals {
 
 
                     break;
-                case PortalTrigger.TriggerFunction.Camera:
-                    if (_camera) {
-                        portal.UnregisterCamera(_camera);
-                    }
-                    break;
             }
         }
 
+
+        //// FSM:
+        //// Inside->Outisde
+        //// Inside->Inside
+        
+        //[Flags]
+        //private enum TriggerStatus {
+        //    Entered = 1,
+        //    Stayed = 2,
+        //    Teleported = 4,
+        //    Exited = 8,
+        //}
+
+        //private struct PortalContext {
+        //    public Portal portal;
+        //    public Teleportable clone;
+        //    public TriggerStatus status;
+        //}
+
+        //private void BeginPortalContext(Portal portal) {
+        //    PortalContext context;
+        //    context.portal = portal;
+        //    context.clone = GetClone(portal);
+        //    context.status = TriggerStatus.Entered;
+        //}
+
+        //private IEnumerator TeleportRoutine(PortalContext context) {
+        //    while (context.status == TriggerStatus.Stayed) {
+
+        //    }
+        //}
 
         #endregion
 

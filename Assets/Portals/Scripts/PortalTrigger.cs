@@ -10,7 +10,6 @@ namespace Portals {
         public enum TriggerFunction {
             Teleport,
             SpawnClone,
-            Camera,
         }
     }
 }

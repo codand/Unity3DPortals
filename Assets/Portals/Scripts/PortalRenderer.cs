@@ -200,15 +200,18 @@ namespace Portals {
             MaterialPropertyBlock block = _blockPool.Take();
             _renderer.GetPropertyBlock(block);
 
-            if (LocalXYPlaneContainsPoint(Camera.current.transform.position)) {
+            // Handle the player clipping through the portal's frontface
+            if (_depth == 0 && LocalXYPlaneContainsPoint(Camera.current.transform.position)) {
                 float penetration = CalculateNearPlanePenetration(Camera.current);
                 if (penetration > 0) {
-                    penetration += 0.001f; // Add a small offset to avoid clip-fighting
                     Vector3 currentScale = _transform.localScale;
+
+                    // Z is divided by two because scale expands in both directions, and
+                    // a small offset is added to avoid clip-fighting
                     Vector3 newScale = new Vector3(
                         _transform.localScale.x,
                         _transform.localScale.y,
-                        penetration / 2); // Divide by two because scale expands in both directions
+                        penetration / 2 + 0.001f);
                     _transform.localScale = newScale;
                     block.SetFloat("_BackfaceAlpha", 1.0f);
                 } else {
