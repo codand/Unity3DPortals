@@ -353,16 +353,14 @@ namespace Portals {
         Matrix4x4 CalculateCullingMatrix() {
             _camera.ResetCullingMatrix();
 
-            Bounds bounds = _portal.ExitPortal.GetComponent<MeshFilter>().sharedMesh.bounds;
-
             // Lower left of the backside of our plane in world coordinates
-            Vector3 pa = _portal.ExitPortal.transform.TransformPoint(new Vector3(bounds.extents.x, -bounds.extents.y, 0));
+            Vector3 pa = _portal.ExitPortal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 0));
 
             // Lower right
-            Vector3 pb = _portal.ExitPortal.transform.TransformPoint(new Vector3(-bounds.extents.x, -bounds.extents.y, 0));
+            Vector3 pb = _portal.ExitPortal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 0));
 
             // Upper left
-            Vector3 pc = _portal.ExitPortal.transform.TransformPoint(new Vector3(bounds.extents.x, bounds.extents.y, 0));
+            Vector3 pc = _portal.ExitPortal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 0));
 
             Vector3 pe = _camera.transform.position;
 

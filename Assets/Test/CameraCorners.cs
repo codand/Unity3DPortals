@@ -8,11 +8,11 @@ public class CameraCorners : MonoBehaviour {
 
         Camera camera = GetComponent<Camera>();
 
-        Vector3[] points = GetNearPlanePoints(camera);
-        Debug.Log("TopLeft: " + points[0]);
-        Debug.Log("TopRight: " + points[1]);
-        Debug.Log("BottomRight: " + points[2]);
-        Debug.Log("BottomLeft: " + points[3]);
+        //Vector3[] points = GetNearPlanePoints(camera);
+        //Debug.Log("TopLeft: " + points[0]);
+        //Debug.Log("TopRight: " + points[1]);
+        //Debug.Log("BottomRight: " + points[2]);
+        //Debug.Log("BottomLeft: " + points[3]);
     }
 
     public static Vector3[] GetNearPlanePoints(Camera camera) {

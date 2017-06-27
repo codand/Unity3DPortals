@@ -227,15 +227,15 @@ namespace Portals {
                 _rigidbody.mass *= scaleDelta * scaleDelta * scaleDelta;
             }
 
-            Teleportable clone = GetClone(portal);
-            ReplaceShaders(this.gameObject, portal.ExitPortal);
-            ReplaceShaders(clone.gameObject, portal);
+            //Teleportable clone = GetClone(portal);
+            //ReplaceShaders(this.gameObject, portal.ExitPortal);
+            //ReplaceShaders(clone.gameObject, portal);
 
-            _portalToClone.Remove(portal);
-            _portalToClone.Add(portal.ExitPortal, clone);
+            //_portalToClone.Remove(portal);
+            //_portalToClone.Add(portal.ExitPortal, clone);
 
-            clone.IgnoreCollisions(portal.ExitPortal.IgnoredColliders, false);
-            clone.IgnoreCollisions(portal.IgnoredColliders, true);
+            //clone.IgnoreCollisions(portal.ExitPortal.IgnoredColliders, false);
+            //clone.IgnoreCollisions(portal.IgnoredColliders, true);
         }
 
         private void OnPortalTriggerExit(PortalTrigger trigger){

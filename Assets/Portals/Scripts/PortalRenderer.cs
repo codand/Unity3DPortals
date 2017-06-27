@@ -51,9 +51,13 @@ namespace Portals {
         private Stack<ShaderKeyword> _keywordStack;
         private ObjectPool<MaterialPropertyBlock> _blockPool;
 
+        private Transform _transform;
+
         void Awake() {
-            _renderer = GetComponentInChildren<Renderer>();
-            _meshFilter = GetComponentInChildren<MeshFilter>();
+            _renderer = GetComponent<Renderer>();
+            _meshFilter = GetComponent<MeshFilter>();
+
+            _transform = this.transform;
             _blockStack = new Stack<MaterialPropertyBlock>();
             _keywordStack = new Stack<ShaderKeyword>();
             _blockPool = new ObjectPool<MaterialPropertyBlock>(1, () => new MaterialPropertyBlock());
@@ -76,8 +80,8 @@ namespace Portals {
                 _portalMaterial = portalMaterial;
                 _backFaceMaterial = backFaceMaterial;
 
-                _portalMaterial.SetTexture("_TransparencyMask", _transparencyMask);
-                _portalMaterial.SetTexture("_DefaultTexture", _defaultTexture);
+                _portalMaterial.SetTexture("_TransparencyMask", _portal.TransparencyMask);
+                _portalMaterial.SetTexture("_DefaultTexture", _portal.DefaultTexture);
 
                 _renderer.sharedMaterials = new Material[] {
                     _portalMaterial,
@@ -88,6 +92,10 @@ namespace Portals {
 
         void OnValidate() {
 
+        }
+
+        void Update() {
+            _transform.localScale = Vector3.one;
         }
 
         void OnDisable() {
@@ -149,20 +157,20 @@ namespace Portals {
 
             PortalCamera currentPortalCamera = PortalCamera.current;
             // Don't ever render our own exit portal
-            if (_depth > 0 && currentPortalCamera != null && this == currentPortalCamera.portal.ExitPortal) {
+            if (_depth > 0 && currentPortalCamera != null && _portal == currentPortalCamera.portal.ExitPortal) {
                 return;
             }
 
             // Stop recursion when we reach maximum depth
-            if (_depth >= _maxRecursiveDepth) {
-                if (_fakeInfiniteRecursion && _maxRecursiveDepth >= 2) {
+            if (_depth >= _portal.MaxRecursiveDepth) {
+                if (_portal.FakeInfiniteRecursion && _portal.MaxRecursiveDepth >= 2) {
                     // Use the previous frame's RenderTexture from the parent camera to render the bottom layer.
                     // This creates an illusion of infinite recursion, but only works with at least two real recursions
                     // because the effect is unconvincing using the Main Camera's previous frame.
                     Camera parentCam = currentPortalCamera.parent;
                     PortalCamera parentPortalCam = parentCam.GetComponent<PortalCamera>();
 
-                    if (currentPortalCamera.portal == this && parentPortalCam.portal == this) {
+                    if (currentPortalCamera.portal == _portal && parentPortalCam.portal == _portal) {
                         // This portal is currently viewing itself.
                         // Render the bottom of the stack with the parent camera's view/projection.
 
@@ -183,7 +191,7 @@ namespace Portals {
                 return;
             }
 
-            if (!ExitPortal || !ExitPortal.isActiveAndEnabled) {
+            if (!_portal.ExitPortal || !_portal.ExitPortal.isActiveAndEnabled) {
                 _portalMaterial.EnableKeyword("DONT_SAMPLE");
             } else {
                 _portalMaterial.DisableKeyword("DONT_SAMPLE");
@@ -191,10 +199,24 @@ namespace Portals {
 
             MaterialPropertyBlock block = _blockPool.Take();
             _renderer.GetPropertyBlock(block);
-            if (_depth == 0 && _camerasInside.Contains(Camera.current)) {
-                block.SetFloat("_BackfaceAlpha", 1.0f);
-            }
 
+            if (LocalXYPlaneContainsPoint(Camera.current.transform.position)) {
+                float penetration = CalculateNearPlanePenetration(Camera.current);
+                if (penetration > 0) {
+                    penetration += 0.001f; // Add a small offset to avoid clip-fighting
+                    Vector3 currentScale = _transform.localScale;
+                    Vector3 newScale = new Vector3(
+                        _transform.localScale.x,
+                        _transform.localScale.y,
+                        penetration / 2); // Divide by two because scale expands in both directions
+                    _transform.localScale = newScale;
+                    block.SetFloat("_BackfaceAlpha", 1.0f);
+                } else {
+                    block.SetFloat("_BackfaceAlpha", 0.0f);
+                }
+            } else {
+                block.SetFloat("_BackfaceAlpha", 0.0f);
+            }
 
             // Initialize or get anything needed for this depth level
             PortalCamera portalCamera = GetOrCreatePortalCamera(Camera.current);
@@ -217,74 +239,61 @@ namespace Portals {
             _depth--;
             _renderer.SetPropertyBlock(block);
             _blockPool.Give(block);
+
         }
 
-        public Vector3[] GetCorners() {
-            Bounds bounds = _meshFilter.sharedMesh.bounds;
+        private bool LocalXYPlaneContainsPoint(Vector3 point) {
+            Vector3 localPoint = _transform.InverseTransformPoint(point);
+            if (localPoint.x < -0.5f) return false;
+            if (localPoint.x > 0.5f) return false;
+            if (localPoint.y > 0.5f) return false;
+            if (localPoint.y < -0.5f) return false;
+            return true;
+        }
 
-            Vector3 lowerLeft = transform.TransformPoint(new Vector3(bounds.extents.x, -bounds.extents.y, 0));
-            Vector3 lowerRight = transform.TransformPoint(new Vector3(-bounds.extents.x, -bounds.extents.y, 0));
-            Vector3 upperLeft = transform.TransformPoint(new Vector3(bounds.extents.x, bounds.extents.y, 0));
-            Vector3 upperRight = transform.TransformPoint(new Vector3(-bounds.extents.x, bounds.extents.y, 0));
+        private float CalculateNearPlanePenetration(Camera camera) {
+            Vector3[] corners = CalculateNearPlaneCorners(camera);
+            Plane plane = _portal.Plane;
+            float maxPenetration = Mathf.NegativeInfinity;
+            for (int i = 0; i < corners.Length; i++) {
+                Vector3 corner = corners[i];
+                float penetration = plane.GetDistanceToPoint(corner);
+                maxPenetration = Mathf.Max(maxPenetration, penetration);
+            }
+            return maxPenetration;
+        }
+
+        public static Vector3[] CalculateNearPlaneCorners(Camera camera) {
+            // Source: https://gamedev.stackexchange.com/questions/19774/determine-corners-of-a-specific-plane-in-the-frustum
+            Transform t = camera.transform;
+            Vector3 p = t.position;
+            Vector3 v = t.forward;
+            Vector3 up = t.up;
+            Vector3 right = t.right;
+            float nDis = camera.nearClipPlane;
+            float fDis = camera.farClipPlane;
+            float fov = camera.fieldOfView * Mathf.Deg2Rad;
+            float ar = camera.aspect;
+
+            float hNear = 2 * Mathf.Tan(fov / 2) * nDis;
+            float wNear = hNear * ar;
+
+            Vector3 cNear = p + v * nDis;
+
+            Vector3 hHalf = up * hNear / 2;
+            Vector3 wHalf = right * wNear / 2;
+
+            Vector3 topLeft = cNear + hHalf - wHalf;
+            Vector3 topRight = cNear + hHalf + wHalf;
+            Vector3 bottomRight = cNear - hHalf + wHalf;
+            Vector3 bottomLeft = cNear - hHalf - wHalf;
 
             return new Vector3[] {
-                lowerLeft,
-                upperLeft,
-                upperRight,
-                lowerRight,
-            };
-        }
-
-        public float PortalScaleAverage() {
-            return Helpers.VectorInternalAverage(this.PortalScale());
-        }
-
-        public Vector3 PortalScale() {
-            return new Vector3(
-                ExitPortal.transform.lossyScale.x / this.transform.lossyScale.x,
-                ExitPortal.transform.lossyScale.y / this.transform.lossyScale.y,
-                ExitPortal.transform.lossyScale.z / this.transform.lossyScale.z);
-        }
-
-        public Quaternion PortalRotation() {
-            // Transforms a quaternion or vector into the second portal's space.
-            // We have to flip the camera in between so that we face the outside direction of the portal
-            return ExitPortal.transform.rotation * Quaternion.Euler(180, 0, 180) * Quaternion.Inverse(this.transform.rotation);
-        }
-
-        public Matrix4x4 PortalMatrix() {
-            Quaternion flip = Quaternion.Euler(0, 180, 0);
-
-            Matrix4x4 TRSEnter = Matrix4x4.TRS(
-                this.transform.position,
-                this.transform.rotation,
-                this.transform.lossyScale);
-            Matrix4x4 TRSExit = Matrix4x4.TRS(
-                ExitPortal.transform.position,
-                ExitPortal.transform.rotation * flip, // Flip around Y axis
-                ExitPortal.transform.lossyScale);
-
-            return TRSExit * TRSEnter.inverse; // Place origin at portal, then apply Exit portal's transform
-        }
-
-        public void ApplyWorldToPortalTransform(Transform target, Vector3 referencePosition, Quaternion referenceRotation, Vector3 referenceScale, bool ignoreScale = false) {
-            Vector3 inversePosition = transform.InverseTransformPoint(referencePosition);
-
-            Quaternion flip = Quaternion.Euler(0, 180, 0);
-
-            target.position = ExitPortal.transform.TransformPoint(flip * inversePosition);
-            target.rotation = PortalRotation() * referenceRotation;
-            if (!ignoreScale) {
-                Vector3 scale = PortalScale();
-                target.localScale = new Vector3(
-                    referenceScale.x * scale.x,
-                    referenceScale.y * scale.y,
-                    referenceScale.z * scale.z);
-            }
-        }
-
-        public void ApplyWorldToPortalTransform(Transform target, Transform reference, bool ignoreScale = false) {
-            ApplyWorldToPortalTransform(target, reference.position, reference.rotation, reference.lossyScale, ignoreScale);
+            topLeft,
+            topRight,
+            bottomRight,
+            bottomLeft
+        };
         }
 
         PortalCamera GetOrCreatePortalCamera(Camera currentCamera) {
@@ -306,11 +315,11 @@ namespace Portals {
                 portalCamera = go.AddComponent<PortalCamera>();
                 portalCamera.Awake();
                 portalCamera.enterScene = this.gameObject.scene;
-                portalCamera.exitScene = ExitPortal.gameObject.scene;
+                portalCamera.exitScene = _portal.ExitPortal.gameObject.scene;
                 portalCamera.parent = currentCamera;
-                portalCamera.portal = this;
+                portalCamera.portal = _portal;
 
-                if (this.gameObject.scene != ExitPortal.gameObject.scene) {
+                if (this.gameObject.scene != _portal.ExitPortal.gameObject.scene) {
                     //PortalCameraRenderSettings thing = go.AddComponent<PortalCameraRenderSettings>();
                     //thing.scene = exitPortal.gameObject.scene;
                 }
@@ -318,149 +327,6 @@ namespace Portals {
                 _camToPortalCam[currentCamera] = portalCamera;
             }
             return portalCamera;
-        }
-
-
-        //void OnTriggerEnter(Collider collider) {
-        //    if (!ExitPortal || !ExitPortal.isActiveAndEnabled) {
-        //        return;
-        //    }
-
-        //    Teleportable teleportable = collider.GetComponent<Teleportable>();
-        //    if (teleportable && !teleportable.IsClone) {
-        //        teleportable._receivedOnTriggerEnterFrom.Add(this);
-        //    }
-        //    if (!teleportable || teleportable.IsClone || teleportable.IsInsidePortal(this)) {
-        //        return;
-        //    }
-
-        //    if (teleportable.Camera) {
-        //        _camerasInside.Add(teleportable.Camera);
-        //    }
-
-        //    collider.gameObject.SendMessage("OnPortalEnter", this, SendMessageOptions.DontRequireReceiver);
-        //    if (onPortalEnterGlobal != null)
-        //        onPortalEnterGlobal(this, collider.gameObject);
-        //    if (onPortalEnter != null)
-        //        onPortalEnter(this, collider.gameObject);
-        //}
-
-        //void OnTriggerExit(Collider collider) {
-        //    if (!ExitPortal || !ExitPortal.isActiveAndEnabled) {
-        //        return;
-        //    }
-
-        //    Teleportable teleportable = collider.GetComponent<Teleportable>();
-        //    if (!teleportable || teleportable.IsClone || !teleportable.IsInsidePortal(this)) {
-        //        return;
-        //    }
-
-        //    if (teleportable.Camera) {
-        //        _camerasInside.Remove(teleportable.Camera);
-        //    }
-
-
-        //    collider.gameObject.SendMessage("OnPortalExit", this, SendMessageOptions.DontRequireReceiver);
-        //    if (onPortalExitGlobal != null)
-        //        onPortalExitGlobal(this, collider.gameObject);
-        //    if (onPortalExit != null)
-        //        onPortalExit(this, collider.gameObject);
-        //}
-
-        //void OnTriggerStay(Collider collider) {
-
-        //    if (!ExitPortal) {
-        //        return;
-        //    }
-
-        //    Teleportable teleportable = collider.GetComponent<Teleportable>();
-        //    if (!teleportable || teleportable.IsClone || !teleportable.IsInsidePortal(this)) {
-        //        return;
-        //    }
-
-        //    Vector3 position = teleportable.Camera ? teleportable.Camera.transform.position : collider.transform.position;
-        //    bool throughPortal = Plane.GetSide(position);
-        //    if (throughPortal) {
-        //        TeleportObject(teleportable, collider);
-        //    }
-        //}
-
-        //IEnumerator HighSpeedTeleportCheck(Teleportable teleportable, Collider collider) {
-        //    // If we're going too fast, sometimes we can skip past the exit collider even with continuous collision detection.
-        //    // In this case, we should wait to see if we get an OnTriggerEnter event from
-        //    // the exit portal in exactly two frames. If we do not, then call OnTriggerExit manually.
-        //    yield return new WaitForFixedUpdate();
-        //    yield return new WaitForFixedUpdate();
-        //    if (!teleportable._receivedOnTriggerEnterFrom.Contains(ExitPortal)) {
-        //        //Debug.Log("TriggerEnter was NOT seen");
-        //        ExitPortal.OnTriggerExit(collider);
-        //    } else {
-        //        //Debug.Log("TriggerEnter WAS seen");
-        //    }
-        //}
-
-        //public void TeleportObject(Teleportable teleportable, Collider collider) {
-        //    PortalLight light = collider.GetComponent<PortalLight>();
-        //    if(light) {
-        //        return;
-        //    }
-
-        //    if (teleportable.Camera) {
-        //        _camerasInside.Remove(teleportable.Camera);
-        //        ExitPortal._camerasInside.Add(teleportable.Camera);
-        //    }
-        //    StartCoroutine(HighSpeedTeleportCheck(teleportable, collider));
-
-        //    CharacterController characterController = collider.GetComponent<CharacterController>();
-        //    Rigidbody rigidbody = collider.GetComponent<Rigidbody>();
-        //    //if (characterController == null && rigidbody == null) {
-        //    //    Debug.LogError(collider.gameObject.name + " must have a Rigidbody or CharacterController to pass through the portal");
-        //    //    return;
-        //    //}
-
-
-
-        //    //if (ExitPortal.AttachedCollider) {
-        //    //    Physics.IgnoreCollision(collider, ExitPortal.AttachedCollider, true);
-        //    //}
-
-        //    ApplyWorldToPortalTransform(collider.gameObject.transform, collider.gameObject.transform);
-
-        //    if (rigidbody != null) {
-        //        // TODO: Evaluate whether or not using Rigidbody.position is important
-        //        // Currently it messes up the _cameraInside stuff because it happens at the next physics step
-        //        //Vector3 newPosition = PortalMatrix().MultiplyPoint3x4(rigidbody.position);
-        //        //Quaternion newRotation = PortalRotation() * rigidbody.rotation;
-        //        //rigidbody.position = newPosition;
-        //        //rigidbody.transform.rotation = newRotation;
-
-        //        float scaleDelta = this.PortalScaleAverage();
-        //        rigidbody.velocity = PortalRotation() * rigidbody.velocity * scaleDelta;
-        //        rigidbody.mass *= scaleDelta * scaleDelta * scaleDelta;
-        //    }
-
-        //    collider.gameObject.SendMessage("OnPortalTeleport", this, SendMessageOptions.DontRequireReceiver);
-        //    if (onPortalTeleportGlobal != null)
-        //        onPortalTeleportGlobal(this, collider.gameObject);
-        //    if (onPortalTeleport != null)
-        //        onPortalTeleport(this, collider.gameObject);
-
-        //    //UnityEditor.EditorApplication.isPaused = true;
-        //}
-
-        public void RegisterCamera(Camera camera) {
-            _camerasInside.Add(camera);
-        }
-
-        public void UnregisterCamera(Camera camera) {
-            _camerasInside.Remove(camera);
-        }
-
-        void OnDrawGizmos() {
-            if (ExitPortal) {
-                Gizmos.color = Color.magenta;
-                Gizmos.DrawLine(this.transform.position, ExitPortal.transform.position);
-            }
         }
 
         private Mesh MakeMesh() {
