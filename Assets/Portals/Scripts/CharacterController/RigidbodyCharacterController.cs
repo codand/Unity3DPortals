@@ -137,9 +137,9 @@ namespace Portals {
         IEnumerator CorrectionRotation(float duration) {
             disable_stuff = true;
 
-            float timeScale = 1.0f;
-            Time.timeScale = timeScale;
-            Time.fixedDeltaTime *= timeScale;
+            //float timeScale = 1.0f;
+            //Time.timeScale = timeScale;
+            //Time.fixedDeltaTime *= timeScale;
 
             float elapsed = 0;
             while (elapsed < duration) {
@@ -153,8 +153,8 @@ namespace Portals {
 
             DoStuff(1.0f);
 
-            Time.timeScale = 1.0f;
-            Time.fixedDeltaTime /= timeScale;
+            //Time.timeScale = 1.0f;
+            //Time.fixedDeltaTime /= timeScale;
             disable_stuff = false;
         }
 

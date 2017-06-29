@@ -194,6 +194,18 @@ namespace Portals {
             return TRSExit * TRSEnter.inverse; // Place origin at portal, then apply Exit portal's transform
         }
 
+        public Vector3 TeleportPoint(Vector3 point) {
+            return PortalMatrix().MultiplyPoint3x4(point);
+        }
+
+        public Vector3 TeleportVector(Vector3 vector) {
+            return PortalMatrix().MultiplyVector(vector);
+        }
+
+        public Quaternion TeleportRotation(Quaternion rotation) {
+            return PortalRotation() * rotation;
+        }
+
         public void ApplyWorldToPortalTransform(Transform target, Vector3 referencePosition, Quaternion referenceRotation, Vector3 referenceScale, bool ignoreScale = false) {
             Vector3 inversePosition = transform.InverseTransformPoint(referencePosition);
 
