@@ -54,7 +54,7 @@ namespace Portals {
         private Transform _transform;
 
         void Awake() {
-            _renderer = GetComponent<Renderer>();
+            _renderer = GetComponent<MeshRenderer>();
             _meshFilter = GetComponent<MeshFilter>();
 
             _transform = this.transform;
@@ -201,22 +201,28 @@ namespace Portals {
             _renderer.GetPropertyBlock(block);
 
             // Handle the player clipping through the portal's frontface
+            bool renderBackface = false;
             if (_depth == 0 && LocalXYPlaneContainsPoint(Camera.current.transform.position)) {
-                float penetration = CalculateNearPlanePenetration(Camera.current);
-                if (penetration > 0) {
-                    Vector3 currentScale = _transform.localScale;
+                // Camera is within the border of the camera
+                if (!_portal.Plane.GetSide(Camera.current.transform.position)) {
+                    // Camera is in front of the plane
+                    float penetration = CalculateNearPlanePenetration(Camera.current);
+                    if (penetration > 0) {
+                        // Near clipping plane is behind the portal at some point
+                        renderBackface = true;
 
-                    // Z is divided by two because scale expands in both directions, and
-                    // a small offset is added to avoid clip-fighting
-                    Vector3 newScale = new Vector3(
-                        _transform.localScale.x,
-                        _transform.localScale.y,
-                        penetration / 2 + 0.001f);
-                    _transform.localScale = newScale;
-                    block.SetFloat("_BackfaceAlpha", 1.0f);
-                } else {
-                    block.SetFloat("_BackfaceAlpha", 0.0f);
+                        // Z is divided by two because scale expands in both directions, and
+                        // a small offset is added to avoid clip-fighting
+                        Vector3 newScale = new Vector3(
+                            _transform.localScale.x,
+                            _transform.localScale.y,
+                            penetration / 2 + 0.001f);
+                        _transform.localScale = newScale;
+                    }
                 }
+            }
+            if (renderBackface) {
+                block.SetFloat("_BackfaceAlpha", 1.0f);
             } else {
                 block.SetFloat("_BackfaceAlpha", 0.0f);
             }

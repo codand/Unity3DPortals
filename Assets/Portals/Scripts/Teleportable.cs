@@ -101,6 +101,8 @@ namespace Portals {
 
         void FixedUpdate() {
             if (!_isClone) {
+
+                SweepTest();
                 foreach (KeyValuePair<Portal, PortalContext> kvp in _contextByPortal) {
                     Portal portal = kvp.Key;
                     PortalContext context = kvp.Value;
@@ -154,21 +156,21 @@ namespace Portals {
             }
         }
 
-        //void SweepTest() {
-        //    List<Collider> portalsHit = new List<Collider>();
-        //    RaycastHit[] hits = _rigidbody.SweepTestAll( _rigidbody.velocity, _rigidbody.velocity.magnitude * Time.fixedDeltaTime, QueryTriggerInteraction.Collide);
-        //    for (int i = 0; i < hits.Length; i++) {
-        //        RaycastHit hit = hits[i];
-        //        if (hit.collider.gameObject.layer == PortalPhysics.PortalLayer) {
-        //            portalsHit.Add(hit.collider);
-        //        }
-        //    }
+        void SweepTest() {
+            List<Collider> portalsHit = new List<Collider>();
+            RaycastHit[] hits = _rigidbody.SweepTestAll(_rigidbody.velocity, _rigidbody.velocity.magnitude * Time.fixedDeltaTime, QueryTriggerInteraction.Collide);
+            for (int i = 0; i < hits.Length; i++) {
+                RaycastHit hit = hits[i];
+                if (hit.collider.gameObject.layer == PortalPhysics.PortalLayer) {
+                    portalsHit.Add(hit.collider);
+                }
+            }
 
-        //    for (int i = 0; i < portalsHit.Count; i++) {
-        //        Collider portalCollider = portalsHit[i];
-        //        OnTriggerEnter(portalCollider);
-        //    }
-        //}
+            //for (int i = 0; i < portalsHit.Count; i++) {
+            //    Collider portalCollider = portalsHit[i];
+            //    OnTriggerEnter(portalCollider);
+            //}
+        }
         #endregion
 
         [Flags]
@@ -200,7 +202,7 @@ namespace Portals {
             if (!trigger.portal.ExitPortal || _contextByPortal.ContainsKey(trigger.portal)) {
                 return;
             }
-
+            
             PortalContext context = new PortalContext();
             _contextByPortal[trigger.portal] = context;
 

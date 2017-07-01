@@ -14,10 +14,19 @@ Shader "Portal/PortalBackface"
 
 		Pass
 		{
+			// Stencil prevents the backface from rendering if we've already seen the frontface
+			// Don't render unless Stencil == 0. The value is decremented when we fail (saw a frontface)
+			// so that a recursive layer above us won't be prevented from rendering.
+			Stencil{
+				Ref 0
+				Comp Equal
+				Fail DecrSat
+			}
 			Blend SrcAlpha OneMinusSrcAlpha
 			ZWrite Off
+
+			ZTest Always
 			Lighting Off
-			Offset -0.001, -100
 
 			CGPROGRAM
 			#pragma vertex vert
@@ -95,9 +104,9 @@ Shader "Portal/PortalBackface"
 				}
 #endif
 
-				UNITY_APPLY_FOG(i.fogCoord, col);
+				//UNITY_APPLY_FOG(i.fogCoord, col);
 
-				col.a *= _BackfaceAlpha;
+				col.a = _BackfaceAlpha;
 				return col;
 			}
 			ENDCG

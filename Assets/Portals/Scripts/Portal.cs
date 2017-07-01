@@ -7,6 +7,7 @@ using UnityEngine.VR;
 
 namespace Portals {
     //[ExecuteInEditMode]
+    [SelectionBase]
     public class Portal : MonoBehaviour {
         [SerializeField] private Portal _exitPortal;
         [SerializeField] private Texture _defaultTexture;
@@ -36,6 +37,11 @@ namespace Portals {
         public delegate void PortalIgnoredCollidersChangedEvent(Portal portal, Collider[] colliders);
         public event PortalIgnoredCollidersChangedEvent onIgnoredCollidersChanged;
 
+        public bool IsOn {
+            get {
+                return this.isActiveAndEnabled && ExitPortal && ExitPortal.isActiveAndEnabled;
+            }
+        }
 
         public Portal ExitPortal {
             get { return _exitPortal; }

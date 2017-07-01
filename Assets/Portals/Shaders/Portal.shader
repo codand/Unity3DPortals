@@ -19,16 +19,23 @@ Shader "Portal/Portal"
 		// Mask off the entire shape so we can't see the backface if the frontface is visible
 		// For some reason, ZWrite doesn't appear to work if we use it in our main pass, so
 		// we need to use this priming pass.
-		Pass {
-			ZWrite On
-			ColorMask 0
-		}
+		//Pass {
+		//	//ZWrite On
+		//	//ColorMask 0
+		//	Stencil {
+		//		Comp Always
+		//		Pass IncrSat
+		//	}
+		//}
 
 		Pass
 		{
+			// Stencil prevents the backface from rendering if we've already seen the frontface
+			Stencil{
+				Comp Always
+				Pass IncrSat
+			}
 			Blend SrcAlpha OneMinusSrcAlpha
-			//Offset -0.1, -10.0
-			Offset -0.1, -1000.0
 			ZWrite Off
 			Lighting Off
 

@@ -125,12 +125,12 @@ namespace Portals {
         }
 
         Coroutine correctRotation = null;
-        //void OnPortalTeleport(Portal portal) {
-        //    if (correctRotation != null) {
-        //        StopCoroutine(correctRotation);
-        //    }
-        //    correctRotation = StartCoroutine(CorrectionRotation(0.5f));
-        //}
+        void OnPortalTeleport(Portal portal) {
+            if (correctRotation != null) {
+                StopCoroutine(correctRotation);
+            }
+            correctRotation = StartCoroutine(CorrectionRotation(0.5f));
+        }
 
         public Transform axis1, axis2;
         bool disable_stuff = false;
