@@ -18,24 +18,33 @@ public class InputManager : MonoBehaviour {
 
     void Update() {
 #if UNITY_IOS || UNITY_ANDROID
-        foreach (Touch touch in Input.touches) {
-            switch (touch.phase) {
-                case TouchPhase.Began:
-                    break;
-                case TouchPhase.Canceled:
-                    break;
-                case TouchPhase.Ended:
-                    break;
-                case TouchPhase.Moved:
-                    float rotationX = touch.deltaPosition.x * _mouseSensitivity;
-                    _playerController.Rotate(rotationX);
+        //foreach (Touch touch in Input.touches) {
+        //    switch (touch.phase) {
+        //        case TouchPhase.Began:
+        //            break;
+        //        case TouchPhase.Canceled:
+        //            break;
+        //        case TouchPhase.Ended:
+        //            break;
+        //        case TouchPhase.Moved:
+        //            float rotationX = touch.deltaPosition.x * _mouseSensitivity;
+        //            _playerController.Rotate(rotationX);
 
-                    float rotationY = touch.deltaPosition.y * _mouseSensitivity;
-                    _playerController.RotateHead(rotationY);
-                    break;
-                case TouchPhase.Stationary:
-                    break;
-            }
+        //            float rotationY = touch.deltaPosition.y * _mouseSensitivity;
+        //            _playerController.RotateHead(rotationY);
+        //            break;
+        //        case TouchPhase.Stationary:
+        //            break;
+        //    }
+        //}
+        float rotationX = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("RightHorizontal") * _mouseSensitivity;
+        if (rotationX != 0) {
+            _playerController.Rotate(rotationX);
+        }
+
+        float rotationY = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("RightVertical") * _mouseSensitivity;
+        if (rotationY != 0) {
+            _playerController.RotateHead(rotationY);
         }
 #else
         // In game actions
@@ -73,6 +82,13 @@ public class InputManager : MonoBehaviour {
     }
 
     void HandleMovement() {
+#if UNITY_ANDROID || UNITY_IOS
+        float vertical = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftVertical");
+        float horizontal = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftHorizontal");
+
+        Vector3 movement = Camera.main.transform.forward * vertical + Camera.main.transform.right * horizontal;
+        _playerController.Move(movement);
+#else
         Vector3 moveDir = Vector3.zero;
         bool moved = false;
         if (Input.GetKey(KeyCode.W)) {
@@ -95,6 +111,7 @@ public class InputManager : MonoBehaviour {
         if (moved) {
             _playerController.Move(moveDir);
         }
+#endif
     }
 
     void FixedUpdate() {

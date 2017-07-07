@@ -12,6 +12,14 @@ public class CompositeTrigger : MonoBehaviour {
         _rigidbodyCounts = new Dictionary<Rigidbody, int>();
     }
 
+    void OnEnable() {
+        // Support live recompile
+        if (_colliderCounts == null || _rigidbodyCounts == null) {
+            Awake();
+            Awake();
+        }
+    }
+
     void OnDisable() {
         _colliderCounts.Clear();
         _rigidbodyCounts.Clear();

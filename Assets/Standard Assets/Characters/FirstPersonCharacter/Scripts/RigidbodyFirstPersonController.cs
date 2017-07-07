@@ -92,7 +92,7 @@ namespace UnityStandardAssets.Characters.FirstPerson
 
         public Vector3 Velocity
         {
-            get { Debug.Log(this.gameObject);  return m_RigidBody.velocity; }
+            get { return m_RigidBody.velocity; }
         }
 
         public bool Grounded

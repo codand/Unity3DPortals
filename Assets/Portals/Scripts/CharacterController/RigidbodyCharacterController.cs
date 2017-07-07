@@ -32,6 +32,8 @@ namespace Portals {
         private float _groundCheckDistance = 0.01f;
         [SerializeField]
         private LayerMask _collisionMask = -1;
+        [SerializeField]
+        private bool _correctRotationOnTeleport = true;
 
         private bool _grounded = false;
 
@@ -126,13 +128,14 @@ namespace Portals {
 
         Coroutine correctRotation = null;
         void OnPortalTeleport(Portal portal) {
-            if (correctRotation != null) {
-                StopCoroutine(correctRotation);
+            if (_correctRotationOnTeleport) {
+                if (correctRotation != null) {
+                    StopCoroutine(correctRotation);
+                }
+                correctRotation = StartCoroutine(CorrectionRotation(0.5f));
             }
-            correctRotation = StartCoroutine(CorrectionRotation(0.5f));
         }
-
-        public Transform axis1, axis2;
+        
         bool disable_stuff = false;
         IEnumerator CorrectionRotation(float duration) {
             disable_stuff = true;
@@ -176,7 +179,7 @@ namespace Portals {
             // Check if our current up angle overshoots our max angle.
             // If it does, and it's within our defined snap angle, then try to look straight up
             // instead of flipping the camera.
-            float angleFromTrueUp = SignedPlanarAngle(_head.up, Vector3.up, _head.right);
+            float angleFromTrueUp = Util.SignedPlanarAngle(_head.up, Vector3.up, _head.right);
             if ((-90 - _portalLookSnapAngle < angleFromTrueUp && angleFromTrueUp < -90) ||
                 (90 < angleFromTrueUp && angleFromTrueUp < 90 + _portalLookSnapAngle)) {
                 dstHeadRotation = srcHeadRotation * Quaternion.Euler(-angleFromTrueUp + 0.5f, 0, 0);
@@ -185,7 +188,7 @@ namespace Portals {
             // Calculate desired body rotation by projecting the desired camera rotation onto the upward plane
             // and using that rotation.
             Vector3 dstForwardVector = Vector3.ProjectOnPlane(dstHeadRotation * Vector3.forward, Vector3.up);
-            float dstBodyAngle = SignedPlanarAngle(dstForwardVector, Vector3.forward, Vector3.up);
+            float dstBodyAngle = Util.SignedPlanarAngle(dstForwardVector, Vector3.forward, Vector3.up);
             Quaternion srcBodyRotation = transform.rotation;
             Quaternion dstBodyRotation = Quaternion.Euler(0, dstBodyAngle, 0);
 
@@ -219,28 +222,6 @@ namespace Portals {
         //    }
         //    return q;
         //}
-
-        float normalizeAngle(float angle, float start, float end) {
-            float width = end - start;
-            float offsetValue = angle - start;
-
-            return (offsetValue - (Mathf.Floor(offsetValue / width) * width)) + start;
-        }
-
-        float SignedPlanarAngle(Vector3 a, Vector3 b, Vector3 normal) {
-            // Project both vectors onto the normal plane
-            Vector3 pa = Vector3.ProjectOnPlane(a, normal);
-            Vector3 pb = Vector3.ProjectOnPlane(b, normal);
-
-            float angle = Vector3.Angle(pa, pb);
-
-            // Use the cross product to determine the sign of the angle
-            Vector3 cross = Vector3.Cross(pa, pb);
-            if (Vector3.Dot(normal, cross) > 0) {
-                angle *= -1;
-            }
-            return angle;
-        }
 
         Quaternion ClampRotationAroundXAxis(Quaternion rotation, float minX, float maxX) {
             rotation.x /= rotation.w;

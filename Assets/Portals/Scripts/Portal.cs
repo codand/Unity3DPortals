@@ -6,7 +6,6 @@ using UnityEngine.Rendering;
 using UnityEngine.VR;
 
 namespace Portals {
-    //[ExecuteInEditMode]
     [SelectionBase]
     public class Portal : MonoBehaviour {
         [SerializeField] private Portal _exitPortal;
@@ -34,8 +33,12 @@ namespace Portals {
         public event PortalTriggerEvent onPortalExit;
         public event PortalTriggerEvent onPortalTeleport;
 
-        public delegate void PortalIgnoredCollidersChangedEvent(Portal portal, Collider[] colliders);
+        public delegate void PortalIgnoredCollidersChangedEvent(Portal portal, Collider[] oldColliders, Collider[] newColliders);
         public event PortalIgnoredCollidersChangedEvent onIgnoredCollidersChanged;
+        public event PortalIgnoredCollidersChangedEvent onExitPortalIgnoredCollidersChanged;
+
+        public delegate void PortalExitChangeEvent(Portal portal, Portal oldExitPortal, Portal newExitPortal);
+        public event PortalExitChangeEvent onExitPortalChanged;
 
         public bool IsOn {
             get {
@@ -46,12 +49,13 @@ namespace Portals {
         public Portal ExitPortal {
             get { return _exitPortal; }
             set {
-                //if (value) {
-                //    _portalMaterial.EnableKeyword("DONT_SAMPLE");
-                //} else {
-                //    _portalMaterial.DisableKeyword("DONT_SAMPLE");
-                //}
+                Portal oldExitPortal = _exitPortal;
+
                 _exitPortal = value;
+
+                if (onExitPortalChanged != null) {
+                    onExitPortalChanged(this, oldExitPortal, _exitPortal);
+                }
             }
         }
 
@@ -112,7 +116,7 @@ namespace Portals {
                 _ignoredColliders = new List<Collider>(value);
 
                 if (onIgnoredCollidersChanged != null) {
-                    onIgnoredCollidersChanged(this, oldColliders);
+                    onIgnoredCollidersChanged(this, oldColliders, IgnoredColliders);
                 }
             }
         }
@@ -126,6 +130,12 @@ namespace Portals {
         public Plane Plane {
             get {
                 return new Plane(transform.forward, transform.position);
+            }
+        }
+
+        public Plane PlaneInverse {
+            get {
+                return new Plane(-transform.forward, transform.position);
             }
         }
 
@@ -212,6 +222,18 @@ namespace Portals {
             return PortalRotation() * rotation;
         }
 
+        public Vector3 InverseTeleportPoint(Vector3 point) {
+            return PortalMatrix().inverse.MultiplyPoint3x4(point);
+        }
+
+        public Vector3 InverseTeleportVector(Vector3 vector) {
+            return PortalMatrix().inverse.MultiplyVector(vector);
+        }
+
+        public Quaternion InverseTeleportRotation(Quaternion rotation) {
+            return Quaternion.Inverse(PortalRotation()) * rotation;
+        }
+
         public void ApplyWorldToPortalTransform(Transform target, Vector3 referencePosition, Quaternion referenceRotation, Vector3 referenceScale, bool ignoreScale = false) {
             Vector3 inversePosition = transform.InverseTransformPoint(referencePosition);
 
@@ -232,15 +254,7 @@ namespace Portals {
             ApplyWorldToPortalTransform(target, reference.position, reference.rotation, reference.lossyScale, ignoreScale);
         }
         
-        public void RegisterCamera(Camera camera) {
-            _camerasInside.Add(camera);
-        }
-
-        public void UnregisterCamera(Camera camera) {
-            _camerasInside.Remove(camera);
-        }
-
-        void OnDrawGizmos() {
+        private void OnDrawGizmos() {
             if (ExitPortal) {
                 Gizmos.color = Color.magenta;
                 Gizmos.DrawLine(this.transform.position, ExitPortal.transform.position);

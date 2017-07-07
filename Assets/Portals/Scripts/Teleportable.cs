@@ -2,11 +2,11 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System;
-
+using System.Linq;
 namespace Portals {
     public class Teleportable : MonoBehaviour {
         #region Variables
-        private static List<Type> _validBehaviours = new List<Type>(){
+        private static List<Type> _validCloneBehaviours = new List<Type>(){
             typeof(Teleportable),
             typeof(Animator),
             typeof(MeshFilter),
@@ -14,11 +14,22 @@ namespace Portals {
             typeof(SkinnedMeshRenderer),
         };
 
+        private enum CameraType {
+            None,
+            FirstPerson,
+            ThirdPerson,
+        }
+
         [SerializeField]
-        private bool _hasFirstPersonCamera;
+        private CameraType _cameraType;
 
         [SerializeField]
         private Camera _camera;
+
+        [SerializeField]
+        private bool _spawnCloneOnAwake = true;
+
+        private const float _clippingOffset = 0.01f;
 
         private bool _isClone;
 
@@ -29,22 +40,22 @@ namespace Portals {
 
         // Stores this object's original shaders so that they can be restored
         private Dictionary<Renderer, Shader> _rendererToShader;
-
-        // Stores one doppleganger for each portal that we're currently in.
-        private Dictionary<Portal, Teleportable> _portalToClone;
+        private Dictionary<Portal, PortalContext> _contextByPortal = new Dictionary<Portal, PortalContext>();
 
         private ObjectPool<Teleportable> _clonePool;
-        
-        private HashSet<PortalTrigger> _occupiedTriggers;
-        private HashSet<Portal> _occupiedPortals;
 
-        private Rigidbody _rigidbody;
-
-        private Teleportable _master;
 
         private Collider[] _allColliders;
 
+        private Rigidbody _rigidbody;
         private RigidbodyInfo _rigidbodyInfo;
+
+        #endregion
+
+
+        #region Events
+        public delegate void PortalEvent(Teleportable sender, Portal portal);
+        public event PortalEvent onTeleport;
         #endregion
 
         #region Initialization
@@ -74,10 +85,7 @@ namespace Portals {
 
 
                 _rendererToShader = new Dictionary<Renderer, Shader>();
-                _portalToClone = new Dictionary<Portal, Teleportable>();
-                _clonePool = new ObjectPool<Teleportable>(1, CreateClone);
-                _occupiedTriggers = new HashSet<PortalTrigger>();
-                _occupiedPortals = new HashSet<Portal>();
+                _clonePool = new ObjectPool<Teleportable>(_spawnCloneOnAwake ? 1 : 0, CreateClone);
 
                 SaveShaders(this.gameObject);
             }
@@ -87,6 +95,10 @@ namespace Portals {
         #region Updates
         void LateUpdate() {
             if (!_isClone) {
+                if (!ShouldUseFixedUpdate()) {
+                    TeleportCheck();
+                }
+
                 foreach (KeyValuePair<Portal, PortalContext> kvp in _contextByPortal) {
                     Portal portal = kvp.Key;
                     PortalContext context = kvp.Value;
@@ -95,14 +107,16 @@ namespace Portals {
                     // Lock clone to master
                     clone.transform.position = portal.TeleportPoint(transform.position);
                     clone.transform.rotation = portal.TeleportRotation(transform.rotation);
+
+                    clone.CopyAnimations(this);
                 }
+
+                _rigidbodyInfo.cameraPosition = _camera.transform.position;
             }
         }
 
         void FixedUpdate() {
             if (!_isClone) {
-
-                SweepTest();
                 foreach (KeyValuePair<Portal, PortalContext> kvp in _contextByPortal) {
                     Portal portal = kvp.Key;
                     PortalContext context = kvp.Value;
@@ -117,7 +131,7 @@ namespace Portals {
                     // Save clone's modified state
                     clone.SaveRigidbodyInfo();
                 }
-
+                
                 // Save master unmodified state
                 SaveRigidbodyInfo();
             }
@@ -153,91 +167,64 @@ namespace Portals {
                     _rigidbody.angularVelocity += angularVelocityTransfer;
                     //_rigidbody.rotation *= rotationTransfer;
                 }
-            }
-        }
 
-        void SweepTest() {
-            List<Collider> portalsHit = new List<Collider>();
-            RaycastHit[] hits = _rigidbody.SweepTestAll(_rigidbody.velocity, _rigidbody.velocity.magnitude * Time.fixedDeltaTime, QueryTriggerInteraction.Collide);
-            for (int i = 0; i < hits.Length; i++) {
-                RaycastHit hit = hits[i];
-                if (hit.collider.gameObject.layer == PortalPhysics.PortalLayer) {
-                    portalsHit.Add(hit.collider);
+                if (ShouldUseFixedUpdate()) {
+                    TeleportCheck();
                 }
             }
-
-            //for (int i = 0; i < portalsHit.Count; i++) {
-            //    Collider portalCollider = portalsHit[i];
-            //    OnTriggerEnter(portalCollider);
-            //}
         }
         #endregion
 
-        [Flags]
-        private enum TriggerFlags {
-            None = 0,
-            Enter = 1,
-            Stay = 2,
-            Exit = 4
-        }
-
-        class PortalContext {
-            public Teleportable clone;
-            public TriggerFlags triggerFlags;
-        }
-
-        Dictionary<Portal, PortalContext> _contextByPortal = new Dictionary<Portal, PortalContext>();
-
         #region Triggers
+        private Portal TeleportCheck() {
+            Portal toTeleport = null;
+            foreach (Portal portal in _contextByPortal.Keys) {
+                if (ShouldTeleport(portal)) {
+                    toTeleport = portal;
+                    break;
+                }
+            }
+            if (toTeleport) {
+                OnTeleport(toTeleport);
+            }
+            return toTeleport;
+        }
+
+        private bool ShouldTeleport(Portal portal) {
+            //TODO: Support CharacterController?
+            Vector3 positionLastStep = _camera && _cameraType == CameraType.FirstPerson ? _rigidbodyInfo.cameraPosition : _rigidbodyInfo.position;
+            Vector3 positionThisStep = _camera && _cameraType == CameraType.FirstPerson ? _camera.transform.position : _rigidbody.position;
+            //Vector3 diff = positionThisStep - positionLastStep;
+            //Debug.Log(positionLastStep + "=>" + positionThisStep);
+            return !portal.Plane.GetSide(positionLastStep) && portal.Plane.GetSide(positionThisStep);
+        }
+
         private void OnCompositeTriggerEnter(CompositeTrigger t) {
             if (_isClone) {
                 return;
             }
-
+            
             PortalTrigger trigger = t as PortalTrigger;
             if (!trigger) {
                 return;
             }
-
-            if (!trigger.portal.ExitPortal || _contextByPortal.ContainsKey(trigger.portal)) {
+            if (!trigger.portal.ExitPortal || !trigger.portal.ExitPortal.isActiveAndEnabled || _contextByPortal.ContainsKey(trigger.portal)) {
                 return;
             }
-            
-            PortalContext context = new PortalContext();
-            _contextByPortal[trigger.portal] = context;
 
-            OnTrigger(trigger.portal, context);
+            OnTrigger(trigger.portal);
         }
 
         private void OnCompositeTriggerStay(CompositeTrigger t) {
-            if (_isClone) {
-                return;
-            }
-            PortalTrigger trigger = t as PortalTrigger;
-            if (!trigger) {
-                return;
-            }
-
-            if (!trigger.portal.ExitPortal || !_contextByPortal.ContainsKey(trigger.portal)) {
-                return;
-            }
-
-            Portal portal = trigger.portal;
-            Vector3 position = _camera ? _camera.transform.position : transform.position;
-            bool throughPortal = portal.Plane.GetSide(position);
-            if (throughPortal) {
-                PortalContext context = _contextByPortal[portal];
-                OnTeleport(trigger.portal, context);
-
-                _contextByPortal.Remove(portal);
-                _contextByPortal.Add(portal.ExitPortal, context);
-            }
+            // In the case that this portal's exit portal is not active, but becomes active, need to check for enter again
+            OnCompositeTriggerEnter(t);
         }
 
         private void OnCompositeTriggerExit(CompositeTrigger t) {
             if (_isClone) {
                 return;
             }
+
             PortalTrigger trigger = t as PortalTrigger;
             if (!trigger) {
                 return;
@@ -245,13 +232,13 @@ namespace Portals {
             if (!trigger.portal.ExitPortal || !_contextByPortal.ContainsKey(trigger.portal)) {
                 return;
             }
-
-            PortalContext context = _contextByPortal[trigger.portal];
-            _contextByPortal.Remove(trigger.portal);
-            OnExit(trigger.portal, context);
+            OnExit(trigger.portal);
         }
 
-        private void OnTrigger(Portal portal, PortalContext context) {
+        private void OnTrigger(Portal portal) {
+            PortalContext context = new PortalContext();
+            _contextByPortal[portal] = context;
+
             Teleportable clone = SpawnClone();
             clone.gameObject.SetActive(true);
             clone.SaveRigidbodyInfo();
@@ -263,58 +250,121 @@ namespace Portals {
             clone.IgnoreCollisions(portal.ExitPortal.IgnoredColliders, true);
 
             portal.onIgnoredCollidersChanged += OnIgnoredCollidersChanged;
+            portal.onExitPortalChanged += OnExitPortalChanged;
+            portal.ExitPortal.onIgnoredCollidersChanged += clone.OnIgnoredCollidersChanged;
 
             context.clone = clone;
         }
 
-        private void OnTeleport(Portal portal, PortalContext context) {
-            IgnoreCollisions(portal.IgnoredColliders, false);
-            IgnoreCollisions(portal.ExitPortal.IgnoredColliders, true);
+        private void OnTeleport(Portal portal) {
+            PortalContext context = _contextByPortal[portal];
+            Teleportable clone = context.clone;
 
-            context.clone.IgnoreCollisions(portal.ExitPortal.IgnoredColliders, false);
-            context.clone.IgnoreCollisions(portal.IgnoredColliders, true);
+            // Always replace our shader because we only support 1 clipping plane at the moment
+            ReplaceShaders(this.gameObject, portal.ExitPortal);
 
-            context.clone.SaveRigidbodyInfo();
+            bool alreadyInExitPortal = _contextByPortal.ContainsKey(portal.ExitPortal);
+            if (alreadyInExitPortal) {
+                // Update our frame data early as to zero out the velocity diffs.
+                // Effectively this prevents the clones from applying any forces to the master
+                clone.SaveRigidbodyInfo();
+                _contextByPortal[portal.ExitPortal].clone.SaveRigidbodyInfo();
+            } else {
+                clone.SaveRigidbodyInfo();
 
-            portal.onIgnoredCollidersChanged -= OnIgnoredCollidersChanged;
-            portal.ExitPortal.onIgnoredCollidersChanged += OnIgnoredCollidersChanged;
+                IgnoreCollisions(portal.IgnoredColliders, false);
+                IgnoreCollisions(portal.ExitPortal.IgnoredColliders, true);
 
-            portal.ApplyWorldToPortalTransform(transform, transform);
-            if (_rigidbody != null) {
-                // TODO: Evaluate whether or not using Rigidbody.position is important
-                // Currently it messes up the _cameraInside stuff because it happens at the next physics step
-                //Vector3 newPosition = PortalMatrix().MultiplyPoint3x4(rigidbody.position);
-                //Quaternion newRotation = PortalRotation() * rigidbody.rotation;
-                //rigidbody.position = newPosition;
-                //rigidbody.transform.rotation = newRotation;
+                clone.IgnoreCollisions(portal.ExitPortal.IgnoredColliders, false);
+                clone.IgnoreCollisions(portal.IgnoredColliders, true);
 
-                float scaleDelta = portal.PortalScaleAverage();
-                _rigidbody.velocity = portal.TeleportVector(_rigidbody.velocity);
-                _rigidbody.mass *= scaleDelta * scaleDelta * scaleDelta;
+                portal.onIgnoredCollidersChanged -= OnIgnoredCollidersChanged;
+                portal.onExitPortalChanged -= OnExitPortalChanged;
+                portal.ExitPortal.onIgnoredCollidersChanged -= clone.OnIgnoredCollidersChanged;
+
+                portal.ExitPortal.onIgnoredCollidersChanged += OnIgnoredCollidersChanged;
+                portal.ExitPortal.onExitPortalChanged += OnExitPortalChanged;
+                portal.onIgnoredCollidersChanged += clone.OnIgnoredCollidersChanged;
+
+                ReplaceShaders(clone.gameObject, portal);
+                
+                // Swap clones if we're not already standing in the exit portal
+                // This only applies to portals very close together.
+                _contextByPortal.Remove(portal);
+                _contextByPortal.Add(portal.ExitPortal, context);
             }
 
-            ReplaceShaders(this.gameObject, portal.ExitPortal);
-            ReplaceShaders(context.clone.gameObject, portal);
+            if (_rigidbody) {
+                // Interpolate velocity change through the portal
+                Vector3 frameMovement = _rigidbody.position - _rigidbodyInfo.position;
+                float distanceFromPortalLastFrame;
+                if (portal.Plane.Raycast(new Ray(_rigidbodyInfo.position, frameMovement), out distanceFromPortalLastFrame)) {
+                    float ratioLastFrame = distanceFromPortalLastFrame / frameMovement.magnitude;
+                    float ratioThisFrame = 1 - ratioLastFrame;
+
+                    Vector3 acceleration = Physics.gravity * Time.deltaTime; // Unfortunately we can't known about forces other than gravity because they aren't exposed by Rigidbody API
+
+                    Vector3 velocity = _rigidbody.velocity;
+                    velocity -= acceleration; // Rewind acceleration
+                    velocity += acceleration * ratioLastFrame; // Replay acceleration until we hit the portal
+                    velocity = portal.TeleportVector(velocity); // Teleport velocity
+                    velocity += acceleration * ratioThisFrame; // Replay acceleration after we passed the portal
+                    _rigidbody.velocity = velocity;
+
+                } else {
+                    _rigidbody.velocity = portal.TeleportVector(_rigidbody.velocity);
+                }
+
+                //float scaleDelta = portal.PortalScaleAverage();
+                //
+                //_rigidbody.mass *= scaleDelta * scaleDelta * scaleDelta;
+
+                _rigidbody.position = portal.TeleportPoint(_rigidbody.position);
+                _rigidbody.transform.rotation = portal.TeleportRotation(_rigidbody.rotation);
+
+                transform.position = _rigidbody.position;
+                transform.rotation = _rigidbody.rotation;
+            }
+            //portal.ApplyWorldToPortalTransform(transform, transform);
 
             gameObject.SendMessage("OnPortalTeleport", portal, SendMessageOptions.DontRequireReceiver);
+            if (onTeleport != null) {
+                onTeleport(this, portal);
+            }
         }
 
-        private void OnExit(Portal portal, PortalContext context) {
+        private void OnExit(Portal portal) {
+            PortalContext context = _contextByPortal[portal];
+            _contextByPortal.Remove(portal);
+
+            Teleportable clone = context.clone;
+
             IgnoreCollisions(portal.IgnoredColliders, false);
-            context.clone.IgnoreCollisions(portal.ExitPortal.IgnoredColliders, false);
+            clone.IgnoreCollisions(portal.ExitPortal.IgnoredColliders, false);
 
             portal.onIgnoredCollidersChanged -= OnIgnoredCollidersChanged;
+            portal.onExitPortalChanged -= OnExitPortalChanged;
+            portal.ExitPortal.onIgnoredCollidersChanged -= clone.OnIgnoredCollidersChanged;
 
-            DespawnClone(context.clone);
+            DespawnClone(clone);
             RestoreShaders();
         }
 
         #endregion
 
         #region Callbacks
-        private void OnIgnoredCollidersChanged(Portal portal, Collider[] oldColliders) {
+        private void OnIgnoredCollidersChanged(Portal portal, Collider[] oldColliders, Collider[] newColliders) {
             IgnoreCollisions(oldColliders, false);
-            IgnoreCollisions(portal.IgnoredColliders, true);
+            IgnoreCollisions(newColliders, true);
+        }
+
+        private void OnExitPortalChanged(Portal portal, Portal oldExitPortal, Portal newExitPortal) {
+            PortalContext context;
+            if (_contextByPortal.TryGetValue(portal, out context)) {
+                Teleportable clone = context.clone;
+                clone.IgnoreCollisions(oldExitPortal.IgnoredColliders, false);
+                clone.IgnoreCollisions(newExitPortal.IgnoredColliders, true);
+            }
         }
 
         private void IgnoreCollisions(Collider[] ignoredColliders, bool ignore) {
@@ -341,7 +391,6 @@ namespace Portals {
             DisableInvalidComponentsRecursively(clone.gameObject);
             clone.gameObject.SetActive(false);
             clone._isClone = true;
-            clone._master = this;
 
             return clone;
         }
@@ -349,7 +398,7 @@ namespace Portals {
         private static void DisableInvalidComponentsRecursively(GameObject obj) {
             Behaviour[] allBehaviours = obj.GetComponents<Behaviour>();
             foreach (Behaviour behaviour in allBehaviours) {
-                if (!_validBehaviours.Contains(behaviour.GetType())) {
+                if (!_validCloneBehaviours.Contains(behaviour.GetType())) {
                     behaviour.enabled = false;
                 }
             }
@@ -361,7 +410,7 @@ namespace Portals {
         void SaveShaders(GameObject obj) {
             Renderer renderer = obj.GetComponent<Renderer>();
             if (renderer) {
-                _rendererToShader[renderer] = renderer.material.shader;
+                _rendererToShader[renderer] = renderer.sharedMaterial.shader;
             }
 
             foreach (Transform child in obj.transform) {
@@ -373,7 +422,7 @@ namespace Portals {
             Renderer renderer = obj.GetComponent<Renderer>();
             if (renderer) {
                 Vector4 clippingPlane = portal.VectorPlane;
-                clippingPlane.w -= portal.ClippingOffset;
+                clippingPlane.w -= _clippingOffset;
                 renderer.material.shader = _clippedShader;
                 renderer.material.SetVector(_clippedShaderPlaneHash, clippingPlane);
             }
@@ -390,6 +439,51 @@ namespace Portals {
 
                 renderer.material.shader = shader;
             }
+        }
+
+        void CopyAnimations(Teleportable from) {
+            Animator src = from.GetComponent<Animator>();
+            if (!src) {
+                return;
+            }
+            Animator dst = this.GetComponent<Animator>();
+            if (!dst) {
+                return;
+            }
+
+            for (int i = 0; i < src.layerCount; i++) {
+                AnimatorStateInfo srcInfo = src.GetCurrentAnimatorStateInfo(i);
+                AnimatorStateInfo srcInfoNext = src.GetNextAnimatorStateInfo(i);
+                AnimatorTransitionInfo srcTransitionInfo = src.GetAnimatorTransitionInfo(i);
+
+                dst.Play(srcInfo.fullPathHash, i, srcInfo.normalizedTime);
+            }
+
+            for (int i = 0; i < src.parameterCount; i++) {
+                AnimatorControllerParameter parameter = src.parameters[i];
+                if (src.IsParameterControlledByCurve(parameter.nameHash)) {
+                    continue;
+                }
+                switch (parameter.type) {
+                    case AnimatorControllerParameterType.Float:
+                        dst.SetFloat(parameter.name, src.GetFloat(parameter.name));
+                        break;
+                    case AnimatorControllerParameterType.Int:
+                        dst.SetInteger(parameter.name, src.GetInteger(parameter.name));
+                        break;
+                    case AnimatorControllerParameterType.Bool:
+                        dst.SetBool(parameter.name, src.GetBool(parameter.name));
+                        break;
+                    case AnimatorControllerParameterType.Trigger:
+                        // TODO: figure out how to set triggers
+                        //dst.SetTrigger(parameter.nameHash, parameter.);
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            dst.speed = src.speed;
         }
 
         Vector3 CalculateImpulseTransfer(Vector3 imp1, Vector3 imp2) {
@@ -413,15 +507,39 @@ namespace Portals {
             _rigidbodyInfo.angularVelocity = _rigidbody.angularVelocity;
         }
 
+        private bool ShouldUseFixedUpdate() {
+            return _cameraType == CameraType.None || _camera == null;
+        }
+
+        Portal[] SweepTest() {
+            Vector3 direction = _rigidbody.velocity;
+            float distance = _rigidbody.velocity.magnitude * Time.fixedDeltaTime;
+            if (direction == Vector3.zero || distance == 0) {
+                direction = Physics.gravity;
+                distance = Physics.gravity.magnitude * Time.fixedDeltaTime;
+            }
+            List<Portal> portalsHit = new List<Portal>();
+            RaycastHit[] hits = _rigidbody.SweepTestAll(direction, distance, QueryTriggerInteraction.Collide);
+            for (int i = 0; i < hits.Length; i++) {
+                RaycastHit hit = hits[i];
+                if (hit.collider.gameObject.layer == PortalPhysics.PortalLayer) {
+                    portalsHit.Add(hit.collider.GetComponent<Portal>());
+                }
+            }
+            return portalsHit.ToArray();
+        }
         #endregion
 
         private struct RigidbodyInfo {
+            public Vector3 cameraPosition;
             public Vector3 position;
             public Quaternion rotation;
             public Vector3 velocity;
             public Vector3 angularVelocity;
-            public Vector3 translationalImpulse;
-            public Vector3 angularImpulse;
+        }
+
+        private class PortalContext {
+            public Teleportable clone;
         }
     }
 }

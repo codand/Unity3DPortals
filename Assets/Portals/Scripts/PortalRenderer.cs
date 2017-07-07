@@ -6,9 +6,17 @@ using UnityEngine.Rendering;
 using UnityEngine.VR;
 
 namespace Portals {
-    //[ExecuteInEditMode]
+    [ExecuteInEditMode]
     public class PortalRenderer : RenderedBehaviour {
+        [Flags]
+        private enum ShaderKeyword {
+            None = 0,
+            SamplePreviousFrame = 1,
+            SampleDefaultTexture = 2,
+        }
+
         [SerializeField] Portal _portal;
+        [SerializeField] float _backfaceTriggerDistance = 0.1f;
 
         // Maps cameras to their children
         private Dictionary<Camera, PortalCamera> _camToPortalCam = new Dictionary<Camera, PortalCamera>();
@@ -20,32 +28,14 @@ namespace Portals {
         // Mesh spawned when walking through a portal so that you can't clip through the portal
         public static Mesh _mesh;
 
-        // Per-portal instance of the backface object
-        private GameObject _backFace;
-
         // Instanced material
         private Material _portalMaterial;
 
         // Instanced backface material
         private Material _backFaceMaterial;
 
-        private Dictionary<Camera, bool> _wasRenderedByCamera = new Dictionary<Camera, bool>();
-        private Stack<Texture> _savedTextures = new Stack<Texture>();
-
-        private bool _inPortal = false;
-
         private Renderer _renderer;
         private MeshFilter _meshFilter;
-
-        private HashSet<Camera> _camerasInside = new HashSet<Camera>();
-        private HashSet<Teleportable> _teleportablesInside = new HashSet<Teleportable>();
-
-        [Flags]
-        private enum ShaderKeyword {
-            None = 0,
-            SamplePreviousFrame = 1,
-            SampleDefaultTexture = 2,
-        }
 
         private Stack<MaterialPropertyBlock> _blockStack;
         private Stack<ShaderKeyword> _keywordStack;
@@ -74,8 +64,8 @@ namespace Portals {
                 Material portalMaterial = new Material(Shader.Find("Portal/Portal"));
                 Material backFaceMaterial = new Material(Shader.Find("Portal/PortalBackface"));
 
-                portalMaterial.name = "Portal FrontFace (Instanced)";
-                backFaceMaterial.name = "Portal BackFace (Instanced)";
+                portalMaterial.name = "Portal FrontFace";
+                backFaceMaterial.name = "Portal BackFace";
 
                 _portalMaterial = portalMaterial;
                 _backFaceMaterial = backFaceMaterial;
@@ -90,10 +80,6 @@ namespace Portals {
             }
         }
 
-        void OnValidate() {
-
-        }
-
         void Update() {
             _transform.localScale = Vector3.one;
         }
@@ -105,7 +91,7 @@ namespace Portals {
             foreach (KeyValuePair<Camera, PortalCamera> kvp in _camToPortalCam) {
                 PortalCamera child = kvp.Value;
                 if (child && child.gameObject) {
-                    DestroyImmediate(child.gameObject);
+                    Util.SafeDestroy(child.gameObject);
                 }
             }
         }
@@ -144,11 +130,19 @@ namespace Portals {
             }
         }
 
+
         protected override void PostRender() {
             RestoreMaterialProperties();
         }
 
         protected override void PreRender() {
+#if UNITY_EDITOR
+            // Workaround for Unity bug that causes Awake/Start to not be called when running in EditMode
+            // https://issuetracker.unity3d.com/issues/awake-and-start-not-called-before-update-when-assembly-is-reloaded-for-executeineditmode-scripts
+            if (_blockPool == null) {
+                Awake();
+            }
+#endif
             SaveMaterialProperties();
 
             if (!enabled || !_renderer || !_renderer.enabled) {
@@ -220,6 +214,11 @@ namespace Portals {
                         _transform.localScale = newScale;
                     }
                 }
+
+                //float distanceFromPlane = _portal.Plane.GetDistanceToPoint(Camera.current.transform.position);
+                //if (distanceFromPlane > _backfaceTriggerDistance && distanceFromPlane <= 0.0f) {
+                //    renderBackface = true;
+                //}
             }
             if (renderBackface) {
                 block.SetFloat("_BackfaceAlpha", 1.0f);
@@ -261,7 +260,8 @@ namespace Portals {
         }
 
         private float CalculateNearPlanePenetration(Camera camera) {
-            Vector3[] corners = CalculateNearPlaneCorners(camera);
+            Vector3[] corners = new Vector3[4];
+            CalculateNearPlaneCornersNoAlloc(camera, ref corners);
             Plane plane = _portal.Plane;
             float maxPenetration = Mathf.NegativeInfinity;
             for (int i = 0; i < corners.Length; i++) {
@@ -272,7 +272,7 @@ namespace Portals {
             return maxPenetration;
         }
 
-        public static Vector3[] CalculateNearPlaneCorners(Camera camera) {
+        public static void CalculateNearPlaneCornersNoAlloc(Camera camera, ref Vector3[] corners) {
             // Source: https://gamedev.stackexchange.com/questions/19774/determine-corners-of-a-specific-plane-in-the-frustum
             Transform t = camera.transform;
             Vector3 p = t.position;
@@ -297,12 +297,10 @@ namespace Portals {
             Vector3 bottomRight = cNear - hHalf + wHalf;
             Vector3 bottomLeft = cNear - hHalf - wHalf;
 
-            return new Vector3[] {
-            topLeft,
-            topRight,
-            bottomRight,
-            bottomLeft
-        };
+            corners[0] = topLeft;
+            corners[1] = topRight;
+            corners[2] = bottomRight;
+            corners[3] = bottomLeft;
         }
 
         PortalCamera GetOrCreatePortalCamera(Camera currentCamera) {

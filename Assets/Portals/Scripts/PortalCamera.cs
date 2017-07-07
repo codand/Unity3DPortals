@@ -6,6 +6,7 @@ using UnityEngine.Rendering;
 using UnityEngine.VR;
 
 namespace Portals {
+    [ExecuteInEditMode]
     [RequireComponent(typeof(Camera))]
     public class PortalCamera : MonoBehaviour {
         Camera _parent;
@@ -95,11 +96,13 @@ namespace Portals {
         }
 
         private void OnDestroy() {
-            cameraMap.Remove(_camera);
+            if (cameraMap != null && cameraMap.ContainsKey(_camera)) {
+                cameraMap.Remove(_camera);
+            }
             if (lastFrameRenderTexture) {
                 RenderTexture.ReleaseTemporary(lastFrameRenderTexture);
             }
-            if (_camera.targetTexture) {
+            if (_camera && _camera.targetTexture) {
                 RenderTexture.ReleaseTemporary(_camera.targetTexture);
             }
         }
@@ -108,7 +111,7 @@ namespace Portals {
         private int _framesSinceLastUse = 0;
         void Update() {
             if (_framesSinceLastUse > 0) {
-                Destroy(this.gameObject);
+                Util.SafeDestroy(this.gameObject);
             }
             _framesSinceLastUse++;
         }

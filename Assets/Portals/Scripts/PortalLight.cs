@@ -200,7 +200,7 @@ namespace Portals {
             foreach (KeyValuePair<Portal, PortalLight> kvp in _portalToChild.ToArray()) {
                 _portalToChild.Remove(kvp.Key);
                 if (kvp.Value && kvp.Value.gameObject) {
-                    Destroy(kvp.Value.gameObject);
+                    Util.SafeDestroy(kvp.Value.gameObject);
                 }
             }
 
@@ -227,7 +227,7 @@ namespace Portals {
                     // If there is a child, but we're no longer in range, remove and destroy the child
                     if (child) {
                         _portalToChild.Remove(portal);
-                        Destroy(child.gameObject);
+                        Util.SafeDestroy(child.gameObject);
                     }
                 }
             }

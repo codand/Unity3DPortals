@@ -57,7 +57,7 @@ public class PortalLightingSystem : MonoBehaviour {
     Mesh GetPrimitiveMesh(PrimitiveType type) {
         GameObject go = GameObject.CreatePrimitive(type);
         Mesh mesh = go.GetComponent<MeshFilter>().sharedMesh;
-        Destroy(go);
+        Util.SafeDestroy(go);
         return mesh;
     }
 
