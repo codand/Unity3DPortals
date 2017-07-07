@@ -31,7 +31,7 @@ namespace Portals.Examples
 
         private List<Portal> m_Portals = new List<Portal>();
         private Teleportable m_Teleportable;
-        private float m_CameraDistance;
+        // private float m_CameraDistance;
 
         protected override void Awake()
         {
@@ -45,7 +45,7 @@ namespace Portals.Examples
 			m_TransformTargetRot = transform.localRotation;
 
             m_Teleportable = m_Target.GetComponent<Teleportable>();
-            m_CameraDistance = m_Cam.localPosition.z;
+            //m_CameraDistance = m_Cam.localPosition.z;
         }
 
 
@@ -61,7 +61,7 @@ namespace Portals.Examples
 
         private void OnEnable() {
             if (m_Teleportable) {
-                m_Teleportable.onTeleport += OnTargetTeleported;
+                m_Teleportable.OnTeleport += OnTargetTeleported;
             }
         }
 
@@ -71,7 +71,7 @@ namespace Portals.Examples
             Cursor.visible = true;
 
             if (m_Teleportable) {
-                m_Teleportable.onTeleport -= OnTargetTeleported;
+                m_Teleportable.OnTeleport -= OnTargetTeleported;
             }
         }
 

@@ -36,7 +36,7 @@ public class PortalLightingSystem : MonoBehaviour {
         _lightMaterial = new Material(Shader.Find("Portal/Portal-DeferredShading"));
         //_lightMaterial = new Material(Shader.Find("Hidden/Internal-DeferredShading"));
 
-        if (!_camera.hdr) {
+        if (!_camera.allowHDR) {
             _lightMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.DstColor);
             _lightMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.Zero);
         }
@@ -83,7 +83,7 @@ public class PortalLightingSystem : MonoBehaviour {
             // TODO: If this doesn't work, then go back and fetch some old git stuff to find this function
             //Vector3 position = _portal.MultiplyPoint(light.transform.position);
             Vector3 position = _portal.PortalMatrix().MultiplyPoint3x4(light.transform.position);
-            Quaternion rotation = _portal.PortalRotation() * light.transform.rotation;
+            //Quaternion rotation = _portal.PortalRotation() * light.transform.rotation;
 
             _cmdBuffer.SetGlobalVector("_LightPos", new Vector4(position.x, position.y, position.z, 1.0f / (light.range * light.range)));
             _cmdBuffer.SetGlobalColor("_LightColor", light.color * light.intensity);

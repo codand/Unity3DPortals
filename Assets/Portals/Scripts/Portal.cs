@@ -1,129 +1,133 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEngine.VR;
-
+// -----------------------------------------------------------------------------------------------------------
+// <summary>
+// Seamless portal system to teleport objects between locations. Objects must have a Teleportable script to pass through.
+// </summary>
+// -----------------------------------------------------------------------------------------------------------
 namespace Portals {
+    using System.Collections.Generic;
+    using UnityEngine;
+
     [SelectionBase]
     public class Portal : MonoBehaviour {
-        [SerializeField] private Portal _exitPortal;
-        [SerializeField] private Texture _defaultTexture;
-        [SerializeField] private Texture _transparencyMask;
-        [SerializeField] private int _maxRecursiveDepth = 2;
-        [SerializeField] private bool _fakeInfiniteRecursion = true;
-        [SerializeField] private bool _useCullingMatrix = true;
-        [SerializeField] private bool _useProjectionMatrix = true;
-        // TODO: Make this only appear when useProjectionMatrix is enabled
-        [SerializeField] private float _clippingOffset = 0.25f;
-        [SerializeField] private bool _copyGI = false;
-        [SerializeField] private List<Collider> _ignoredColliders;
-
-        private HashSet<Camera> _camerasInside = new HashSet<Camera>();
-
-        // TODO: Remove these
-        public delegate void StaticPortalEvent(Portal portal, GameObject obj);
-        public static event StaticPortalEvent onPortalEnterGlobal;
-        public static event StaticPortalEvent onPortalExitGlobal;
-        public static event StaticPortalEvent onPortalTeleportGlobal;
-
-        public delegate void PortalTriggerEvent(Portal portal, GameObject obj);
-        public event PortalTriggerEvent onPortalEnter;
-        public event PortalTriggerEvent onPortalExit;
-        public event PortalTriggerEvent onPortalTeleport;
+        [Tooltip("Exit destination for this portal.")]
+        [SerializeField] private Portal m_ExitPortal;
+        [Tooltip("Default texture that will be used when this portal cannot render the exit side.")]
+        [SerializeField] private Texture m_DefaultTexture;
+        [Tooltip("Grayscale transparency mask. Black is visible, white is transparent.")]
+        [SerializeField] private Texture m_TransparencyMask;
+        [Tooltip("Maximum number of times this portal can recurse.")]
+        [SerializeField] private int m_MaxRecursion = 2;
+        [Tooltip("If enabled, uses the previous frame to draw the last recursion. Max Recursion must be 2 or greater.")]
+        [SerializeField] private bool m_FakeInfiniteRecursion = true;
+        [Tooltip("Colliders to ignore when entering this portal. Set this to the objects behind the portal.")]
+        [SerializeField] private List<Collider> m_IgnoredColliders;
+        [SerializeField] private AdvancedSettings m_AdvanceSettings = new AdvancedSettings() {
+            useCullingMatrix = true,
+            useProjectionMatrix = true,
+            clippingOffset = 0.25f,
+            copyGlobalIllumination = false,
+        };
 
         public delegate void PortalIgnoredCollidersChangedEvent(Portal portal, Collider[] oldColliders, Collider[] newColliders);
-        public event PortalIgnoredCollidersChangedEvent onIgnoredCollidersChanged;
-        public event PortalIgnoredCollidersChangedEvent onExitPortalIgnoredCollidersChanged;
+        public event PortalIgnoredCollidersChangedEvent OnIgnoredCollidersChanged;
 
         public delegate void PortalExitChangeEvent(Portal portal, Portal oldExitPortal, Portal newExitPortal);
-        public event PortalExitChangeEvent onExitPortalChanged;
+        public event PortalExitChangeEvent OnExitPortalChanged;
 
-        public bool IsOn {
-            get {
-                return this.isActiveAndEnabled && ExitPortal && ExitPortal.isActiveAndEnabled;
-            }
-        }
+        public delegate void PortalTextureChangeEvent(Portal portal, Texture oldTexture, Texture newTexture);
+        public event PortalTextureChangeEvent OnDefaultTextureChanged;
+        public event PortalTextureChangeEvent OnTransparencyMaskChanged;
 
         public Portal ExitPortal {
-            get { return _exitPortal; }
+            get {
+                return m_ExitPortal;
+            }
+
             set {
-                Portal oldExitPortal = _exitPortal;
+                Portal oldExitPortal = m_ExitPortal;
 
-                _exitPortal = value;
+                m_ExitPortal = value;
 
-                if (onExitPortalChanged != null) {
-                    onExitPortalChanged(this, oldExitPortal, _exitPortal);
+                if (OnExitPortalChanged != null) {
+                    OnExitPortalChanged(this, oldExitPortal, m_ExitPortal);
                 }
             }
         }
 
         public Texture DefaultTexture {
             get {
-                return _defaultTexture;
+                return m_DefaultTexture;
             }
+
             set {
-                _defaultTexture = value;
-                //_portalMaterial.SetTexture("_DefaultTexture", _defaultTexture);
+                Texture oldTexture = m_DefaultTexture;
+
+                m_DefaultTexture = value;
+
+                if (OnDefaultTextureChanged != null) {
+                    OnDefaultTextureChanged(this, oldTexture, m_DefaultTexture);
+                }
             }
         }
 
         public Texture TransparencyMask {
             get {
-                return _transparencyMask;
+                return m_TransparencyMask;
             }
+
             set {
-                _transparencyMask = value;
-                //_portalMaterial.SetTexture("_TransparencyMask", _transparencyMask);
-            }
-        }
+                Texture oldTexture = m_TransparencyMask;
 
-        public int MaxRecursiveDepth {
-            get { return _maxRecursiveDepth; }
-            set { _maxRecursiveDepth = value; }
-        }
+                m_TransparencyMask = value;
 
-        public bool FakeInfiniteRecursion {
-            get { return _fakeInfiniteRecursion; }
-            set { _fakeInfiniteRecursion = value; }
-        }
-
-        public bool UseCullingMatrix {
-            get { return _useCullingMatrix; }
-            set { _useCullingMatrix = value; }
-        }
-
-        public bool UseProjectionMatrix {
-            get { return _useProjectionMatrix; }
-            set { _useProjectionMatrix = value; }
-        }
-
-        public float ClippingOffset {
-            get { return _clippingOffset; }
-            set { _clippingOffset = value; }
-        }
-
-        public bool CopyGI {
-            get { return _copyGI; }
-            set { _copyGI = value; }
-        }
-
-        public Collider[] IgnoredColliders {
-            get { return _ignoredColliders.ToArray(); }
-            set {
-                Collider[] oldColliders = _ignoredColliders.ToArray();
-                _ignoredColliders = new List<Collider>(value);
-
-                if (onIgnoredCollidersChanged != null) {
-                    onIgnoredCollidersChanged(this, oldColliders, IgnoredColliders);
+                if (OnTransparencyMaskChanged != null) {
+                    OnTransparencyMaskChanged(this, oldTexture, m_TransparencyMask);
                 }
             }
         }
 
-        public PortalTrigger[] PortalTriggers {
+        public int MaxRecursion {
+            get { return m_MaxRecursion; }
+            set { m_MaxRecursion = value; }
+        }
+
+        public bool FakeInfiniteRecursion {
+            get { return m_FakeInfiniteRecursion; }
+            set { m_FakeInfiniteRecursion = value; }
+        }
+
+        public bool UseCullingMatrix {
+            get { return m_AdvanceSettings.useCullingMatrix; }
+            set { m_AdvanceSettings.useCullingMatrix = value; }
+        }
+
+        public bool UseProjectionMatrix {
+            get { return m_AdvanceSettings.useProjectionMatrix; }
+            set { m_AdvanceSettings.useProjectionMatrix = value; }
+        }
+
+        public float ClippingOffset {
+            get { return m_AdvanceSettings.clippingOffset; }
+            set { m_AdvanceSettings.clippingOffset = value; }
+        }
+
+        public bool CopyGlobalIllumination {
+            get { return m_AdvanceSettings.copyGlobalIllumination; }
+            set { m_AdvanceSettings.copyGlobalIllumination = value; }
+        }
+
+        public Collider[] IgnoredColliders {
             get {
-                return GetComponentsInChildren<PortalTrigger>();
+                return m_IgnoredColliders.ToArray();
+            }
+
+            set {
+                Collider[] oldColliders = m_IgnoredColliders.ToArray();
+                m_IgnoredColliders = new List<Collider>(value);
+
+                if (OnIgnoredCollidersChanged != null) {
+                    OnIgnoredCollidersChanged(this, oldColliders, IgnoredColliders);
+                }
             }
         }
 
@@ -259,6 +263,25 @@ namespace Portals {
                 Gizmos.color = Color.magenta;
                 Gizmos.DrawLine(this.transform.position, ExitPortal.transform.position);
             }
+        }
+
+        private void OnValidate() {
+            // Calls OnX methods
+            ExitPortal = m_ExitPortal;
+            DefaultTexture = m_DefaultTexture;
+            TransparencyMask = m_TransparencyMask;
+        }
+
+        [System.Serializable]
+        private struct AdvancedSettings {
+            [Tooltip("If enabled, uses a custom culling matrix to reduce number of objects drawn through a portal.")]
+            public bool useCullingMatrix;
+            [Tooltip("If enabled, uses a custom projection matrix to prevent objects behind the portal from being drawn.")]
+            public bool useProjectionMatrix;
+            [Tooltip("Offset at which the custom projection matrix will be disabled.Increase this value if you experience Z-Fighting issues. Decrease this if you can see objects behind the portal.")]
+            public float clippingOffset;
+            [Tooltip("If enabled, global illumination settings will be copied if the exit portal is in a different scene.")]
+            public bool copyGlobalIllumination;
         }
     }
 }

@@ -114,13 +114,13 @@ namespace Portals {
         }
 
         void OnEnable() {
-            Portal.onPortalTeleportGlobal += OnPortalTeleport;
+            //Portal.onPortalTeleportGlobal += OnPortalTeleport;
             SceneManager.sceneLoaded += OnSceneLoaded;
             SceneManager.sceneUnloaded += OnSceneUnloaded;
         }
 
         void OnDisable() {
-            Portal.onPortalTeleportGlobal -= OnPortalTeleport;
+            //Portal.onPortalTeleportGlobal -= OnPortalTeleport;
             SceneManager.sceneLoaded -= OnSceneLoaded;
             SceneManager.sceneUnloaded -= OnSceneUnloaded;
         }

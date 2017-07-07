@@ -29,7 +29,7 @@ namespace Portals {
                 }
 
                 // Bail if we recurse too many times
-                if (recursiveDepth >= portal.MaxRecursiveDepth) {
+                if (recursiveDepth >= portal.MaxRecursion) {
                     hitInfo = default(RaycastHit);
                     return false;
                 }

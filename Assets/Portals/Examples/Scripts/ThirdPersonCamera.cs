@@ -29,7 +29,7 @@ namespace Portals.Examples {
             m_PortalStack = new Stack<Portal>();
             m_Teleportable = m_Target.GetComponent<Teleportable>();
             if (m_Teleportable) {
-                m_Teleportable.onTeleport += OnTargetTeleported;
+                m_Teleportable.OnTeleport += OnTargetTeleported;
             }
         }
 

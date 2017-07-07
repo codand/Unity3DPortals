@@ -9,14 +9,12 @@ public class FollowThroughPortal : MonoBehaviour {
     [SerializeField] float _followSpeed = 5.0f;
 
     Portal _portal;
-    Camera _cam;
     MonoBehaviour[] _rootBehaviours;
 
     Vector3 _defaultPosition;
     Quaternion _defaultRotation;
 
     void Awake() {
-        _cam = GetComponent<Camera>();
         _defaultPosition = transform.localPosition;
         _defaultRotation = transform.localRotation;
 
@@ -24,11 +22,11 @@ public class FollowThroughPortal : MonoBehaviour {
     }
 
     void OnEnable() {
-        _target.onTeleport += OnTargetTeleported;
+        _target.OnTeleport += OnTargetTeleported;
     }
 
     void OnDisable() {
-        _target.onTeleport -= OnTargetTeleported;
+        _target.OnTeleport -= OnTargetTeleported;
     }
 
     void OnTargetTeleported(Teleportable sender, Portal portal) {

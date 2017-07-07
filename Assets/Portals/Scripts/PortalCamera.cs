@@ -87,7 +87,7 @@ namespace Portals {
             }
         }
 
-        RenderSettingsStruct _savedRenderSettings = new RenderSettingsStruct();
+        // RenderSettingsStruct _savedRenderSettings = new RenderSettingsStruct();
         RenderSettingsStruct _sceneRenderSettings = new RenderSettingsStruct();
 
         public void Awake() {

@@ -17,13 +17,13 @@ namespace Portals {
         List<Portal> _allPortals;
         Dictionary<Portal, PortalLight> _portalToChild;
 
-        static List<Renderer> _shadowRenderers;
+        //static List<Renderer> _shadowRenderers;
 
         PortalLight SpawnLight(Portal portal) {
             GameObject obj = new GameObject();
             //obj.hideFlags = HideFlags.HideAndDontSave;
             obj.name = "~" + this.name + "->" + portal.name;
-            Light light = obj.AddComponent<Light>();
+            //Light light = obj.AddComponent<Light>();
             PortalLight portalLight = obj.AddComponent<PortalLight>();
             portalLight._parentLight = this;
             portalLight._portal = portal;
@@ -172,7 +172,7 @@ namespace Portals {
         void Awake() {
             _light = GetComponent<Light>();
             _portalToChild = new Dictionary<Portal, PortalLight>();
-            _shadowRenderers = new List<Renderer>();
+            //_shadowRenderers = new List<Renderer>();
         }
 
         public void SpawnShadowCasters() {

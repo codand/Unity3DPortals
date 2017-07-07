@@ -49,11 +49,11 @@ namespace Portals {
         }
 
         void OnEnable() {
-            Portal.onPortalTeleportGlobal += HandleObjectCarriedThroughPortal;
+            //Portal.onPortalTeleportGlobal += HandleObjectCarriedThroughPortal;
         }
 
         void OnDisable() {
-            Portal.onPortalTeleportGlobal -= HandleObjectCarriedThroughPortal;
+            //Portal.onPortalTeleportGlobal -= HandleObjectCarriedThroughPortal;
         }
 
         void HandleObjectCarriedThroughPortal(Portal portal, GameObject obj) {
