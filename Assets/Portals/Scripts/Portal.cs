@@ -24,7 +24,7 @@ namespace Portals {
         [SerializeField] private AdvancedSettings m_AdvanceSettings = new AdvancedSettings() {
             useCullingMatrix = true,
             useProjectionMatrix = true,
-            clippingOffset = 0.25f,
+            clippingOffset = 0.01f,
             copyGlobalIllumination = false,
         };
 
@@ -37,6 +37,12 @@ namespace Portals {
         public delegate void PortalTextureChangeEvent(Portal portal, Texture oldTexture, Texture newTexture);
         public event PortalTextureChangeEvent OnDefaultTextureChanged;
         public event PortalTextureChangeEvent OnTransparencyMaskChanged;
+
+        public bool IsOpen {
+            get {
+                return this.isActiveAndEnabled && ExitPortal && ExitPortal.isActiveAndEnabled; 
+            }
+        }
 
         public Portal ExitPortal {
             get {
@@ -258,12 +264,12 @@ namespace Portals {
             ApplyWorldToPortalTransform(target, reference.position, reference.rotation, reference.lossyScale, ignoreScale);
         }
         
-        private void OnDrawGizmos() {
-            if (ExitPortal) {
-                Gizmos.color = Color.magenta;
-                Gizmos.DrawLine(this.transform.position, ExitPortal.transform.position);
-            }
-        }
+        ////private void OnDrawGizmos() {
+        ////    if (ExitPortal) {
+        ////        Gizmos.color = Color.magenta;
+        ////        Gizmos.DrawLine(this.transform.position, ExitPortal.transform.position);
+        ////    }
+        ////}
 
         private void OnValidate() {
             // Calls OnX methods

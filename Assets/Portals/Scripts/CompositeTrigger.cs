@@ -16,7 +16,6 @@ public class CompositeTrigger : MonoBehaviour {
         // Support live recompile
         if (_colliderCounts == null || _rigidbodyCounts == null) {
             Awake();
-            Awake();
         }
     }
 

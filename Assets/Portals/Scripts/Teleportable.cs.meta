@@ -1,10 +1,13 @@
 fileFormatVersion: 2
 guid: fa3f73add1147f14f8d133346e6a0c90
-timeCreated: 1496790127
+timeCreated: 1499878588
 licenseType: Free
 MonoImporter:
   serializedVersion: 2
-  defaultReferences: []
+  defaultReferences:
+  - m_Camera: {instanceID: 0}
+  - m_ReplacementShader: {fileID: 4800000, guid: f919f642bd5df034c9810c0bba3ec5a5,
+      type: 3}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

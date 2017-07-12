@@ -3,8 +3,11 @@ using System.Collections.Generic;
 
 namespace Portals {
     public class ObjectPool<T> {
+        public int Count { get; private set; }
+
         private Queue<T> _available;
         private Func<T> _createObjectFunc;
+
         public ObjectPool(int numPreallocated = 0, Func<T> createObjectFunc = null) {
             _available = new Queue<T>();
             _createObjectFunc = createObjectFunc;
@@ -18,6 +21,7 @@ namespace Portals {
             T t = default(T);
             if (_available.Count > 0) {
                 t = _available.Dequeue();
+                Count--;
             } else {
                 t = MakeObject();
             }
@@ -26,6 +30,7 @@ namespace Portals {
 
         public void Give(T t) {
             _available.Enqueue(t);
+            Count++;
         }
 
         private T MakeObject() {

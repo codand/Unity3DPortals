@@ -8,6 +8,7 @@ namespace Portals.Example {
         [SerializeField] GameObject _ballPrefab;
         [SerializeField] float _fireSpeed = 10.0f;
         [SerializeField] KeyCode _fireKey = KeyCode.LeftShift;
+        [SerializeField] float _destroyAfter = 15.0f;
 
         private Camera _camera;
 
@@ -22,6 +23,8 @@ namespace Portals.Example {
 
                 Rigidbody rigidbody = ball.GetComponent<Rigidbody>();
                 rigidbody.velocity = _camera.transform.forward * _fireSpeed;
+
+                Destroy(ball, _destroyAfter);
             }
         }
     }
