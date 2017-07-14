@@ -59,7 +59,6 @@ Shader "Portal/Portal"
 				float4 pos : SV_POSITION;
 				float4 screenUV : TEXCOORD0;
 				float4 objUV : TEXCOORD1;
-				UNITY_FOG_COORDS(2)
 			};
 
 #ifdef SAMPLE_PREVIOUS_FRAME
@@ -78,15 +77,12 @@ Shader "Portal/Portal"
 #ifdef SAMPLE_PREVIOUS_FRAME
 				// Instead of getting the clip position of our portal from the currently rendering camera,
 				// calculate the clip position of the portal from a higher level portal. PORTAL_MATRIX_VP == camera.projectionMatrix.
-				float4 recursionClipPos = mul(PORTAL_MATRIX_VP, mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1.0)));
-
-				// TODO: Figure out how to get this value properly (https://docs.unity3d.com/Manual/SL-UnityShaderVariables.html)
-				_ProjectionParams.x = 1;
-				o.screenUV = ComputeScreenPos(recursionClipPos);
+				float4 clipPos = mul(PORTAL_MATRIX_VP, mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1.0)));
+				clipPos.y *= _ProjectionParams.x;
+				o.screenUV = ComputeScreenPos(clipPos);
 #else
 				o.screenUV = ComputeScreenPos(o.pos);
 #endif
-				UNITY_TRANSFER_FOG(o, o.pos);
 				return o;
 			}
 
@@ -122,7 +118,6 @@ Shader "Portal/Portal"
 #endif
 				
 				col.a = tex2D(_TransparencyMask, i.objUV).r;
-				//UNITY_APPLY_FOG(i.fogCoord, col);
 				return col;
 			}
 			ENDCG
