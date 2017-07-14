@@ -44,7 +44,7 @@ namespace Portals {
         public PortalRenderer PortalRenderer {
             get {
                 if (!m_PortalRenderer) {
-                    m_PortalRenderer = GetComponent<PortalRenderer>();
+                    m_PortalRenderer = GetComponentInChildren<PortalRenderer>();
                 }
                 return m_PortalRenderer;
             }
