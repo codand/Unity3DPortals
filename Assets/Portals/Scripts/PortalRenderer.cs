@@ -39,6 +39,17 @@ namespace Portals {
         private Transform m_Transform;
         #endregion
 
+        #region Properties
+        public static Mesh Mesh {
+            get {
+                if (!m_Mesh) {
+                    m_Mesh = MakePortalMesh();
+                }
+                return m_Mesh;
+            }
+        }
+        #endregion
+
         #region Enums
         [Flags]
         private enum ShaderKeyword {
@@ -150,15 +161,15 @@ namespace Portals {
             s_Depth++;
             if (VRDevice.isPresent) {
                 if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Left) {
-                    RenderTexture leftEyeTexture = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Left);
+                    RenderTexture leftEyeTexture = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Left, renderBackface);
                     block.SetTexture("_LeftEyeTexture", leftEyeTexture);
                 }
                 if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Right) {
-                    RenderTexture rightEyeTexture = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Right);
+                    RenderTexture rightEyeTexture = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Right, renderBackface);
                     block.SetTexture("_RightEyeTexture", rightEyeTexture);
                 }
             } else {
-                RenderTexture rightEyeTexture = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Mono);
+                RenderTexture rightEyeTexture = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Mono, renderBackface);
                 block.SetTexture("_RightEyeTexture", rightEyeTexture);
             }
             s_Depth--;
@@ -181,11 +192,7 @@ namespace Portals {
             //// TODO
             //// this.gameObject.layer = PortalPhysics.PortalLayer;
 
-            if (!m_Mesh) {
-                m_Mesh = MakePortalMesh();
-            }
-
-            m_MeshFilter.sharedMesh = m_Mesh;
+            m_MeshFilter.sharedMesh = PortalRenderer.Mesh;
             if (!m_PortalMaterial || !m_BackfaceMaterial) {
                 Material portalMaterial = new Material(Shader.Find("Portal/Portal"));
                 Material backFaceMaterial = new Material(Shader.Find("Portal/PortalBackface"));

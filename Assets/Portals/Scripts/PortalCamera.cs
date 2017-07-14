@@ -17,6 +17,7 @@ namespace Portals {
         int _renderDepth;
         RenderTexture _leftEyeRenderTexture;
         RenderTexture _rightEyeRenderTexture;
+        private Material _depthPunchMaterial;
 
         public Matrix4x4 lastFrameWorldToCameraMatrix;
         public Matrix4x4 lastFrameProjectionMatrix;
@@ -150,7 +151,7 @@ namespace Portals {
             }
         }
 
-        public RenderTexture RenderToTexture(Camera.MonoOrStereoscopicEye eye) {
+        public RenderTexture RenderToTexture(Camera.MonoOrStereoscopicEye eye, bool renderBackface) {
             _framesSinceLastUse = 0;
             if (lastFrameRenderTexture) {
                 RenderTexture.ReleaseTemporary(lastFrameRenderTexture);
@@ -206,6 +207,11 @@ namespace Portals {
                 _camera.ResetCullingMatrix();
             }
 
+            if (_portal.UseDepthMask) {
+                DrawDepthPunchMesh(renderBackface);
+            } else {
+                _camera.RemoveAllCommandBuffers();
+            }
 
             _camera.targetTexture = texture;
             _camera.Render();
@@ -213,6 +219,30 @@ namespace Portals {
             return texture;
         }
 
+        private void DrawDepthPunchMesh(bool renderBackface) {
+            if (!_depthPunchMaterial) {
+                Shader shader = Shader.Find("Portals/DepthPunch");
+                _depthPunchMaterial = new Material(shader);
+            }
+
+            if (_camera.commandBufferCount == 0) {
+                CommandBuffer buf = new CommandBuffer();
+                buf.name = "Set Depth to 0";
+                buf.ClearRenderTarget(true, false, Color.red, 0.0f);
+                _camera.AddCommandBuffer(CameraEvent.BeforeForwardOpaque, buf);
+            }
+
+            // Need to render from the parent's point of view
+            PortalRenderer renderer = _portal.PortalRenderer;
+            Matrix4x4 matrix =  _camera.cameraToWorldMatrix * _parent.worldToCameraMatrix * renderer.transform.localToWorldMatrix;
+
+            // Punch a hole in the depth mask
+            Graphics.DrawMesh(PortalRenderer.Mesh, matrix, _depthPunchMaterial, renderer.gameObject.layer, _camera, 0);
+            if (renderBackface) {
+                Graphics.DrawMesh(PortalRenderer.Mesh, matrix, _depthPunchMaterial, renderer.gameObject.layer, _camera, 1);
+            }
+        }
+        
         void UpdateCameraModes(Camera src, Camera dest) {
             if (dest == null) {
                 return;

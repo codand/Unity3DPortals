@@ -22,11 +22,14 @@ namespace Portals {
         [Tooltip("Colliders to ignore when entering this portal. Set this to the objects behind the portal.")]
         [SerializeField] private List<Collider> m_IgnoredColliders;
         [SerializeField] private AdvancedSettings m_AdvanceSettings = new AdvancedSettings() {
+            useDepthMask = true,
             useCullingMatrix = true,
             useProjectionMatrix = true,
             clippingOffset = 0.01f,
             copyGlobalIllumination = false,
         };
+
+        private PortalRenderer m_PortalRenderer;
 
         public delegate void PortalIgnoredCollidersChangedEvent(Portal portal, Collider[] oldColliders, Collider[] newColliders);
         public event PortalIgnoredCollidersChangedEvent OnIgnoredCollidersChanged;
@@ -37,6 +40,15 @@ namespace Portals {
         public delegate void PortalTextureChangeEvent(Portal portal, Texture oldTexture, Texture newTexture);
         public event PortalTextureChangeEvent OnDefaultTextureChanged;
         public event PortalTextureChangeEvent OnTransparencyMaskChanged;
+
+        public PortalRenderer PortalRenderer {
+            get {
+                if (!m_PortalRenderer) {
+                    m_PortalRenderer = GetComponent<PortalRenderer>();
+                }
+                return m_PortalRenderer;
+            }
+        }
 
         public bool IsOpen {
             get {
@@ -100,6 +112,11 @@ namespace Portals {
         public bool FakeInfiniteRecursion {
             get { return m_FakeInfiniteRecursion; }
             set { m_FakeInfiniteRecursion = value; }
+        }
+
+        public bool UseDepthMask {
+            get { return m_AdvanceSettings.useDepthMask; }
+            set { m_AdvanceSettings.useDepthMask = value; }
         }
 
         public bool UseCullingMatrix {
@@ -280,6 +297,7 @@ namespace Portals {
 
         [System.Serializable]
         private struct AdvancedSettings {
+            public bool useDepthMask;
             [Tooltip("If enabled, uses a custom culling matrix to reduce number of objects drawn through a portal.")]
             public bool useCullingMatrix;
             [Tooltip("If enabled, uses a custom projection matrix to prevent objects behind the portal from being drawn.")]
