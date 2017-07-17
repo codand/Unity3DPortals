@@ -28,6 +28,11 @@ namespace Portals {
         }
 
         private void Update() {
+            if (_camera.stereoEnabled) {
+                Debug.LogError("Setting field of view not supported in VR. Disabling script.");
+                this.enabled = false;
+                return;
+            }
             float speed = Vector3.Dot(_rigidbody.velocity, _camera.transform.forward);
 
             float ratio = Mathf.Clamp01((speed - _triggerSpeed) / (_maxSpeedModified - _triggerSpeed));

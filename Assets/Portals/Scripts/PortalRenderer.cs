@@ -79,7 +79,7 @@ namespace Portals {
             }
 
             if (!m_Portal.ExitPortal || !m_Portal.ExitPortal.isActiveAndEnabled) {
-                m_PortalMaterial.EnableKeyword("DONT_SAMPLE");
+                m_PortalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
                 return;
             }
 
@@ -102,17 +102,40 @@ namespace Portals {
                     if (currentPortalCamera.portal == m_Portal && parentPortalCam.portal == m_Portal) {
                         // This portal is currently viewing itself.
                         // Render the bottom of the stack with the parent camera's view/projection.
+                        PortalCamera.FrameData frameData = parentPortalCam.PreviousFrameData;
+                        Matrix4x4 projectionMatrix;
+                        Matrix4x4 worldToCameraMatrix;
+                        Texture texture;
+                        string sampler;
+                        switch (parentCam.stereoTargetEye) {
+                            case StereoTargetEyeMask.Right:
+                                projectionMatrix = frameData.rightEyeProjectionMatrix;
+                                worldToCameraMatrix = frameData.rightEyeWorldToCameraMatrix;
+                                texture = frameData.rightEyeTexture;
+                                sampler = "_RightEyeTexture";
+                                break;
+                            case StereoTargetEyeMask.Left:
+                            case StereoTargetEyeMask.Both:
+                            case StereoTargetEyeMask.None:
+                            default:
+                                projectionMatrix = frameData.leftEyeProjectionMatrix;
+                                worldToCameraMatrix = frameData.leftEyeWorldToCameraMatrix;
+                                texture = frameData.leftEyeTexture;
+                                sampler = "_LeftEyeTexture";
+                                break;
+                        }
+
                         m_PortalMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
-                        m_PortalMaterial.SetMatrix("PORTAL_MATRIX_VP", parentPortalCam.lastFrameProjectionMatrix * parentPortalCam.lastFrameWorldToCameraMatrix);
-                        m_PortalMaterial.SetTexture("_RightEyeTexture", parentPortalCam.lastFrameRenderTexture);
+                        m_PortalMaterial.SetMatrix("PORTAL_MATRIX_VP", projectionMatrix * worldToCameraMatrix);
+                        m_PortalMaterial.SetTexture(sampler, texture);
                     } else {
                         // We are viewing another portal.
                         // Render the bottom of the stack with a base texture
-                        m_PortalMaterial.EnableKeyword("DONT_SAMPLE");
+                        m_PortalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
                     }
                 } else {
                     m_PortalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
-                    m_PortalMaterial.EnableKeyword("DONT_SAMPLE");
+                    m_PortalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
                 }
 
                 // Exit. We don't need to process any further depths.
@@ -123,54 +146,37 @@ namespace Portals {
             m_Renderer.GetPropertyBlock(block);
 
             // Handle the player clipping through the portal's frontface
-            bool renderBackface = false;
-            if (s_Depth == 0 && LocalXYPlaneContainsPoint(Camera.current.transform.position)) {
-                // Camera is within the border of the camera
-                if (!m_Portal.Plane.GetSide(Camera.current.transform.position)) {
-                    // Camera is in front of the plane
-                    float penetration = CalculateNearPlanePenetration(Camera.current);
-                    if (penetration > 0) {
-                        // Near clipping plane is behind the portal at some point
-                        renderBackface = true;
+            bool renderBackface = ShouldRenderBackface(Camera.current);
+            block.SetFloat("_BackfaceAlpha", renderBackface ? 1.0f : 0.0f);
 
-                        ////// Z is divided by two because scale expands in both directions, and
-                        ////// a small offset is added to avoid clip-fighting
-                        ////Vector3 newScale = new Vector3(
-                        ////    m_Transform.localScale.x,
-                        ////    m_Transform.localScale.y,
-                        ////    penetration / 2 + 0.001f);
-                        ////m_Transform.localScale = newScale;
-                    }
-                }
-
-                ////float distanceFromPlane = _portal.Plane.GetDistanceToPoint(Camera.current.transform.position);
-                ////if (distanceFromPlane > _backfaceTriggerDistance && distanceFromPlane <= 0.0f) {
-                ////    renderBackface = true;
-                ////}
-            }
-            if (renderBackface) {
-                block.SetFloat("_BackfaceAlpha", 1.0f);
-            } else {
-                block.SetFloat("_BackfaceAlpha", 0.0f);
-            }
-
-            // Initialize or get anything needed for this depth level
+            // Get camera for next depth level
             PortalCamera portalCamera = GetOrCreatePortalCamera(Camera.current);
-            //// portalCamera.renderDepth = s_depth + 1;
 
             s_Depth++;
-            if (VRDevice.isPresent) {
-                if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Left) {
-                    RenderTexture leftEyeTexture = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Left, renderBackface);
-                    block.SetTexture("_LeftEyeTexture", leftEyeTexture);
-                }
+            if (Camera.current.stereoEnabled) {
+                // Stereo rendering. Render both eyes.
                 if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Right) {
-                    RenderTexture rightEyeTexture = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Right, renderBackface);
-                    block.SetTexture("_RightEyeTexture", rightEyeTexture);
+                    RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Right, renderBackface);
+                    block.SetTexture("_RightEyeTexture", tex);
+                }
+                if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Left) {
+                    RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Left, renderBackface);
+                    block.SetTexture("_LeftEyeTexture", tex);
                 }
             } else {
-                RenderTexture rightEyeTexture = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Mono, renderBackface);
-                block.SetTexture("_RightEyeTexture", rightEyeTexture);
+                // Mono rendering. Render only one eye, but set which texture to use based on the camera's target eye.
+                RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Mono, renderBackface);
+                switch (Camera.current.stereoTargetEye) {
+                    case StereoTargetEyeMask.Right:
+                        block.SetTexture("_RightEyeTexture", tex);
+                        break;
+                    case StereoTargetEyeMask.None:
+                    case StereoTargetEyeMask.Left:
+                    case StereoTargetEyeMask.Both:
+                    default:
+                        block.SetTexture("_LeftEyeTexture", tex);
+                        break;
+                }
             }
             s_Depth--;
             m_Renderer.SetPropertyBlock(block);
@@ -258,7 +264,7 @@ namespace Portals {
             if (m_PortalMaterial.IsKeywordEnabled("SAMPLE_PREVIOUS_FRAME")) {
                 keywords |= ShaderKeyword.SamplePreviousFrame;
             }
-            if (m_PortalMaterial.IsKeywordEnabled("DONT_SAMPLE")) {
+            if (m_PortalMaterial.IsKeywordEnabled("SAMPLE_DEFAULT_TEXTURE")) {
                 keywords |= ShaderKeyword.SampleDefaultTexture;
             }
             m_ShaderKeywordStack.Push(keywords);
@@ -277,18 +283,32 @@ namespace Portals {
             }
 
             if ((keywords & ShaderKeyword.SampleDefaultTexture) == ShaderKeyword.SampleDefaultTexture) {
-                m_PortalMaterial.EnableKeyword("DONT_SAMPLE");
+                m_PortalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
             } else {
-                m_PortalMaterial.DisableKeyword("DONT_SAMPLE");
+                m_PortalMaterial.DisableKeyword("SAMPLE_DEFAULT_TEXTURE");
             }
         }
+
+        private bool ShouldRenderBackface(Camera camera) {
+            // Decrease the size of the box in which we will render the backface when rendering stereo.
+            // This will prevent the backface from appearing in one eye when near the edge of the portal.
+            float scaleMultiplier = camera.stereoEnabled ? 0.9f : 1.0f;
+            if (s_Depth == 0 && LocalXYPlaneContainsPoint(Camera.current.transform.position, scaleMultiplier)) {
+                // Camera is within the border of the camera
+                if (!m_Portal.Plane.GetSide(Camera.current.transform.position)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         
-        private bool LocalXYPlaneContainsPoint(Vector3 point) {
+        private bool LocalXYPlaneContainsPoint(Vector3 point, float scaleMultiplier) {
+            float extents = 0.5f * scaleMultiplier;
             Vector3 localPoint = m_Transform.InverseTransformPoint(point);
-            if (localPoint.x < -0.5f) return false;
-            if (localPoint.x > 0.5f) return false;
-            if (localPoint.y > 0.5f) return false;
-            if (localPoint.y < -0.5f) return false;
+            if (localPoint.x < -extents) return false;
+            if (localPoint.x > extents) return false;
+            if (localPoint.y > extents) return false;
+            if (localPoint.y < -extents) return false;
             return true;
         }
 
@@ -341,7 +361,8 @@ namespace Portals {
             m_PortalCamByCam.TryGetValue(currentCamera, out portalCamera);
             if (!portalCamera) {
                 GameObject go = new GameObject("~" + currentCamera.name + "->" + gameObject.name, typeof(Camera));
-                go.hideFlags = HideFlags.HideAndDontSave;
+                //go.hideFlags = HideFlags.HideAndDontSave;
+                go.hideFlags = HideFlags.DontSave;
 
                 Camera camera = go.GetComponent<Camera>();
                 camera.enabled = false;

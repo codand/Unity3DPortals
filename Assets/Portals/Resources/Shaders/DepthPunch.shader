@@ -30,6 +30,7 @@ Shader "Portals/DepthPunch"
 			};
 
 			struct output {
+				fixed4 color : SV_Target;
 				float depth: SV_Depth;
 			};
 
@@ -47,6 +48,7 @@ Shader "Portals/DepthPunch"
 #else
 				o.depth = 1;
 #endif
+				o.color = fixed4(0, 0, 0, 0);
 				return o;
 			}
 			ENDCG

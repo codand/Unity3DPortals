@@ -15,10 +15,9 @@ namespace Portals {
         Scene _enterScene;
         Scene _exitScene;
         int _renderDepth;
-        RenderTexture _leftEyeRenderTexture;
-        RenderTexture _rightEyeRenderTexture;
+        private int _framesSinceLastUse = 0;
         private Material _depthPunchMaterial;
-
+        private FrameData _previousFrameData;
         public Matrix4x4 lastFrameWorldToCameraMatrix;
         public Matrix4x4 lastFrameProjectionMatrix;
         public RenderTexture lastFrameRenderTexture;
@@ -33,13 +32,17 @@ namespace Portals {
             }
         }
 
+        public FrameData PreviousFrameData {
+            get { return _previousFrameData; }
+        }
+
         public Camera parent {
             get { return _parent; }
             set { _parent = value; }
         }
 
         public new Camera camera {
-            get { return _camera;}
+            get { return _camera; }
         }
 
 
@@ -76,40 +79,32 @@ namespace Portals {
             }
         }
 
-        public RenderTexture leftEyeRenderTexture {
-            get {
-                return _leftEyeRenderTexture;
-            }
-        }
-
-        public RenderTexture rightEyeRenderTexture {
-            get {
-                return _rightEyeRenderTexture;
-            }
-        }
-
         // RenderSettingsStruct _savedRenderSettings = new RenderSettingsStruct();
         RenderSettingsStruct _sceneRenderSettings = new RenderSettingsStruct();
 
         public void Awake() {
             _camera = GetComponent<Camera>();
             cameraMap[_camera] = this;
+
+            _previousFrameData = new FrameData();
         }
 
         private void OnDestroy() {
             if (cameraMap != null && cameraMap.ContainsKey(_camera)) {
                 cameraMap.Remove(_camera);
             }
-            if (lastFrameRenderTexture) {
-                RenderTexture.ReleaseTemporary(lastFrameRenderTexture);
-            }
-            if (_camera && _camera.targetTexture) {
+
+            if (_camera && _camera.targetTexture && _camera.targetTexture != _previousFrameData.leftEyeTexture && _camera.targetTexture != _previousFrameData.rightEyeTexture) {
                 RenderTexture.ReleaseTemporary(_camera.targetTexture);
+            }
+            if (_previousFrameData.leftEyeTexture) {
+                RenderTexture.ReleaseTemporary(_previousFrameData.leftEyeTexture);
+            }
+            if (_previousFrameData.rightEyeTexture) {
+                RenderTexture.ReleaseTemporary(_previousFrameData.rightEyeTexture);
             }
         }
 
-
-        private int _framesSinceLastUse = 0;
         void Update() {
             if (_framesSinceLastUse > 0) {
                 Util.SafeDestroy(this.gameObject);
@@ -151,70 +146,89 @@ namespace Portals {
             }
         }
 
+        private void SaveFrameData() {
+            switch (_camera.stereoTargetEye) {
+                case StereoTargetEyeMask.Right:
+                    if (_previousFrameData.rightEyeTexture) {
+                        RenderTexture.ReleaseTemporary(_previousFrameData.rightEyeTexture);
+                    }
+                    _previousFrameData.rightEyeProjectionMatrix = _camera.projectionMatrix;
+                    _previousFrameData.rightEyeWorldToCameraMatrix = _camera.worldToCameraMatrix;
+                    _previousFrameData.rightEyeTexture = _camera.targetTexture;
+                    break;
+                case StereoTargetEyeMask.Left:
+                case StereoTargetEyeMask.Both:
+                case StereoTargetEyeMask.None:
+                default:
+                    if (_previousFrameData.leftEyeTexture) {
+                        RenderTexture.ReleaseTemporary(_previousFrameData.leftEyeTexture);
+                    }
+                    _previousFrameData.leftEyeProjectionMatrix = _camera.projectionMatrix;
+                    _previousFrameData.leftEyeWorldToCameraMatrix = _camera.worldToCameraMatrix;
+                    _previousFrameData.leftEyeTexture = _camera.targetTexture;
+                    break;
+            }
+        }
+
         public RenderTexture RenderToTexture(Camera.MonoOrStereoscopicEye eye, bool renderBackface) {
             _framesSinceLastUse = 0;
-            if (lastFrameRenderTexture) {
-                RenderTexture.ReleaseTemporary(lastFrameRenderTexture);
-            }
-            lastFrameRenderTexture = _camera.targetTexture;
-            lastFrameWorldToCameraMatrix = _camera.worldToCameraMatrix;
-            lastFrameProjectionMatrix = _camera.projectionMatrix;
 
-            RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
+            // Copy parent camera's settings
+            CopyCameraSettings(_parent, _camera);
 
             Vector3 parentEyePosition = Vector3.zero;
             Quaternion parentEyeRotation = Quaternion.identity;
 
+            Matrix4x4 projectionMatrix = _parent.projectionMatrix;
             switch (eye) {
                 case Camera.MonoOrStereoscopicEye.Left:
-                    _leftEyeRenderTexture = texture;
                     _camera.stereoTargetEye = StereoTargetEyeMask.Left;
-                    // TODO: Determine if GetStereoRotation is necessary
+                    projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left);
                     parentEyePosition = GetStereoPosition(_parent, VRNode.LeftEye);
                     parentEyeRotation = GetStereoRotation(_parent, VRNode.LeftEye);
                     break;
                 case Camera.MonoOrStereoscopicEye.Right:
-                    _rightEyeRenderTexture = texture;
                     _camera.stereoTargetEye = StereoTargetEyeMask.Right;
+                    projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Right);
                     parentEyePosition = GetStereoPosition(_parent, VRNode.RightEye);
                     parentEyeRotation = GetStereoRotation(_parent, VRNode.RightEye);
                     break;
                 case Camera.MonoOrStereoscopicEye.Mono:
                 default:
-                    _leftEyeRenderTexture = texture;
-                    _camera.stereoTargetEye = StereoTargetEyeMask.None;
-                    parentEyePosition = GetStereoPosition(_parent, VRNode.LeftEye);
-                    parentEyeRotation = GetStereoRotation(_parent, VRNode.LeftEye);
+                    _camera.stereoTargetEye = _parent.stereoTargetEye;
+                    projectionMatrix = _parent.projectionMatrix;
+                    parentEyePosition = _parent.transform.position;
+                    parentEyeRotation = _parent.transform.rotation;
                     break;
             }
 
-            // Copy parent camera's settings
-            UpdateCameraModes(_parent, _camera);
+            _camera.transform.position = _portal.TeleportPoint(parentEyePosition);
+            _camera.transform.rotation = _portal.TeleportRotation(parentEyeRotation);
+            _camera.projectionMatrix = projectionMatrix;
 
-            // Adjust camera transform
-            //_portal.ApplyWorldToPortalTransform(this.transform, parentEyePosition, parentEyeRotation, _parent.transform.lossyScale);
-            _portal.ApplyWorldToPortalTransform(this.transform, parentEyePosition, parentEyeRotation, Vector3.zero, true);
+            //if (_portal.UseProjectionMatrix) {
+            //    _camera.projectionMatrix = CalculateProjectionMatrix(eye);
+            //} else {
+            //    _camera.ResetProjectionMatrix();
+            //}
 
-            if (_portal.UseProjectionMatrix) {
-                _camera.projectionMatrix = CalculateProjectionMatrix(eye);
-            } else {
-                _camera.ResetProjectionMatrix();
-            }
+            //if (_portal.UseCullingMatrix) {
+            //    _camera.cullingMatrix = CalculateCullingMatrix();
+            //} else {
+            //    _camera.ResetCullingMatrix();
+            //}
 
-            if (_portal.UseCullingMatrix) {
-                _camera.cullingMatrix = CalculateCullingMatrix();
-            } else {
-                _camera.ResetCullingMatrix();
-            }
+            //if (_portal.UseDepthMask) {
+            //    DrawDepthPunchMesh(renderBackface);
+            //} else {
+            //    _camera.RemoveAllCommandBuffers();
+            //}
 
-            if (_portal.UseDepthMask) {
-                DrawDepthPunchMesh(renderBackface);
-            } else {
-                _camera.RemoveAllCommandBuffers();
-            }
-
+            RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
             _camera.targetTexture = texture;
             _camera.Render();
+
+            SaveFrameData();
 
             return texture;
         }
@@ -225,6 +239,7 @@ namespace Portals {
                 _depthPunchMaterial = new Material(shader);
             }
 
+            // Use a command buffer that clears depth to 0 (infinitely close)
             if (_camera.commandBufferCount == 0) {
                 CommandBuffer buf = new CommandBuffer();
                 buf.name = "Set Depth to 0";
@@ -234,36 +249,39 @@ namespace Portals {
 
             // Need to render from the parent's point of view
             PortalRenderer renderer = _portal.PortalRenderer;
-            Matrix4x4 matrix =  _camera.cameraToWorldMatrix * _parent.worldToCameraMatrix * renderer.transform.localToWorldMatrix;
+            Matrix4x4 matrix = _camera.cameraToWorldMatrix * _parent.worldToCameraMatrix * renderer.transform.localToWorldMatrix;
 
-            // Punch a hole in the depth mask
+            // Punch a hole in the depth buffer, so that everything can be drawn behind it
             Graphics.DrawMesh(PortalRenderer.Mesh, matrix, _depthPunchMaterial, renderer.gameObject.layer, _camera, 0);
             if (renderBackface) {
                 Graphics.DrawMesh(PortalRenderer.Mesh, matrix, _depthPunchMaterial, renderer.gameObject.layer, _camera, 1);
             }
         }
-        
-        void UpdateCameraModes(Camera src, Camera dest) {
-            if (dest == null) {
-                return;
-            }
-            dest.clearFlags = src.clearFlags;
-            dest.backgroundColor = src.backgroundColor;
-            // update other values to match current camera.
-            // even if we are supplying custom camera&projection matrices,
-            // some of values are used elsewhere (e.g. skybox uses far plane)
-            dest.farClipPlane = src.farClipPlane;
-            dest.nearClipPlane = src.nearClipPlane;
-            dest.orthographic = src.orthographic;
-            dest.fieldOfView = src.fieldOfView;
-            dest.aspect = src.aspect;
-            dest.orthographicSize = src.orthographicSize;
-            dest.renderingPath = src.renderingPath;
-            dest.allowHDR = src.allowHDR;
-            dest.allowMSAA = src.allowMSAA;
 
+        void CopyCameraSettings(Camera src, Camera dst) {
+            dst.clearFlags = src.clearFlags;
+            dst.backgroundColor = src.backgroundColor;
+            dst.farClipPlane = src.farClipPlane;
+            dst.nearClipPlane = src.nearClipPlane;
+            dst.orthographic = src.orthographic;
+            dst.aspect = src.aspect;
+            dst.orthographicSize = src.orthographicSize;
+            dst.renderingPath = src.renderingPath;
+            dst.allowHDR = src.allowHDR;
+            dst.allowMSAA = src.allowMSAA;
+            dst.cullingMask = src.cullingMask;
+            //dst.depthTextureMode = src.depthTextureMode;
+            //dst.transparencySortAxis = src.transparencySortAxis;
+            //dst.transparencySortMode = src.transparencySortMode;
             // TODO: Fix occlusion culling
-            dest.useOcclusionCulling = src.useOcclusionCulling;
+            dst.useOcclusionCulling = src.useOcclusionCulling;
+
+            dst.eventMask = 0; // Ignore OnMouseXXX events
+
+            if (!dst.stereoEnabled) {
+                // Can't set FoV while in VR
+                dst.fieldOfView = src.fieldOfView;
+            }
         }
 
         //void DecomposeMatrix4x4(Matrix4x4 matrix) {
@@ -692,6 +710,20 @@ namespace Portals {
                 RenderSettings.sun = sun;
                 //DynamicGI.UpdateEnvironment();
             }
+        }
+
+        [System.Serializable] // TODO: shouldn't be serializable in the future
+        public class FrameData {
+            public RenderTexture leftEyeTexture;
+            public RenderTexture rightEyeTexture;
+
+            public Matrix4x4 leftEyeProjectionMatrix;
+            public Matrix4x4 rightEyeProjectionMatrix;
+
+            public Matrix4x4 leftEyeWorldToCameraMatrix;
+            public Matrix4x4 rightEyeWorldToCameraMatrix;
+
+            public FrameData() { }
         }
     }
 }
