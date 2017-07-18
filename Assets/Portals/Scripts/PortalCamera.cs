@@ -206,25 +206,27 @@ namespace Portals {
             _camera.transform.rotation = _portal.TeleportRotation(parentEyeRotation);
             _camera.projectionMatrix = projectionMatrix;
 
-            //if (_portal.UseProjectionMatrix) {
-            //    _camera.projectionMatrix = CalculateProjectionMatrix(eye);
-            //} else {
-            //    _camera.ResetProjectionMatrix();
-            //}
 
-            //if (_portal.UseCullingMatrix) {
-            //    _camera.cullingMatrix = CalculateCullingMatrix();
-            //} else {
-            //    _camera.ResetCullingMatrix();
-            //}
+            if (_portal.UseProjectionMatrix) {
+                _camera.projectionMatrix = CalculateObliqueProjectionMatrix(projectionMatrix);
+            } else {
+                _camera.projectionMatrix = projectionMatrix;
+            }
 
-            //if (_portal.UseDepthMask) {
-            //    DrawDepthPunchMesh(renderBackface);
-            //} else {
-            //    _camera.RemoveAllCommandBuffers();
-            //}
+            if (_portal.UseCullingMatrix) {
+                _camera.cullingMatrix = CalculateCullingMatrix();
+            } else {
+                _camera.ResetCullingMatrix();
+            }
+
+            if (_portal.UseDepthMask) {
+                DrawDepthPunchMesh(renderBackface);
+            } else {
+                _camera.RemoveAllCommandBuffers();
+            }
 
             RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
+
             _camera.targetTexture = texture;
             _camera.Render();
 
@@ -232,6 +234,7 @@ namespace Portals {
 
             return texture;
         }
+        int textureIndex = 0;
 
         private void DrawDepthPunchMesh(bool renderBackface) {
             if (!_depthPunchMaterial) {
@@ -243,12 +246,13 @@ namespace Portals {
             if (_camera.commandBufferCount == 0) {
                 CommandBuffer buf = new CommandBuffer();
                 buf.name = "Set Depth to 0";
-                buf.ClearRenderTarget(true, false, Color.red, 0.0f);
+                buf.ClearRenderTarget(true, true, Color.red, 0.0f);
                 _camera.AddCommandBuffer(CameraEvent.BeforeForwardOpaque, buf);
             }
 
             // Need to render from the parent's point of view
             PortalRenderer renderer = _portal.PortalRenderer;
+            _camera.ResetWorldToCameraMatrix();
             Matrix4x4 matrix = _camera.cameraToWorldMatrix * _parent.worldToCameraMatrix * renderer.transform.localToWorldMatrix;
 
             // Punch a hole in the depth buffer, so that everything can be drawn behind it
@@ -277,6 +281,7 @@ namespace Portals {
             dst.useOcclusionCulling = src.useOcclusionCulling;
 
             dst.eventMask = 0; // Ignore OnMouseXXX events
+            dst.cameraType = src.cameraType;
 
             if (!dst.stereoEnabled) {
                 // Can't set FoV while in VR
@@ -284,78 +289,46 @@ namespace Portals {
             }
         }
 
-        //void DecomposeMatrix4x4(Matrix4x4 matrix) {
-        //    float near = matrix.m23 / (matrix.m22 - 1);
-        //    float far = matrix.m23 / (matrix.m22 + 1);
-        //    float bottom = near * (matrix.m12 - 1) / matrix.m11;
-        //    float top = near * (matrix.m12 + 1) / matrix.m11;
-        //    float left = near * (matrix.m02 - 1) / matrix.m00;
-        //    float right = near * (matrix.m02 + 1) / matrix.m00;
+        void DecomposeMatrix4x4(Matrix4x4 matrix) {
+            float near = matrix.m23 / (matrix.m22 - 1);
+            float far = matrix.m23 / (matrix.m22 + 1);
+            float bottom = near * (matrix.m12 - 1) / matrix.m11;
+            float top = near * (matrix.m12 + 1) / matrix.m11;
+            float left = near * (matrix.m02 - 1) / matrix.m00;
+            float right = near * (matrix.m02 + 1) / matrix.m00;
 
-        //    Debug.Log("near: " + near);
-        //    Debug.Log("far: " + far);
-        //    Debug.Log("bottom: " + bottom);
-        //    Debug.Log("top: " + top);
-        //    Debug.Log("left: " + left);
-        //    Debug.Log("right: " + right);
-        //}
+            Debug.Log("near: " + near);
+            Debug.Log("far: " + far);
+            Debug.Log("bottom: " + bottom);
+            Debug.Log("top: " + top);
+            Debug.Log("left: " + left);
+            Debug.Log("right: " + right);
+        }
 
-        Matrix4x4 CalculateProjectionMatrix(Camera.MonoOrStereoscopicEye eye) {
-            // Set targetTexture to null because GetStereoProjectionMatrix won't return a valid matrix otherwise.
-            RenderTexture savedTargetTexture = _camera.targetTexture;
-            _camera.targetTexture = null;
-
-            // Restore original projection matrix
-            _camera.ResetProjectionMatrix();
-
-            Matrix4x4 projectionMatrix;
-            switch (eye) {
-                case Camera.MonoOrStereoscopicEye.Left:
-                    projectionMatrix = _camera.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left);
-                    break;
-                case Camera.MonoOrStereoscopicEye.Right:
-                    projectionMatrix = _camera.GetStereoProjectionMatrix(Camera.StereoscopicEye.Right);
-                    break;
-                case Camera.MonoOrStereoscopicEye.Mono:
-                default:
-                    projectionMatrix = _camera.projectionMatrix;
-                    break;
-            }
-            _camera.targetTexture = savedTargetTexture;
-
-            // Calculate plane made from the exit portal's trnasform
+        Matrix4x4 CalculateObliqueProjectionMatrix(Matrix4x4 projectionMatrix) {
+            // Calculate plane made from the exit portal's transform
             Plane exitPortalPlane = _portal.ExitPortal.Plane;
 
             // Determine whether or not we've crossed the plane already. If we have, we don't need to apply
             // oblique frustum clipping. Offset the value by our portal's ClippingOffset to reduce the effects
             // so that it swaps over slightly early. This helps reduce artifacts caused by loss of depth accuracy.
-            bool onFarSide = !new Plane(exitPortalPlane.normal, exitPortalPlane.distance - _portal.ClippingOffset).GetSide(transform.position);
-            if (onFarSide) {
-                return projectionMatrix;
+            bool onCloseSide = new Plane(exitPortalPlane.normal, exitPortalPlane.distance - _portal.ClippingOffset).GetSide(transform.position);
+            if (onCloseSide) {
+                // Offset the clipping plane itself so that a character walking through a portal has no seams
+                exitPortalPlane.distance -= _portal.ClippingOffset / 2;
+
+                // Project our world space clipping plane to the camera's local coordinates
+                // e.g. normal (0, 0, 1) becomes (1, 0, 0) if we're looking left parallel to the plane
+                Vector4 cameraSpaceNormal = _camera.transform.InverseTransformDirection(exitPortalPlane.normal);
+                Vector4 cameraSpacePoint = _camera.transform.InverseTransformPoint(exitPortalPlane.normal * -exitPortalPlane.distance);
+
+                // Calculate the d value for our plane by projecting our transformed point
+                // onto our transformed normal vector.
+                float distanceFromPlane = Vector4.Dot(cameraSpaceNormal, cameraSpacePoint);
+                Vector4 cameraSpacePlane = new Vector4(-cameraSpaceNormal.x, -cameraSpaceNormal.y, cameraSpaceNormal.z, distanceFromPlane);
+
+                MakeProjectionMatrixOblique(ref projectionMatrix, cameraSpacePlane);
             }
-
-            // Offset the clipping plane itself so that a character walking through a portal has no seams
-            exitPortalPlane.distance -= _portal.ClippingOffset / 2;
-
-            // Project our world space clipping plane to the camera's local coordinates
-            // e.g. normal (0, 0, 1) becomes (1, 0, 0) if we're looking left parallel to the plane
-            Vector4 cameraSpaceNormal = _camera.transform.InverseTransformDirection(exitPortalPlane.normal);
-            Vector4 cameraSpacePoint = _camera.transform.InverseTransformPoint(exitPortalPlane.normal * -exitPortalPlane.distance);
-
-            // Calculate the d value for our plane by projecting our transformed point
-            // onto our transformed normal vector.
-            float distanceFromPlane = Vector4.Dot(cameraSpaceNormal, cameraSpacePoint);
-
-            // Not sure why x and y have to be negative.
-            Vector4 cameraSpacePlane = new Vector4(-cameraSpaceNormal.x, -cameraSpaceNormal.y, cameraSpaceNormal.z, distanceFromPlane);
-
-            //DecomposeMatrix4x4(projectionMatrix);
-            //Valve.VR.EVREye evrEye = eye == Camera.MonoOrStereoscopicEye.Left ? Valve.VR.EVREye.Eye_Left : Valve.VR.EVREye.Eye_Right;
-            //projectionMatrix = HMDMatrix4x4ToMatrix4x4(SteamVR.instance.hmd.GetProjectionMatrix(Valve.VR.EVREye.Eye_Left, _camera.nearClipPlane, _camera.farClipPlane, Valve.VR.EGraphicsAPIConvention.API_DirectX));
-
-            //cameraSpacePlane = new Vector4(1, 0, -1, -3);
-
-            MakeProjectionMatrixOblique(ref projectionMatrix, cameraSpacePlane);
             return projectionMatrix;
         }
 

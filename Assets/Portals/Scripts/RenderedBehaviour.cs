@@ -21,8 +21,10 @@ namespace Portals {
         }
 
         void OnWillRenderObject() {
-            _seenBy.Add(Camera.current);
-            PreRender();
+            if (!_seenBy.Contains(Camera.current)) {
+                _seenBy.Add(Camera.current);
+                PreRender();
+            }
         }
 
         protected abstract void PreRender();
