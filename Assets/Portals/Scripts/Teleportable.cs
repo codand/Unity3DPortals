@@ -357,15 +357,16 @@ namespace Portals {
         }
 
         private void ExitPortal(Portal portal) {
+            PortalContext context = m_ContextByPortal[portal];
+
             // Do an extra teleport check in case...
             //  1. We're using Update to check for teleports instead of FixedUpdate (we have a first person camera)
             //  2. We exit the trigger before the Update loop has a chance to see that the camera crossed the portal plane
-            if (ShouldTeleport(portal)) {
+            if (ShouldTeleport(portal, context)) {
                 Teleport(portal);
                 return;
             }
 
-            PortalContext context = m_ContextByPortal[portal];
             m_ContextByPortal.Remove(portal);
 
             Teleportable clone = context.clone;
@@ -392,8 +393,11 @@ namespace Portals {
 
         private Portal TeleportCheck() {
             Portal toTeleport = null;
-            foreach (Portal portal in m_ContextByPortal.Keys) {
-                if (ShouldTeleport(portal)) {
+            foreach (KeyValuePair<Portal, PortalContext> kvp in m_ContextByPortal) {
+                Portal portal = kvp.Key;
+                PortalContext context = kvp.Value;
+
+                if (ShouldTeleport(portal, context)) {
                     toTeleport = portal;
                     break;
                 }
@@ -406,12 +410,13 @@ namespace Portals {
             return toTeleport;
         }
 
-        private bool ShouldTeleport(Portal portal) {
-            // TODO: Support CharacterController?
-            Vector3 positionLastStep = m_Camera && m_CameraType == CameraType.FirstPerson ? m_CameraPositionLastFrame : m_RigidbodyLastTick.position;
+        private bool ShouldTeleport(Portal portal, PortalContext context) {
             Vector3 positionThisStep = m_Camera && m_CameraType == CameraType.FirstPerson ? m_Camera.transform.position : m_Rigidbody.position;
-            //Debug.Log(positionLastStep.y + "=>" + positionThisStep.y);
-            return !portal.Plane.GetSide(positionLastStep) && portal.Plane.GetSide(positionThisStep);
+            bool inFrontLastFrame = context.isInFrontOfPortal;
+            bool inFrontThisFrame = portal.Plane.GetSide(positionThisStep);
+            context.isInFrontOfPortal = inFrontThisFrame;
+
+            return !inFrontLastFrame && inFrontThisFrame;
         }
 
         #endregion
@@ -593,6 +598,7 @@ namespace Portals {
         private class PortalContext {
             public Teleportable clone;
             public TriggerStatus triggerStatus;
+            public bool isInFrontOfPortal;
         }
         #endregion
     }

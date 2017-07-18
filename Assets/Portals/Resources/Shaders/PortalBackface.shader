@@ -21,12 +21,15 @@ Shader "Portal/PortalBackface"
 			Stencil{
 				Ref 0
 				Comp Equal
+				//Fail DecrSat
 				Fail DecrSat
+				Pass IncrSat
 			}
 			Blend SrcAlpha OneMinusSrcAlpha
 			ZWrite Off
 			ZTest Always
 			Lighting Off
+			Cull Off
 
 			CGPROGRAM
 			#define IS_BACKFACE

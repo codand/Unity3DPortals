@@ -22,6 +22,7 @@ Shader "Portal/Portal"
 			Stencil{
 				Comp Always
 				Pass IncrSat
+				ZFail IncrSat
 			}
 			Blend SrcAlpha OneMinusSrcAlpha
 			ZWrite Off

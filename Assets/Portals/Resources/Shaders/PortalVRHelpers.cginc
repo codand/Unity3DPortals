@@ -75,7 +75,6 @@ fixed4 fragPortal(v2f i) : SV_Target
 
 #ifdef IS_BACKFACE
 	col.a = _BackfaceAlpha;
-	//col = float4(0, 0, 1, 1);
 #else
 	col.a = tex2D(_TransparencyMask, i.objUV).r;
 #endif
