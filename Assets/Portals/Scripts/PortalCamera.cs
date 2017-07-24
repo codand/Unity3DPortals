@@ -176,35 +176,63 @@ namespace Portals {
             // Copy parent camera's settings
             CopyCameraSettings(_parent, _camera);
 
-            Vector3 parentEyePosition = Vector3.zero;
-            Quaternion parentEyeRotation = Quaternion.identity;
+            //Vector3 parentEyePosition = Vector3.zero;
+            //Quaternion parentEyeRotation = Quaternion.identity;
 
-            Matrix4x4 projectionMatrix = _parent.projectionMatrix;
+            //Matrix4x4 projectionMatrix = _parent.projectionMatrix;
+            //switch (eye) {
+            //    case Camera.MonoOrStereoscopicEye.Left:
+            //        _camera.stereoTargetEye = StereoTargetEyeMask.Left;
+            //        projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left);
+            //        parentEyePosition = GetStereoPosition(_parent, VRNode.LeftEye);
+            //        parentEyeRotation = GetStereoRotation(_parent, VRNode.LeftEye);
+            //        break;
+            //    case Camera.MonoOrStereoscopicEye.Right:
+            //        _camera.stereoTargetEye = StereoTargetEyeMask.Right;
+            //        projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Right);
+            //        parentEyePosition = GetStereoPosition(_parent, VRNode.RightEye);
+            //        parentEyeRotation = GetStereoRotation(_parent, VRNode.RightEye);
+            //        break;
+            //    case Camera.MonoOrStereoscopicEye.Mono:
+            //    default:
+            //        _camera.stereoTargetEye = _parent.stereoTargetEye;
+            //        projectionMatrix = _parent.projectionMatrix;
+            //        parentEyePosition = _parent.transform.position;
+            //        parentEyeRotation = _parent.transform.rotation;
+            //        break;
+            //}
+
+            //_camera.transform.position = _portal.TeleportPoint(parentEyePosition);
+            //_camera.transform.rotation = _portal.TeleportRotation(parentEyeRotation);
+            //_camera.projectionMatrix = projectionMatrix;
+
+            Matrix4x4 projectionMatrix;
+            Matrix4x4 worldToCameraMatrix;
             switch (eye) {
                 case Camera.MonoOrStereoscopicEye.Left:
                     _camera.stereoTargetEye = StereoTargetEyeMask.Left;
                     projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left);
-                    parentEyePosition = GetStereoPosition(_parent, VRNode.LeftEye);
-                    parentEyeRotation = GetStereoRotation(_parent, VRNode.LeftEye);
+                    worldToCameraMatrix = _parent.GetStereoViewMatrix(Camera.StereoscopicEye.Left);
                     break;
                 case Camera.MonoOrStereoscopicEye.Right:
                     _camera.stereoTargetEye = StereoTargetEyeMask.Right;
                     projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Right);
-                    parentEyePosition = GetStereoPosition(_parent, VRNode.RightEye);
-                    parentEyeRotation = GetStereoRotation(_parent, VRNode.RightEye);
+                    worldToCameraMatrix = _parent.GetStereoViewMatrix(Camera.StereoscopicEye.Right);
                     break;
                 case Camera.MonoOrStereoscopicEye.Mono:
                 default:
                     _camera.stereoTargetEye = _parent.stereoTargetEye;
                     projectionMatrix = _parent.projectionMatrix;
-                    parentEyePosition = _parent.transform.position;
-                    parentEyeRotation = _parent.transform.rotation;
+                    worldToCameraMatrix = _parent.worldToCameraMatrix;
                     break;
             }
 
-            _camera.transform.position = _portal.TeleportPoint(parentEyePosition);
-            _camera.transform.rotation = _portal.TeleportRotation(parentEyeRotation);
+            _camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
             _camera.projectionMatrix = projectionMatrix;
+
+            // TODO: Get rid of SteamVR dependency
+            _camera.transform.position = _portal.TeleportPoint(_parent.transform.position);
+            _camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
 
 
             if (_portal.UseProjectionMatrix) {

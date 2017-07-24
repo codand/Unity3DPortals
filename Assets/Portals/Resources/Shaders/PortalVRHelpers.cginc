@@ -10,7 +10,7 @@
 #ifdef UNITY_SINGLE_PASS_STEREO
 #define PORTAL_VR_CURRENT_EYE (unity_StereoEyeIndex == 0 ? PORTAL_VR_EYE_LEFT : PORTAL_VR_EYE_RIGHT)
 #else
-#define PORTAL_VR_CURRENT_EYE (unity_CameraProjection[0][2] >= 0 ? PORTAL_VR_EYE_LEFT : PORTAL_VR_EYE_RIGHT)
+#define PORTAL_VR_CURRENT_EYE (unity_CameraProjection[0][2] <= 0 ? PORTAL_VR_EYE_LEFT : PORTAL_VR_EYE_RIGHT)
 //#define PORTAL_VR_CURRENT_EYE (unity_CameraProjection[0][2] == 0 ? PORTAL_VR_EYE_MONO : (unity_CameraProjection[0][2] > 0 ? PORTAL_VR_EYE_LEFT : PORTAL_VR_EYE_RIGHT))
 #endif
 

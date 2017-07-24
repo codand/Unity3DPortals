@@ -316,7 +316,7 @@ namespace Portals {
                 }
             }
 
-            if (m_Rigidbody) {
+            if (m_Rigidbody && !m_Rigidbody.isKinematic) {
                 // Interpolate velocity change through the portal
                 Vector3 frameMovement = m_Rigidbody.position - m_RigidbodyLastTick.position;
                 float distanceFromPortalLastFrame;
@@ -345,8 +345,10 @@ namespace Portals {
 
                 transform.position = m_Rigidbody.position;
                 transform.rotation = m_Rigidbody.rotation;
+            } else {
+                transform.position = portal.TeleportPoint(transform.position);
+                transform.rotation = portal.TeleportRotation(transform.rotation);
             }
-            //// portal.ApplyWorldToPortalTransform(transform, transform);
 
             StartCoroutine(HighSpeedExitTriggerCheck(portal.ExitPortal));
 
@@ -575,10 +577,12 @@ namespace Portals {
         }
 
         private void SaveRigidbodyInfo() {
-            m_RigidbodyLastTick.position = m_Rigidbody.position;
-            m_RigidbodyLastTick.rotation = m_Rigidbody.rotation;
-            m_RigidbodyLastTick.velocity = m_Rigidbody.velocity;
-            m_RigidbodyLastTick.angularVelocity = m_Rigidbody.angularVelocity;
+            if (m_Rigidbody) {
+                m_RigidbodyLastTick.position = m_Rigidbody.position;
+                m_RigidbodyLastTick.rotation = m_Rigidbody.rotation;
+                m_RigidbodyLastTick.velocity = m_Rigidbody.velocity;
+                m_RigidbodyLastTick.angularVelocity = m_Rigidbody.angularVelocity;
+            }
         }
 
         private bool ShouldUseFixedUpdate() {
