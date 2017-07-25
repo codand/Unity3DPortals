@@ -17,10 +17,9 @@ namespace Portals {
         int _renderDepth;
         private int _framesSinceLastUse = 0;
         private Material _depthPunchMaterial;
+
+        [SerializeField]
         private FrameData _previousFrameData;
-        public Matrix4x4 lastFrameWorldToCameraMatrix;
-        public Matrix4x4 lastFrameProjectionMatrix;
-        public RenderTexture lastFrameRenderTexture;
 
         public static Dictionary<Camera, PortalCamera> cameraMap = new Dictionary<Camera, PortalCamera>();
 
@@ -262,7 +261,70 @@ namespace Portals {
 
             return texture;
         }
-        int textureIndex = 0;
+
+        public RenderTexture RenderToTextureStereo(bool renderBackface) {
+            _framesSinceLastUse = 0;
+
+            // Copy parent camera's settings
+            CopyCameraSettings(_parent, _camera);
+
+            RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
+
+            //RenderIntoTexture(texture, new Rect(0.1f, 0.0f, 0.9f, 1.0f), Camera.StereoscopicEye.Left, renderBackface);
+            //RenderIntoTexture(texture, new Rect(0.5f, 0.0f, 0.5f, 1.0f), Camera.StereoscopicEye.Right, renderBackface);
+
+            //SaveFrameData();
+
+            RenderTexture.ReleaseTemporary(texture);
+            return texture;
+        }
+
+        void RenderIntoTexture(RenderTexture targetTexture, Rect rect, Camera.StereoscopicEye eye, bool renderBackface) {
+            Matrix4x4 projectionMatrix;
+            Matrix4x4 worldToCameraMatrix;
+            switch (eye) {
+                default:
+                case Camera.StereoscopicEye.Left:
+                    projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left);
+                    worldToCameraMatrix = _parent.GetStereoViewMatrix(Camera.StereoscopicEye.Left);
+                    break;
+                case Camera.StereoscopicEye.Right:
+                    projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Right);
+                    worldToCameraMatrix = _parent.GetStereoViewMatrix(Camera.StereoscopicEye.Right);
+                    break;
+            }
+
+            _camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
+            _camera.projectionMatrix = projectionMatrix;
+
+            // TODO: Get rid of SteamVR dependency
+            _camera.transform.position = _portal.TeleportPoint(_parent.transform.position);
+            _camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
+
+
+            if (_portal.UseProjectionMatrix) {
+                _camera.projectionMatrix = CalculateObliqueProjectionMatrix(projectionMatrix);
+            } else {
+                _camera.projectionMatrix = projectionMatrix;
+            }
+
+            if (_portal.UseCullingMatrix) {
+                _camera.cullingMatrix = CalculateCullingMatrix();
+            } else {
+                _camera.ResetCullingMatrix();
+            }
+
+            if (_portal.UseDepthMask) {
+                DrawDepthPunchMesh(renderBackface);
+            } else {
+                _camera.RemoveAllCommandBuffers();
+            }
+
+            //_camera.rect = rect;
+            //_camera.targetTexture = targetTexture;
+            //_camera.Render();
+        }
+
 
         private void DrawDepthPunchMesh(bool renderBackface) {
             if (!_depthPunchMaterial) {

@@ -154,15 +154,8 @@ namespace Portals {
 
             s_Depth++;
             if (Camera.current.stereoEnabled) {
-                // Stereo rendering. Render both eyes.
-                if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Right) {
-                    RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Right, renderBackface);
-                    block.SetTexture("_RightEyeTexture", tex);
-                }
-                if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Left) {
-                    RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Left, renderBackface);
-                    block.SetTexture("_LeftEyeTexture", tex);
-                }
+                RenderTexture tex = portalCamera.RenderToTextureStereo(renderBackface);
+                block.SetTexture("_LeftEyeTexture", tex);
             } else {
                 // Mono rendering. Render only one eye, but set which texture to use based on the camera's target eye.
                 RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Mono, renderBackface);
