@@ -3,7 +3,7 @@ Shader "Portal/Portal"
 	Properties
 	{
 		_DefaultTexture("DefaultTexture", 2D) = "white" {}
-		_LeftEyeTexture("LeftEyeTexture", 2D) = "black" {}
+		_LeftEyeTexture("LeftEyeTexture", 2D) = "bump" {}
 		_RightEyeTexture("RightEyeTexture", 2D) = "red" {}
 		_TransparencyMask("TransparencyMask", 2D) = "white" {}
 	}

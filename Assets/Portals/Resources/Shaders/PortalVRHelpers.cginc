@@ -3,15 +3,17 @@
 
 #include "UnityCG.cginc"
 
-#define PORTAL_VR_EYE_LEFT -1
+#define PORTAL_VR_EYE_LEFT 0
 #define PORTAL_VR_EYE_RIGHT 1
-#define PORTAL_VR_EYE_MONO 0
+//#define PORTAL_VR_EYE_MONO 2
 
 #ifdef UNITY_SINGLE_PASS_STEREO
 #define PORTAL_VR_CURRENT_EYE (unity_StereoEyeIndex == 0 ? PORTAL_VR_EYE_LEFT : PORTAL_VR_EYE_RIGHT)
 #else
-#define PORTAL_VR_CURRENT_EYE (unity_CameraProjection[0][2] <= 0 ? PORTAL_VR_EYE_LEFT : PORTAL_VR_EYE_RIGHT)
-//#define PORTAL_VR_CURRENT_EYE (unity_CameraProjection[0][2] == 0 ? PORTAL_VR_EYE_MONO : (unity_CameraProjection[0][2] > 0 ? PORTAL_VR_EYE_LEFT : PORTAL_VR_EYE_RIGHT))
+// _PortalMultiPassCurrentEye is this enum: https://docs.unity3d.com/ScriptReference/Camera.MonoOrStereoscopicEye.html
+float _PortalMultiPassCurrentEye;
+#define PORTAL_VR_CURRENT_EYE ((_PortalMultiPassCurrentEye == 0 || _PortalMultiPassCurrentEye == 2) ? PORTAL_VR_EYE_LEFT : PORTAL_VR_EYE_RIGHT)
+//#define PORTAL_VR_CURRENT_EYE (unity_CameraProjection[0][2] <= 0 ? PORTAL_VR_EYE_LEFT : PORTAL_VR_EYE_RIGHT)
 #endif
 
 #ifdef SAMPLE_PREVIOUS_FRAME
@@ -22,6 +24,9 @@ sampler2D _DefaultTexture;
 sampler2D _LeftEyeTexture;
 sampler2D _RightEyeTexture;
 sampler2D _TransparencyMask;
+
+sampler2D _PortalTexture;
+
 #ifdef IS_BACKFACE
 float _BackfaceAlpha;
 #endif
@@ -63,6 +68,7 @@ float4 sampleCurrentTextureProj(float4 uv)
 	else {
 		return tex2Dproj(_RightEyeTexture, uv);
 	}
+	//return tex2Dproj(_PortalTexture, uv);
 }
 
 fixed4 fragPortal(v2f i) : SV_Target

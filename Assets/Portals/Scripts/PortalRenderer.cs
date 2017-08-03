@@ -16,6 +16,9 @@ namespace Portals {
         // Mesh spawned when walking through a portal so that you can't clip through the portal
         private static Mesh m_Mesh;
 
+        // Counts the number of active PortalRenderers in the scene.
+        private static int m_ActivePortalRendererCount = 0;
+
         private Portal m_Portal;
 
         // Maps cameras to their children
@@ -153,23 +156,33 @@ namespace Portals {
             PortalCamera portalCamera = GetOrCreatePortalCamera(Camera.current);
 
             s_Depth++;
+            //RenderTexture tex = portalCamera.RenderToTexture2();
+            //block.SetTexture("_PortalTexture", tex);
             if (Camera.current.stereoEnabled) {
-                RenderTexture tex = portalCamera.RenderToTextureStereo(renderBackface);
-                block.SetTexture("_LeftEyeTexture", tex);
+                // Stereo rendering. Render both eyes.
+                if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Left) {
+                    RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Left, renderBackface);
+                    block.SetTexture("_LeftEyeTexture", tex);
+                }
+                if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Right) {
+                    RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Right, renderBackface);
+                    block.SetTexture("_RightEyeTexture", tex);
+                }
             } else {
                 // Mono rendering. Render only one eye, but set which texture to use based on the camera's target eye.
                 RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Mono, renderBackface);
-                switch (Camera.current.stereoTargetEye) {
-                    case StereoTargetEyeMask.Right:
-                        block.SetTexture("_RightEyeTexture", tex);
-                        break;
-                    case StereoTargetEyeMask.None:
-                    case StereoTargetEyeMask.Left:
-                    case StereoTargetEyeMask.Both:
-                    default:
-                        block.SetTexture("_LeftEyeTexture", tex);
-                        break;
-                }
+                block.SetTexture("_LeftEyeTexture", tex);
+                //switch (Camera.current.stereoTargetEye) {
+                //    case StereoTargetEyeMask.Right:
+                //        block.SetTexture("_RightEyeTexture", tex);
+                //        break;
+                //    case StereoTargetEyeMask.None:
+                //    case StereoTargetEyeMask.Left:
+                //    case StereoTargetEyeMask.Both:
+                //    default:
+                //        block.SetTexture("_LeftEyeTexture", tex);
+                //        break;
+                //}
             }
             s_Depth--;
             m_Renderer.SetPropertyBlock(block);
@@ -215,6 +228,11 @@ namespace Portals {
         private void OnEnable() {
             m_Portal.OnDefaultTextureChanged += OnDefaultTextureChanged;
             m_Portal.OnTransparencyMaskChanged += OnTransparencyMaskChanged;
+
+            if (m_ActivePortalRendererCount == 0) {
+                Camera.onPreRender += SetCurrentEyeGlobal;
+            }
+            m_ActivePortalRendererCount += 1;
         }
 
         private void OnDisable() {
@@ -230,6 +248,11 @@ namespace Portals {
                     Util.SafeDestroy(child.gameObject);
                 }
             }
+
+            m_ActivePortalRendererCount -= 1;
+            if (m_ActivePortalRendererCount == 0) {
+                Camera.onPreRender -= SetCurrentEyeGlobal;
+            }
         }
         #endregion
 
@@ -244,6 +267,13 @@ namespace Portals {
 
         private void OnTransparencyMaskChanged(Portal portal, Texture oldTexture, Texture newTexture) {
             m_PortalMaterial.SetTexture("_TransparencyMask", newTexture);
+        }
+
+        private static void SetCurrentEyeGlobal(Camera cam) {
+            // Globally set the current eye for Multi-Pass stereo rendering.
+            // We also run this code in Single-Pass rendering because Unity doesn't have a runtime
+            // check for single/multi-pass stereo, but the value gets ignored.
+            Shader.SetGlobalFloat("_PortalMultiPassCurrentEye", (int)cam.stereoActiveEye);
         }
         #endregion
 

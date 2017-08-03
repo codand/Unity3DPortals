@@ -175,52 +175,19 @@ namespace Portals {
             // Copy parent camera's settings
             CopyCameraSettings(_parent, _camera);
 
-            //Vector3 parentEyePosition = Vector3.zero;
-            //Quaternion parentEyeRotation = Quaternion.identity;
-
-            //Matrix4x4 projectionMatrix = _parent.projectionMatrix;
-            //switch (eye) {
-            //    case Camera.MonoOrStereoscopicEye.Left:
-            //        _camera.stereoTargetEye = StereoTargetEyeMask.Left;
-            //        projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left);
-            //        parentEyePosition = GetStereoPosition(_parent, VRNode.LeftEye);
-            //        parentEyeRotation = GetStereoRotation(_parent, VRNode.LeftEye);
-            //        break;
-            //    case Camera.MonoOrStereoscopicEye.Right:
-            //        _camera.stereoTargetEye = StereoTargetEyeMask.Right;
-            //        projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Right);
-            //        parentEyePosition = GetStereoPosition(_parent, VRNode.RightEye);
-            //        parentEyeRotation = GetStereoRotation(_parent, VRNode.RightEye);
-            //        break;
-            //    case Camera.MonoOrStereoscopicEye.Mono:
-            //    default:
-            //        _camera.stereoTargetEye = _parent.stereoTargetEye;
-            //        projectionMatrix = _parent.projectionMatrix;
-            //        parentEyePosition = _parent.transform.position;
-            //        parentEyeRotation = _parent.transform.rotation;
-            //        break;
-            //}
-
-            //_camera.transform.position = _portal.TeleportPoint(parentEyePosition);
-            //_camera.transform.rotation = _portal.TeleportRotation(parentEyeRotation);
-            //_camera.projectionMatrix = projectionMatrix;
-
             Matrix4x4 projectionMatrix;
             Matrix4x4 worldToCameraMatrix;
             switch (eye) {
                 case Camera.MonoOrStereoscopicEye.Left:
-                    _camera.stereoTargetEye = StereoTargetEyeMask.Left;
                     projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left);
                     worldToCameraMatrix = _parent.GetStereoViewMatrix(Camera.StereoscopicEye.Left);
                     break;
                 case Camera.MonoOrStereoscopicEye.Right:
-                    _camera.stereoTargetEye = StereoTargetEyeMask.Right;
                     projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Right);
                     worldToCameraMatrix = _parent.GetStereoViewMatrix(Camera.StereoscopicEye.Right);
                     break;
                 case Camera.MonoOrStereoscopicEye.Mono:
                 default:
-                    _camera.stereoTargetEye = _parent.stereoTargetEye;
                     projectionMatrix = _parent.projectionMatrix;
                     worldToCameraMatrix = _parent.worldToCameraMatrix;
                     break;
@@ -228,11 +195,8 @@ namespace Portals {
 
             _camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
             _camera.projectionMatrix = projectionMatrix;
-
-            // TODO: Get rid of SteamVR dependency
             _camera.transform.position = _portal.TeleportPoint(_parent.transform.position);
             _camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
-
 
             if (_portal.UseProjectionMatrix) {
                 _camera.projectionMatrix = CalculateObliqueProjectionMatrix(projectionMatrix);
@@ -253,6 +217,7 @@ namespace Portals {
             }
 
             RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
+            //texture.name = System.Enum.GetName(typeof(Camera.MonoOrStereoscopicEye), eye) + " " + _camera.stereoTargetEye + " " + Time.renderedFrameCount;
 
             _camera.targetTexture = texture;
             _camera.Render();
@@ -261,70 +226,6 @@ namespace Portals {
 
             return texture;
         }
-
-        public RenderTexture RenderToTextureStereo(bool renderBackface) {
-            _framesSinceLastUse = 0;
-
-            // Copy parent camera's settings
-            CopyCameraSettings(_parent, _camera);
-
-            RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
-
-            //RenderIntoTexture(texture, new Rect(0.1f, 0.0f, 0.9f, 1.0f), Camera.StereoscopicEye.Left, renderBackface);
-            //RenderIntoTexture(texture, new Rect(0.5f, 0.0f, 0.5f, 1.0f), Camera.StereoscopicEye.Right, renderBackface);
-
-            //SaveFrameData();
-
-            RenderTexture.ReleaseTemporary(texture);
-            return texture;
-        }
-
-        void RenderIntoTexture(RenderTexture targetTexture, Rect rect, Camera.StereoscopicEye eye, bool renderBackface) {
-            Matrix4x4 projectionMatrix;
-            Matrix4x4 worldToCameraMatrix;
-            switch (eye) {
-                default:
-                case Camera.StereoscopicEye.Left:
-                    projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left);
-                    worldToCameraMatrix = _parent.GetStereoViewMatrix(Camera.StereoscopicEye.Left);
-                    break;
-                case Camera.StereoscopicEye.Right:
-                    projectionMatrix = _parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Right);
-                    worldToCameraMatrix = _parent.GetStereoViewMatrix(Camera.StereoscopicEye.Right);
-                    break;
-            }
-
-            _camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
-            _camera.projectionMatrix = projectionMatrix;
-
-            // TODO: Get rid of SteamVR dependency
-            _camera.transform.position = _portal.TeleportPoint(_parent.transform.position);
-            _camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
-
-
-            if (_portal.UseProjectionMatrix) {
-                _camera.projectionMatrix = CalculateObliqueProjectionMatrix(projectionMatrix);
-            } else {
-                _camera.projectionMatrix = projectionMatrix;
-            }
-
-            if (_portal.UseCullingMatrix) {
-                _camera.cullingMatrix = CalculateCullingMatrix();
-            } else {
-                _camera.ResetCullingMatrix();
-            }
-
-            if (_portal.UseDepthMask) {
-                DrawDepthPunchMesh(renderBackface);
-            } else {
-                _camera.RemoveAllCommandBuffers();
-            }
-
-            //_camera.rect = rect;
-            //_camera.targetTexture = targetTexture;
-            //_camera.Render();
-        }
-
 
         private void DrawDepthPunchMesh(bool renderBackface) {
             if (!_depthPunchMaterial) {
