@@ -231,6 +231,7 @@ namespace Portals {
 
             if (m_ActivePortalRendererCount == 0) {
                 Camera.onPreRender += SetCurrentEyeGlobal;
+                Camera.onPostRender += RestoreCurrentEyeGlobal;
             }
             m_ActivePortalRendererCount += 1;
         }
@@ -252,6 +253,7 @@ namespace Portals {
             m_ActivePortalRendererCount -= 1;
             if (m_ActivePortalRendererCount == 0) {
                 Camera.onPreRender -= SetCurrentEyeGlobal;
+                Camera.onPostRender -= RestoreCurrentEyeGlobal;
             }
         }
         #endregion
@@ -269,11 +271,19 @@ namespace Portals {
             m_PortalMaterial.SetTexture("_TransparencyMask", newTexture);
         }
 
+
+        private static Stack<float> eyeStack = new Stack<float>();
         private static void SetCurrentEyeGlobal(Camera cam) {
+            eyeStack.Push(Shader.GetGlobalFloat("_PortalMultiPassCurrentEye"));
             // Globally set the current eye for Multi-Pass stereo rendering.
             // We also run this code in Single-Pass rendering because Unity doesn't have a runtime
             // check for single/multi-pass stereo, but the value gets ignored.
             Shader.SetGlobalFloat("_PortalMultiPassCurrentEye", (int)cam.stereoActiveEye);
+        }
+
+        private static void RestoreCurrentEyeGlobal(Camera cam) {
+            float eye = eyeStack.Pop();
+            Shader.SetGlobalFloat("_PortalMultiPassCurrentEye", eye);
         }
         #endregion
 

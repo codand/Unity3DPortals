@@ -145,9 +145,9 @@ namespace Portals {
             }
         }
 
-        private void SaveFrameData() {
-            switch (_camera.stereoTargetEye) {
-                case StereoTargetEyeMask.Right:
+        private void SaveFrameData(Camera.MonoOrStereoscopicEye eye) {
+            switch (eye) {
+                case Camera.MonoOrStereoscopicEye.Right:
                     if (_previousFrameData.rightEyeTexture) {
                         RenderTexture.ReleaseTemporary(_previousFrameData.rightEyeTexture);
                     }
@@ -155,9 +155,8 @@ namespace Portals {
                     _previousFrameData.rightEyeWorldToCameraMatrix = _camera.worldToCameraMatrix;
                     _previousFrameData.rightEyeTexture = _camera.targetTexture;
                     break;
-                case StereoTargetEyeMask.Left:
-                case StereoTargetEyeMask.Both:
-                case StereoTargetEyeMask.None:
+                case Camera.MonoOrStereoscopicEye.Left:
+                case Camera.MonoOrStereoscopicEye.Mono:
                 default:
                     if (_previousFrameData.leftEyeTexture) {
                         RenderTexture.ReleaseTemporary(_previousFrameData.leftEyeTexture);
@@ -193,9 +192,14 @@ namespace Portals {
                     break;
             }
 
-            _camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
+            //_camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
+            //_camera.projectionMatrix = projectionMatrix;
+            //_camera.transform.position = _portal.TeleportPoint(_parent.transform.position);
+            //_camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
+
             _camera.projectionMatrix = projectionMatrix;
-            _camera.transform.position = _portal.TeleportPoint(_parent.transform.position);
+            _camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
+            _camera.transform.position = _camera.cameraToWorldMatrix.GetPosition();
             _camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
 
             if (_portal.UseProjectionMatrix) {
@@ -217,12 +221,13 @@ namespace Portals {
             }
 
             RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
-            //texture.name = System.Enum.GetName(typeof(Camera.MonoOrStereoscopicEye), eye) + " " + _camera.stereoTargetEye + " " + Time.renderedFrameCount;
+            texture.name = System.Enum.GetName(typeof(Camera.MonoOrStereoscopicEye), eye) + " " + _camera.stereoTargetEye + " " + Time.renderedFrameCount;
 
             _camera.targetTexture = texture;
+            
             _camera.Render();
 
-            SaveFrameData();
+            SaveFrameData(eye);
 
             return texture;
         }
@@ -585,13 +590,13 @@ namespace Portals {
             }
         }
 
-        void OnDrawGizmosSelected() {
-            Gizmos.color = new Color(1.0f, 0.0f, 0.0f, 1.0f);
-            DrawFrustumGizmo(_camera.cullingMatrix);
+        //void OnDrawGizmosSelected() {
+        //    Gizmos.color = new Color(1.0f, 0.0f, 0.0f, 1.0f);
+        //    DrawFrustumGizmo(_camera.cullingMatrix);
 
-            Gizmos.color = new Color(0.0f, 1.0f, 0.0f, 1.0f);
-            DrawFrustumGizmo(_camera.projectionMatrix * _camera.worldToCameraMatrix);
-        }
+        //    Gizmos.color = new Color(0.0f, 1.0f, 0.0f, 1.0f);
+        //    DrawFrustumGizmo(_camera.projectionMatrix * _camera.worldToCameraMatrix);
+        //}
 
         struct RenderSettingsStruct {
             public Color ambientEquatorColor;

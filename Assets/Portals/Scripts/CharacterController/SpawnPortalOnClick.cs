@@ -20,7 +20,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
     [SerializeField] LayerMask _canHit = -1;
     [SerializeField] AnimationCurve _portalSpawnCurve = AnimationCurves.Overshoot;
     [SerializeField] float _portalSpawnTime = 0.25f;
-    [SerializeField] float _normalOffset = 0.01f;
+    [SerializeField] float _normalOffset = 0.05f;
 
     Portal _leftPortal;
     Portal _rightPortal;
@@ -98,9 +98,10 @@ public class SpawnPortalOnClick : MonoBehaviour {
         Portal portal = obj.GetComponent<Portal>();
 
         ParticleSystem particles = portal.GetComponentInChildren<ParticleSystem>();
-        ParticleSystem.MainModule main = particles.main;
-        main.startColor = color;
-
+        if (particles) {
+            ParticleSystem.MainModule main = particles.main;
+            main.startColor = color;
+        }
         return portal;
     }
 
