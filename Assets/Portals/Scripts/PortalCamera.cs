@@ -111,10 +111,10 @@ namespace Portals {
             _framesSinceLastUse++;
         }
 
-        Vector3 GetStereoPosition(Camera camera, VRNode node) {
+        Vector3 GetStereoPosition(Camera camera, UnityEngine.XR.XRNode node) {
             if (camera.stereoEnabled) {
                 // If our parent is rendering stereo, we need to handle eye offsets and root transformations
-                Vector3 localPosition = InputTracking.GetLocalPosition(node);
+                Vector3 localPosition = UnityEngine.XR.InputTracking.GetLocalPosition(node);
 
                 // GetLocalPosition returns the local position of the camera, but we need the global position
                 // so we have to manually grab the parent.
@@ -130,9 +130,9 @@ namespace Portals {
             }
         }
 
-        Quaternion GetStereoRotation(Camera camera, VRNode node) {
+        Quaternion GetStereoRotation(Camera camera, UnityEngine.XR.XRNode node) {
             if (camera.stereoEnabled) {
-                Quaternion localRotation = InputTracking.GetLocalRotation(node);
+                Quaternion localRotation = UnityEngine.XR.InputTracking.GetLocalRotation(node);
                 Transform parent = camera.transform.parent;
                 if (parent) {
                     return parent.rotation * localRotation;

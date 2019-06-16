@@ -340,11 +340,16 @@ namespace Portals {
                 ////
                 //// _rigidbody.mass *= scaleDelta * scaleDelta * scaleDelta;
 
-                m_Rigidbody.position = portal.TeleportPoint(m_Rigidbody.position);
-                m_Rigidbody.transform.rotation = portal.TeleportRotation(m_Rigidbody.rotation);
+                //Debug.Log(m_Rigidbody.position + " " + portal.TeleportPoint(m_Rigidbody.position));
+                //m_Rigidbody.position = portal.TeleportPoint(m_Rigidbody.position);
+                //m_Rigidbody.transform.rotation = portal.TeleportRotation(m_Rigidbody.rotation);
 
-                transform.position = m_Rigidbody.position;
-                transform.rotation = m_Rigidbody.rotation;
+                // TODO: Determine whether or not I need to be using rigidbody.position
+                transform.position = portal.TeleportPoint(m_Rigidbody.position);
+                transform.rotation = portal.TeleportRotation(m_Rigidbody.rotation);
+
+                //m_Rigidbody.position = Vector3.zero;
+                //transform.position = Vector3.zero;
             } else {
                 transform.position = portal.TeleportPoint(transform.position);
                 transform.rotation = portal.TeleportRotation(transform.rotation);

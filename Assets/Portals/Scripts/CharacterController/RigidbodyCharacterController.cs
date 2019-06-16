@@ -112,7 +112,8 @@ namespace Portals {
             //    newAngle = -_maxLookAngle;
             //}
 
-            _head.localRotation *= Quaternion.Euler(-angle, 0, 0);
+            _head.localRotation = Quaternion.Euler(_head.localRotation.eulerAngles.x - angle, 0, 0);
+            //_head.localRotation *= Quaternion.Euler(-angle, 0, 0);
             _head.localRotation = ClampRotationAroundXAxis(_head.localRotation, -_maxLookAngle, _maxLookAngle);
             //Quaternion rotation = Quaternion.AngleAxis(angle, -Vector3.right);
             //Quaternion desiredRotation = _head.localRotation * rotation;
@@ -132,7 +133,7 @@ namespace Portals {
                 if (correctRotation != null) {
                     StopCoroutine(correctRotation);
                 }
-                correctRotation = StartCoroutine(CorrectionRotation(0.5f));
+                correctRotation = StartCoroutine(CorrectionRotation(0.2f));
             }
         }
         
@@ -140,50 +141,51 @@ namespace Portals {
         IEnumerator CorrectionRotation(float duration) {
             disable_stuff = true;
 
-            //float timeScale = 1.0f;
-            //Time.timeScale = timeScale;
-            //Time.fixedDeltaTime *= timeScale;
+            float timeScale = 0.1f;
+            Time.timeScale = timeScale;
+            Time.fixedDeltaTime *= timeScale;
 
             float elapsed = 0;
             while (elapsed < duration) {
                 float ratio = elapsed / duration;
 
-                DoStuff(ratio);
-
+                float angle = DoStuff(ratio * ratio);
+                if (angle <= 1.0f) {
+                    break;
+                }
                 yield return null;
                 elapsed += Time.deltaTime;
             }
 
             DoStuff(1.0f);
 
-            //Time.timeScale = 1.0f;
-            //Time.fixedDeltaTime /= timeScale;
+            Time.timeScale = 1.0f;
+            Time.fixedDeltaTime /= timeScale;
             disable_stuff = false;
         }
 
-        void DoStuff(float ratio) {
-
-
-
+        float DoStuff(float ratio) {
             // TODO: Make this independent of input
             float xRot = Input.GetAxis("Mouse X") * 3;
             float yRot = Input.GetAxis("Mouse Y") * 3;
 
-            Quaternion frameBodyRotation = Quaternion.Euler(0, xRot, 0);
-            Quaternion frameHeadRotation = Quaternion.Euler(-yRot, 0, 0);
+            Quaternion frameXRotation = Quaternion.Euler(0, xRot, 0);
+            Quaternion frameYRotation = Quaternion.Euler(-yRot, 0, 0);
 
             // Calculate head rotation
             Quaternion srcHeadRotation = _head.rotation;
             Quaternion dstHeadRotation = Quaternion.LookRotation(_head.forward, Vector3.up);
+            float angle = Quaternion.Angle(srcHeadRotation, dstHeadRotation);
+            Debug.Log(angle);
 
-            // Check if our current up angle overshoots our max angle.
-            // If it does, and it's within our defined snap angle, then try to look straight up
-            // instead of flipping the camera.
-            float angleFromTrueUp = Util.SignedPlanarAngle(_head.up, Vector3.up, _head.right);
-            if ((-90 - _portalLookSnapAngle < angleFromTrueUp && angleFromTrueUp < -90) ||
-                (90 < angleFromTrueUp && angleFromTrueUp < 90 + _portalLookSnapAngle)) {
-                dstHeadRotation = srcHeadRotation * Quaternion.Euler(-angleFromTrueUp + 0.5f, 0, 0);
-            }
+            //// Check if our current up angle overshoots our max angle.
+            //// If it does, and it's within our defined snap angle, then try to look straight up
+            //// instead of flipping the camera.
+            //float angleFromTrueUp = Util.SignedPlanarAngle(_head.up, Vector3.up, _head.right);
+            //if ((-90 - _portalLookSnapAngle < angleFromTrueUp && angleFromTrueUp < -90) ||
+            //    (90 < angleFromTrueUp && angleFromTrueUp < 90 + _portalLookSnapAngle)) {
+            //    dstHeadRotation = srcHeadRotation * Quaternion.Euler(-angleFromTrueUp + 0.5f, 0, 0);
+            //}
 
             // Calculate desired body rotation by projecting the desired camera rotation onto the upward plane
             // and using that rotation.
@@ -192,16 +194,14 @@ namespace Portals {
             Quaternion srcBodyRotation = transform.rotation;
             Quaternion dstBodyRotation = Quaternion.Euler(0, dstBodyAngle, 0);
 
-            transform.rotation = Quaternion.Slerp(srcBodyRotation, dstBodyRotation, ratio) * frameBodyRotation;
-            _head.rotation     = Quaternion.Slerp(srcHeadRotation, dstHeadRotation, ratio) * frameHeadRotation * frameBodyRotation;
-
-            //transform.rotation = Quaternion.RotateTowards(srcBodyRotation, dstBodyRotation, 1.0f) * frameBodyRotation;
-            //_head.rotation     = Quaternion.RotateTowards(srcHeadRotation, dstHeadRotation, 1.0f) * frameHeadRotation * frameBodyRotation;
+            transform.rotation = Quaternion.Slerp(srcBodyRotation, dstBodyRotation, ratio) * frameXRotation;
+            _head.rotation     = Quaternion.Slerp(srcHeadRotation, dstHeadRotation, ratio) * frameYRotation * frameXRotation;
 
             //// TODO: this doesn't account for body
             //if (Quaternion.Angle(correctedHeadRotation, dstHeadRotation) < 0.1f) {
             //    break;
             //}
+            return angle;
         }
 
         //Quaternion AlignAxis(Quaternion rotation, Vector3 axis) {
