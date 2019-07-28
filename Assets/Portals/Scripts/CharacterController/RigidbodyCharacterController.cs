@@ -176,7 +176,6 @@ namespace Portals {
             Quaternion srcHeadRotation = _head.rotation;
             Quaternion dstHeadRotation = Quaternion.LookRotation(_head.forward, Vector3.up);
             float angle = Quaternion.Angle(srcHeadRotation, dstHeadRotation);
-            Debug.Log(angle);
 
             //// Check if our current up angle overshoots our max angle.
             //// If it does, and it's within our defined snap angle, then try to look straight up

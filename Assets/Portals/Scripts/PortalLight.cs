@@ -23,7 +23,7 @@ namespace Portals {
             GameObject obj = new GameObject();
             //obj.hideFlags = HideFlags.HideAndDontSave;
             obj.name = "~" + this.name + "->" + portal.name;
-            //Light light = obj.AddComponent<Light>();
+            Light light = obj.AddComponent<Light>();
             PortalLight portalLight = obj.AddComponent<PortalLight>();
             portalLight._parentLight = this;
             portalLight._portal = portal;
@@ -96,7 +96,7 @@ namespace Portals {
 
         Vector4[] GetShadowPlanes() {
             Vector3 position = transform.position;
-            Vector3[] corners = _portal.ExitPortal.GetCorners();
+            Vector3[] corners = _portal.ExitPortal.WorldSpaceCorners();
             Vector4[] shadowPlanes = new Vector4[] {
                 MakePlane(corners[0], corners[1], corners[2]),
                 MakePlane(position, corners[0], corners[1]),
@@ -146,7 +146,7 @@ namespace Portals {
 
             if (_portal && _portal.ExitPortal) {
                 _commandBuffer.SetGlobalFloat("_UseShadowPlanes", 1);
-                Vector3[] corners3 = _portal.ExitPortal.GetCorners();
+                Vector3[] corners3 = _portal.ExitPortal.WorldSpaceCorners();
                 Vector4[] corners4 = new Vector4[corners3.Length];
                 for (int i = 0; i < corners3.Length; i++) {
                     Vector3 c3 = corners3[i];

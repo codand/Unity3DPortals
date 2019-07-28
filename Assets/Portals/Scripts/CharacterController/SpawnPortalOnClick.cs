@@ -77,9 +77,9 @@ public class SpawnPortalOnClick : MonoBehaviour {
                 // Make sure the portal can fit flushly on the object we've hit.
                 // If it can fit, but it's hanging off the edge, push it in.
                 // Otherwise, disable the portal.
-                Vector3 fitOffset;
-                if (FindFit(portal, hit.collider, out fitOffset)) {
-                    portal.transform.position = fitOffset + hit.normal * _normalOffset;
+                Vector3 newPosition;
+                if (FindFit(portal, hit.collider, out newPosition)) {
+                    portal.transform.position = newPosition + hit.normal * _normalOffset;
                     portal.IgnoredColliders = new Collider[] { hit.collider };
                     portal.gameObject.SetActive(true);
 
@@ -117,7 +117,21 @@ public class SpawnPortalOnClick : MonoBehaviour {
         return rotation;
     }
 
-    bool FindFit(Portal portal, Collider collider, out Vector3 offset) {
+    bool FindFit(Portal portal, Collider collider, out Vector3 newPosition) {
+        if (collider is BoxCollider) {
+            return FindFitBoxCollider(portal, collider, out newPosition);
+        } else if (collider is MeshCollider) {
+            return FindFitMeshCollider(portal, collider, out newPosition);
+        } else {
+            newPosition = portal.transform.position;
+            return true;
+        }
+    }
+
+    bool FindFitBoxCollider(Portal portal, Collider collider, out Vector3 offset) {
+        // Loop through each corner of the portal rect.
+        // For each point, calculate the min and max distance to the collider surface
+        // and choose the most extreme of each.
         Vector3 minOffset = new Vector3(Mathf.Infinity, Mathf.Infinity, Mathf.Infinity);
         Vector3 maxOffset = new Vector3(Mathf.NegativeInfinity, Mathf.NegativeInfinity, Mathf.NegativeInfinity);
         foreach (Vector3 corner in portal.WorldSpaceCorners()) {
@@ -138,6 +152,104 @@ public class SpawnPortalOnClick : MonoBehaviour {
             offset = portal.transform.position + minOffset + maxOffset;
             return true;
         }
+    }
+    
+    int RaycastCorners(Collider collider, Vector3[] corners, Vector3 offset, Vector3 direction, float normalOffset, bool[] outHits) {
+        int numHits = 0;
+        for (int i = 0; i < corners.Length; i++) {
+            Vector3 corner = corners[i] + offset;
+
+            // Perform raycast from a tiny bit back from the contact point to a little bit through the contact point
+            Ray ray = new Ray(corner - direction * normalOffset, direction);
+            outHits[i] = collider.Raycast(ray, out RaycastHit hitInfo, _normalOffset * 2);
+            if (outHits[i]) {
+                numHits++;
+            }
+        }
+        return numHits;
+    }
+
+    bool FindViableCoplanarRectOnCollider(Collider collider, Vector3 center, Vector3[] corners, Vector3 forward, int iterations, out Vector3 offset) {
+        bool[] hits = new bool[4];
+        int numHits = 0;
+        offset = Vector3.zero;
+        int currentIteration = 0;
+        for (currentIteration = 0; currentIteration < iterations; currentIteration++) {
+            numHits = RaycastCorners(collider, corners, offset, forward, _normalOffset, hits);
+
+            // Success
+            if (numHits == 4) {
+                break;
+            }
+
+            // If none of the corner raycasts hit the collider, can't guess which direction to go
+            if (numHits == 0) {
+                break;
+            }
+
+            Vector3 stepOffset = Vector3.zero;
+            for (int i = 0; i < corners.Length; i++) {
+                if (hits[i]) {
+                    Vector3 toCorner = corners[i] - center;
+                    stepOffset += toCorner;
+                }
+            }
+
+            // If two of our corners are coplanar and share an edge, our offset will be facing the correct direction,
+            // but it will have too much magnitude because the vectors face partially in the same direction.
+            // If there are three hits, this isn't an issue because two of them will have to be opposites, so the two
+            // will cancel eachother out.
+            if (numHits == 2) {
+                stepOffset /= 2;
+            }
+
+            // Reduce our offset distance by a power of 2 each iteration.
+            stepOffset *= Mathf.Pow(0.5f, currentIteration);
+
+            offset += stepOffset;
+        }
+
+        // Test again with the latest offset
+        numHits = RaycastCorners(collider, corners, offset, forward, _normalOffset, hits);
+
+        // If viable solution is found, try to improve it with remaining iterations by creeping backwards
+        if (numHits == 4) {
+            for (int i = currentIteration; i < iterations; i++) {
+                // Creep backwards by a smaller distance each iteration
+                Vector3 stepOffset = offset * Mathf.Pow(0.5f, currentIteration);
+                Vector3 newOffset = offset - stepOffset;
+
+                // Check new offset
+                int foo = RaycastCorners(collider, corners, newOffset, forward, _normalOffset, hits);
+                if (foo == 4) {
+                    offset = newOffset;
+                }
+            }
+        }
+       
+        return numHits == 4;
+    }
+
+    bool FindFitMeshCollider(Portal portal, Collider collider, out Vector3 newPosition) {
+        newPosition = portal.transform.position;
+
+        MeshCollider meshCollider = collider as MeshCollider;
+        if (!meshCollider) {
+            return false;
+        }
+        Vector3 center = portal.transform.position;
+        Vector3[] corners = portal.WorldSpaceCorners();
+        Vector3 forward = portal.transform.forward;
+
+        // TODO: magic number
+        int numIterations = 5;
+        bool viablePositionExists = FindViableCoplanarRectOnCollider(collider, center, corners, forward, numIterations, out Vector3 offset);
+        if (!viablePositionExists) {
+            return false;
+        }
+
+        newPosition = portal.transform.position + offset;
+        return true;
     }
 
     void SetScaleOverTime(Transform t, Vector3 startSize, Vector3 endSize, AnimationCurve curve, float time) {
