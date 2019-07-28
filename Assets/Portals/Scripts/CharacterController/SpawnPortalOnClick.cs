@@ -21,6 +21,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
     [SerializeField] AnimationCurve _portalSpawnCurve = AnimationCurves.Overshoot;
     [SerializeField] float _portalSpawnTime = 0.25f;
     [SerializeField] float _normalOffset = 0.05f;
+    [SerializeField] bool _shootThroughPortals = false;
 
     Portal _leftPortal;
     Portal _rightPortal;
@@ -57,8 +58,15 @@ public class SpawnPortalOnClick : MonoBehaviour {
         if (leftClick || rightClick) {
             Ray ray = new Ray(_camera.transform.position, _camera.transform.forward);
             RaycastHit hit;
+            bool hitSomething;
 
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity, _canHit)) {
+            if (_shootThroughPortals) {
+                hitSomething = PortalPhysics.Raycast(ray, out hit, Mathf.Infinity, _canHit, QueryTriggerInteraction.Ignore);
+            } else {
+                hitSomething = Physics.Raycast(ray, out hit, Mathf.Infinity, _canHit, QueryTriggerInteraction.Ignore);
+            }
+
+            if (hitSomething) {
                 // Spawn a bullet that will auto-destroy itself after it travels a certain distance
                 Color color = leftClick ? Color.blue : Color.red;
                 SpawnBullet(_bulletPrefab, _camera.transform.position + _camera.transform.forward * _bulletSpawnOffset, _camera.transform.forward, hit.distance, color);
