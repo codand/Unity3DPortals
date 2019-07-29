@@ -68,7 +68,14 @@ namespace Portals {
 
         public void ToggleNoClip() {
             _noClipEnabled = !_noClipEnabled;
-            _rigidbody.isKinematic = _noClipEnabled;
+
+            if (_noClipEnabled) {
+                _rigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                _rigidbody.isKinematic = true;
+            } else {
+                _rigidbody.isKinematic = false;
+                _rigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
+            }
         }
 
         public void Move(Vector3 direction) {

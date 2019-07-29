@@ -22,6 +22,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
     [SerializeField] float _portalSpawnTime = 0.25f;
     [SerializeField] float _normalOffset = 0.05f;
     [SerializeField] bool _shootThroughPortals = false;
+    [SerializeField] int _meshColliderIterationCount = 10;
 
     Portal _leftPortal;
     Portal _rightPortal;
@@ -223,8 +224,9 @@ public class SpawnPortalOnClick : MonoBehaviour {
         // If viable solution is found, try to improve it with remaining iterations by creeping backwards
         if (numHits == 4) {
             for (int i = currentIteration; i < iterations; i++) {
+                
                 // Creep backwards by a smaller distance each iteration
-                Vector3 stepOffset = offset * Mathf.Pow(0.5f, currentIteration);
+                Vector3 stepOffset = offset * Mathf.Pow(0.5f, i);
                 Vector3 newOffset = offset - stepOffset;
 
                 // Check new offset
@@ -250,7 +252,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
         Vector3 forward = portal.transform.forward;
 
         // TODO: magic number
-        int numIterations = 5;
+        int numIterations = _meshColliderIterationCount;
         bool viablePositionExists = FindViableCoplanarRectOnCollider(collider, center, corners, forward, numIterations, out Vector3 offset);
         if (!viablePositionExists) {
             return false;

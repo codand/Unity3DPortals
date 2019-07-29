@@ -8,6 +8,7 @@ namespace Portals {
     using System.Collections;
     using System.Collections.Generic;
     using UnityEngine;
+    using System.Linq;
 
     public class Teleportable : MonoBehaviour {
         #region Constants
@@ -142,10 +143,74 @@ namespace Portals {
             }
         }
 
+        Dictionary<Portal, int> m_PortalFrameCounter = new Dictionary<Portal, int>();
+
+        private void OnTriggerStay(Collider other) {
+            if (m_IsClone) {
+                return;
+            }
+
+            Portal portal = other.GetComponent<Portal>();
+            if (!portal) {
+                return;
+            }
+            m_PortalFrameCounter[portal] = 2;
+            if (portal.IsOpen && !m_ContextByPortal.ContainsKey(portal)) {
+
+                Debug.Log("Trigger");
+                EnterPortal(portal);
+            }
+        }
+
+        private void SweepTest() {
+            if (m_IsClone) {
+                return;
+            }
+
+            //m_PortalTriggersSeen = new HashSet<Portal>();
+            RaycastHit[] hits = m_Rigidbody.SweepTestAll(m_Rigidbody.velocity, m_Rigidbody.velocity.magnitude * Time.fixedDeltaTime, QueryTriggerInteraction.Collide);
+            //RaycastHit[] hits = Physics.SphereCastAll(transform.position, 1f, transform.forward, 1.0f);
+            foreach (var hit in hits) {
+                if (hit.collider.gameObject.layer == LayerMask.NameToLayer("Portal")) {
+                    Portal portal = hit.collider.GetComponent<Portal>();
+
+                    m_PortalFrameCounter[portal] = 2;
+                    if (portal.IsOpen && !m_ContextByPortal.ContainsKey(portal)) {
+                        Debug.Log("Enter " + portal);
+                        EnterPortal(portal);
+                    }
+                }
+            }
+
+            HashSet<Portal> toRemove = new HashSet<Portal>();
+            foreach(var kvp in m_PortalFrameCounter.ToList()) {
+                int count = kvp.Value - 1;
+                m_PortalFrameCounter[kvp.Key] = count;
+                if (count == -1) {
+                    toRemove.Add(kvp.Key);
+                    Debug.Log("Adding " + kvp.Key);
+                }
+            }
+            
+            foreach (var portal in toRemove) {
+                Debug.Log("Exit " + portal);
+                if (m_ContextByPortal.ContainsKey(portal)) {
+                    ExitPortal(portal);
+                }
+                m_PortalFrameCounter.Remove(portal);
+            }
+        }
+
+        private void Update() {
+
+            //SweepTest();
+        }
+
         private void FixedUpdate() {
             if (!m_IsClone) {
-                m_PortalTriggersSeen.Clear();
-
+                //if (m_Rigidbody.IsSleeping()) {
+                //    m_Rigidbody.WakeUp();
+                //}
                 foreach (KeyValuePair<Portal, PortalContext> kvp in m_ContextByPortal) {
                     Portal portal = kvp.Key;
                     PortalContext context = kvp.Value;
@@ -169,6 +234,7 @@ namespace Portals {
 
         private void LateFixedUpdate() {
             if (!m_IsClone) {
+                SweepTest();
                 foreach (KeyValuePair<Portal, PortalContext> kvp in m_ContextByPortal) {
                     Portal portal = kvp.Key;
                     PortalContext context = kvp.Value;
@@ -196,6 +262,7 @@ namespace Portals {
                     m_Rigidbody.position += positionTransfer;
                     m_Rigidbody.angularVelocity += angularVelocityTransfer;
                     //// _rigidbody.rotation *= rotationTransfer;
+
                 }
 
                 if (ShouldUseFixedUpdate()) {
@@ -218,43 +285,43 @@ namespace Portals {
         //    }
         //}
 
-        private void OnCompositeTriggerStay(CompositeTrigger t) {
-            if (m_IsClone) {
-                return;
-            }
+        //private void OnCompositeTriggerStay(CompositeTrigger t) {
+        //    if (m_IsClone) {
+        //        return;
+        //    }
 
-            PortalTrigger trigger = t as PortalTrigger;
-            if (!trigger) {
-                return;
+        //    PortalTrigger trigger = t as PortalTrigger;
+        //    if (!trigger) {
+        //        return;
 
-            }
+        //    }
 
-            m_PortalTriggersSeen.Add(trigger.portal);
-            if (trigger.portal.IsOpen && !m_ContextByPortal.ContainsKey(trigger.portal)) {
-                TriggerPortal(trigger.portal);
-            }
-        }
+        //    m_PortalTriggersSeen.Add(trigger.portal);
+        //    if (trigger.portal.IsOpen && !m_ContextByPortal.ContainsKey(trigger.portal)) {
+        //        TriggerPortal(trigger.portal);
+        //    }
+        //}
 
-        private void OnCompositeTriggerExit(CompositeTrigger t) {
-            if (m_IsClone) {
-                return;
-            }
+        //private void OnCompositeTriggerExit(CompositeTrigger t) {
+        //    if (m_IsClone) {
+        //        return;
+        //    }
 
-            PortalTrigger trigger = t as PortalTrigger;
-            if (!trigger) {
-                return;
-            }
+        //    PortalTrigger trigger = t as PortalTrigger;
+        //    if (!trigger) {
+        //        return;
+        //    }
 
-            m_PortalTriggersSeen.Add(trigger.portal);
-            if (m_ContextByPortal.ContainsKey(trigger.portal)) {
-                ExitPortal(trigger.portal);
-            }
-        }
+        //    m_PortalTriggersSeen.Add(trigger.portal);
+        //    if (m_ContextByPortal.ContainsKey(trigger.portal)) {
+        //        ExitPortal(trigger.portal);
+        //    }
+        //}
 
         #endregion
 
         #region Teleportation
-        private void TriggerPortal(Portal portal) {
+        private void EnterPortal(Portal portal) {
             Teleportable clone = SpawnClone();
             clone.gameObject.SetActive(true);
             clone.SaveRigidbodyInfo();
@@ -355,7 +422,7 @@ namespace Portals {
                 transform.rotation = portal.TeleportRotation(transform.rotation);
             }
 
-            StartCoroutine(HighSpeedExitTriggerCheck(portal.ExitPortal));
+            //StartCoroutine(HighSpeedExitTriggerCheck(portal.ExitPortal));
 
             gameObject.SendMessage("OnPortalTeleport", portal, SendMessageOptions.DontRequireReceiver);
             if (OnTeleport != null) {

@@ -93,6 +93,14 @@ namespace Portals {
                 return;
             }
 
+            // The stencil buffer gets used by Unity in deferred rendering and must clear itself, otherwise
+            // it will be full of junk. https://docs.unity3d.com/Manual/SL-Stencil.html
+            if (s_Depth == 0) {
+                if (Camera.current.actualRenderingPath == RenderingPath.DeferredLighting || Camera.current.actualRenderingPath == RenderingPath.DeferredShading) {
+                    Camera.current.clearStencilAfterLightingPass = true;
+                }
+            }
+
             // Stop recursion when we reach maximum depth
             if (s_Depth >= m_Portal.MaxRecursion) {
                 if (m_Portal.FakeInfiniteRecursion && m_Portal.MaxRecursion >= 2) {
@@ -208,9 +216,6 @@ namespace Portals {
             if (!m_PortalMaterial || !m_BackfaceMaterial) {
                 Material portalMaterial = new Material(Shader.Find("Portal/Portal"));
                 Material backFaceMaterial = new Material(Shader.Find("Portal/PortalBackface"));
-
-                portalMaterial.name = "Portal FrontFace";
-                backFaceMaterial.name = "Portal BackFace";
 
                 m_PortalMaterial = portalMaterial;
                 m_BackfaceMaterial = backFaceMaterial;
