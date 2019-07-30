@@ -8,6 +8,7 @@ namespace Portals {
     using System.Collections.Generic;
     using UnityEngine;
     using UnityEngine.VR;
+    using UnityEngine.Rendering;
 
     [ExecuteInEditMode]
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
@@ -148,7 +149,7 @@ namespace Portals {
                     m_PortalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
                     m_PortalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
                 }
-
+                
                 // Exit. We don't need to process any further depths.
                 return;
             }
@@ -398,7 +399,7 @@ namespace Portals {
             PortalCamera portalCamera = null;
             m_PortalCamByCam.TryGetValue(currentCamera, out portalCamera);
             if (!portalCamera) {
-                GameObject go = new GameObject("~" + currentCamera.name + "->" + gameObject.name, typeof(Camera));
+                GameObject go = new GameObject("~" + currentCamera.name + "->" + m_Portal.name, typeof(Camera));
                 //go.hideFlags = HideFlags.HideAndDontSave;
                 go.hideFlags = HideFlags.DontSave;
 

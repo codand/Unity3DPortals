@@ -46,7 +46,7 @@ Shader "Portals/StandardClipped"
 		[HideInInspector] _ZWrite ("__zw", Float) = 1.0
 
 
-		_ClippingPlane("Clipping Plane", Vector) = (1, 0, 0, 0)
+		//_ClippingPlane("Clipping Plane", Vector) = (1, 0, 0, 0)
 	}
 
 	CGINCLUDE
@@ -83,6 +83,7 @@ Shader "Portals/StandardClipped"
 			#pragma shader_feature _ _SPECULARHIGHLIGHTS_OFF
 			#pragma shader_feature _ _GLOSSYREFLECTIONS_OFF
 			#pragma shader_feature _PARALLAXMAP
+			//#pragma shader_feature PLANAR_CLIPPING_ENABLED;
 
 			#pragma multi_compile_fwdbase
 			#pragma multi_compile_fog

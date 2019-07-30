@@ -274,7 +274,8 @@ namespace Portals {
             //dst.transparencySortAxis = src.transparencySortAxis;
             //dst.transparencySortMode = src.transparencySortMode;
             // TODO: Fix occlusion culling
-            dst.useOcclusionCulling = src.useOcclusionCulling;
+            //dst.useOcclusionCulling = src.useOcclusionCulling;
+            dst.useOcclusionCulling = false;
 
             dst.eventMask = 0; // Ignore OnMouseXXX events
             dst.cameraType = src.cameraType;
