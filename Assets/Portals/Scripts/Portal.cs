@@ -24,7 +24,7 @@ namespace Portals {
         [SerializeField] private AdvancedSettings m_AdvanceSettings = new AdvancedSettings() {
             useDepthMask = true,
             useCullingMatrix = true,
-            useProjectionMatrix = true,
+            useObliqueProjectionMatrix = true,
             clippingOffset = 0.01f,
             copyGlobalIllumination = false,
         };
@@ -124,9 +124,14 @@ namespace Portals {
             set { m_AdvanceSettings.useCullingMatrix = value; }
         }
 
-        public bool UseProjectionMatrix {
-            get { return m_AdvanceSettings.useProjectionMatrix; }
-            set { m_AdvanceSettings.useProjectionMatrix = value; }
+        public bool UseObliqueProjectionMatrix {
+            get { return m_AdvanceSettings.useObliqueProjectionMatrix; }
+            set { m_AdvanceSettings.useObliqueProjectionMatrix = value; }
+        }
+
+        public bool UseScissorRect {
+            get { return m_AdvanceSettings.useScissorRect; }
+            set { m_AdvanceSettings.useScissorRect = value; }
         }
 
         public float ClippingOffset {
@@ -301,7 +306,9 @@ namespace Portals {
             [Tooltip("If enabled, uses a custom culling matrix to reduce number of objects drawn through a portal.")]
             public bool useCullingMatrix;
             [Tooltip("If enabled, uses a custom projection matrix to prevent objects behind the portal from being drawn.")]
-            public bool useProjectionMatrix;
+            public bool useObliqueProjectionMatrix;
+            [Tooltip("Enabling reduces overdraw by not rendering any pixels outside of a portal frame.")]
+            public bool useScissorRect;
             [Tooltip("Offset at which the custom projection matrix will be disabled.Increase this value if you experience Z-Fighting issues. Decrease this if you can see objects behind the portal.")]
             public float clippingOffset;
             [Tooltip("If enabled, global illumination settings will be copied if the exit portal is in a different scene.")]

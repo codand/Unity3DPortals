@@ -68,6 +68,33 @@ namespace Portals {
             RestoreMaterialProperties();
         }
 
+        private Vector2 ClampedWorldToViewportPoint(Camera cam, Vector3 worldPoint) {
+            Vector3 viewportPoint = cam.WorldToViewportPoint(worldPoint);
+            if (viewportPoint.z < 0) {
+                // Point is behind the camera, invert
+                viewportPoint.x *= -1;
+                viewportPoint.y *= -1;
+            }
+            return (Vector2)viewportPoint;
+        }
+
+        private Rect CalculatePortalViewportRect(Camera cam) {
+            var corners = m_Portal.WorldSpaceCorners();
+            var tl = ClampedWorldToViewportPoint(Camera.current, corners[0]);
+            var tr = ClampedWorldToViewportPoint(Camera.current, corners[1]);
+            var br = ClampedWorldToViewportPoint(Camera.current, corners[2]);
+            var bl = ClampedWorldToViewportPoint(Camera.current, corners[3]);
+
+            var min = Vector2.Min(Vector2.Min(Vector2.Min(tl, tr), br), bl);
+            var max = Vector2.Max(Vector2.Max(Vector2.Max(tl, tr), br), bl);
+
+            Rect viewportRect = new Rect(min.x, min.y, max.x - min.x, max.y - min.y);
+            //if (max.x < 0f || min.x > 1f || max.y < 0f || min.y > 1f) {
+                // Not sure if I need to do anything here yet
+            //}
+            return viewportRect;
+        }
+
         protected override void PreRender() {
 #if UNITY_EDITOR
             // Workaround for Unity bug that causes Awake/Start to not be called when running in EditMode
@@ -93,6 +120,11 @@ namespace Portals {
             if (s_Depth > 0 && currentPortalCamera != null && m_Portal == currentPortalCamera.portal.ExitPortal) {
                 return;
             }
+
+            // TODO: Split into separate method
+            // Calculate where in screen space the portal lies.
+            // We use this to only render as much of the screen as necessary, avoiding overdraw.
+            Rect viewportRect = CalculatePortalViewportRect(Camera.current);
 
             // The stencil buffer gets used by Unity in deferred rendering and must clear itself, otherwise
             // it will be full of junk. https://docs.unity3d.com/Manual/SL-Stencil.html
@@ -170,16 +202,16 @@ namespace Portals {
             if (Camera.current.stereoEnabled) {
                 // Stereo rendering. Render both eyes.
                 if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Left) {
-                    RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Left, renderBackface);
+                    RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Left, viewportRect, renderBackface);
                     block.SetTexture("_LeftEyeTexture", tex);
                 }
                 if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Right) {
-                    RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Right, renderBackface);
+                    RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Right, viewportRect, renderBackface);
                     block.SetTexture("_RightEyeTexture", tex);
                 }
             } else {
                 // Mono rendering. Render only one eye, but set which texture to use based on the camera's target eye.
-                RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Mono, renderBackface);
+                RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Mono, viewportRect, renderBackface);
                 block.SetTexture("_LeftEyeTexture", tex);
                 //switch (Camera.current.stereoTargetEye) {
                 //    case StereoTargetEyeMask.Right:

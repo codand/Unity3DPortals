@@ -12,6 +12,6 @@ public class ToggleCullingMatrix : MonoBehaviour {
 
     public void Update() {
         portal.UseCullingMatrix = toggleCullingMatrix.isOn;
-        portal.UseProjectionMatrix = toggleProjectionMatrix.isOn;
+        portal.UseObliqueProjectionMatrix = toggleProjectionMatrix.isOn;
     }
 }

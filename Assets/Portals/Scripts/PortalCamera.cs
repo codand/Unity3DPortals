@@ -168,7 +168,26 @@ namespace Portals {
             }
         }
 
-        public RenderTexture RenderToTexture(Camera.MonoOrStereoscopicEye eye, bool renderBackface) {
+        public Matrix4x4 CalculateScissorMatrix(Matrix4x4 projectionMatrix, Rect r) {
+            if (r.x < 0) {
+                r.width += r.x;
+                r.x = 0;
+            }
+
+            if (r.y < 0) {
+                r.height += r.y;
+                r.y = 0;
+            }
+
+            r.width = Mathf.Min(1 - r.x, r.width);
+            r.height = Mathf.Min(1 - r.y, r.height);
+
+            Matrix4x4 m1 = Matrix4x4.TRS(new Vector3((1 / r.width - 1), (1 / r.height - 1), 0), Quaternion.identity, new Vector3(1 / r.width, 1 / r.height, 1));
+            Matrix4x4 m2 = Matrix4x4.TRS(new Vector3(-r.x * 2 / r.width, -r.y * 2 / r.height, 0), Quaternion.identity, Vector3.one);
+            return m2 * m1 * projectionMatrix;
+        }
+
+        public RenderTexture RenderToTexture(Camera.MonoOrStereoscopicEye eye, Rect viewportRect, bool renderBackface) {
             _framesSinceLastUse = 0;
 
             // Copy parent camera's settings
@@ -196,16 +215,22 @@ namespace Portals {
             //_camera.projectionMatrix = projectionMatrix;
             //_camera.transform.position = _portal.TeleportPoint(_parent.transform.position);
             //_camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
-
+            
             _camera.projectionMatrix = projectionMatrix;
             _camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
             _camera.transform.position = _camera.cameraToWorldMatrix.GetPosition();
             _camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
+            
 
-            if (_portal.UseProjectionMatrix) {
+            if (_portal.UseObliqueProjectionMatrix) {
                 _camera.projectionMatrix = CalculateObliqueProjectionMatrix(projectionMatrix);
+            }
+            
+            if (_portal.UseScissorRect) {
+                _camera.rect = viewportRect;
+                _camera.projectionMatrix = CalculateScissorMatrix(_camera.projectionMatrix, viewportRect);
             } else {
-                _camera.projectionMatrix = projectionMatrix;
+                _camera.rect = new Rect(0, 0, 1, 1);
             }
 
             if (_portal.UseCullingMatrix) {
@@ -224,7 +249,7 @@ namespace Portals {
             texture.name = System.Enum.GetName(typeof(Camera.MonoOrStereoscopicEye), eye) + " " + _camera.stereoTargetEye + " " + Time.renderedFrameCount;
 
             _camera.targetTexture = texture;
-            
+
             _camera.Render();
 
             SaveFrameData(eye);

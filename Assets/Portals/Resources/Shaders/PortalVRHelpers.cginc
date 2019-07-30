@@ -43,6 +43,21 @@ struct v2f {
 	float4 objUV : TEXCOORD1;
 };
 
+struct FragmentOutput {
+#if defined(DEFERRED_PASS)
+	float4 gBuffer0 : SV_Target0;
+	float4 gBuffer1 : SV_Target1;
+	float4 gBuffer2 : SV_Target2;
+	float4 gBuffer3 : SV_Target3;
+
+#if defined(SHADOWS_SHADOWMASK)
+	float4 gBuffer4 : SV_Target4;
+#endif
+#else
+	float4 color : SV_Target;
+#endif
+};
+
 v2f vertPortal(appdata v)
 {
 	v2f o;
@@ -71,12 +86,13 @@ float4 sampleCurrentTextureProj(float4 uv)
 	//return tex2Dproj(_PortalTexture, uv);
 }
 
-fixed4 fragPortal(v2f i) : SV_Target
+FragmentOutput fragPortal(v2f i)
 {
+	FragmentOutput o;
 #ifdef SAMPLE_DEFAULT_TEXTURE
-	fixed4 col = tex2Dproj(_DefaultTexture, i.objUV);
+	float4 col = tex2Dproj(_DefaultTexture, i.objUV);
 #else 
-	fixed4 col = sampleCurrentTextureProj(i.screenUV);
+	float4 col = sampleCurrentTextureProj(i.screenUV);
 #endif
 
 #ifdef IS_BACKFACE
@@ -84,7 +100,9 @@ fixed4 fragPortal(v2f i) : SV_Target
 #else
 	col.a = tex2D(_TransparencyMask, i.objUV).r;
 #endif
-	return col;
+
+	o.color = col;
+	return o;
 }
 
 #endif // PORTAL_VR_HELPERS_INCLUDED
