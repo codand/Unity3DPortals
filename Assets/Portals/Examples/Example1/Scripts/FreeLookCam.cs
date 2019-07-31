@@ -137,14 +137,14 @@ namespace Portals.Examples
             if (m_Portals.Count > 0) {
                 Portal portal = m_Portals[0];
 
-                float srcRot = Util.NormalizeAngle(transform.eulerAngles.y, -180, 180);
+                float srcRot = MathUtil.NormalizeAngle(transform.eulerAngles.y, -180, 180);
                 float dstRot = ClampAngle(srcRot, portal, portal.transform.up);
                 if (srcRot != dstRot) {
                     m_LookAngle = dstRot;
                     transform.localRotation = Quaternion.Euler(0, m_LookAngle, 0);
                 }
 
-                float srcTilt = Util.NormalizeAngle(m_Pivot.eulerAngles.x, -180, 180);
+                float srcTilt = MathUtil.NormalizeAngle(m_Pivot.eulerAngles.x, -180, 180);
                 float dstTilt = ClampAngle(srcTilt, portal, portal.transform.right);
                 if (srcTilt != dstTilt) {
                     m_TiltAngle = dstTilt;
@@ -182,9 +182,9 @@ namespace Portals.Examples
                 //Debug.DrawLine(pivot, intersection);
                 //Debug.DrawLine(pivot, clampedWorldIntersection, Color.cyan);
 
-                angleOffset = Util.SignedPlanarAngle(newDirection, direction, axis);
+                angleOffset = MathUtil.SignedPlanarAngle(newDirection, direction, axis);
             }
-            return Util.NormalizeAngle(angleOffset + angle, -180, 180);
+            return MathUtil.NormalizeAngle(angleOffset + angle, -180, 180);
         }
     }
 }

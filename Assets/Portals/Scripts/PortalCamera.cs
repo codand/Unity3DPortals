@@ -168,25 +168,6 @@ namespace Portals {
             }
         }
 
-        public Matrix4x4 CalculateScissorMatrix(Matrix4x4 projectionMatrix, Rect r) {
-            if (r.x < 0) {
-                r.width += r.x;
-                r.x = 0;
-            }
-
-            if (r.y < 0) {
-                r.height += r.y;
-                r.y = 0;
-            }
-
-            r.width = Mathf.Min(1 - r.x, r.width);
-            r.height = Mathf.Min(1 - r.y, r.height);
-
-            Matrix4x4 m1 = Matrix4x4.TRS(new Vector3((1 / r.width - 1), (1 / r.height - 1), 0), Quaternion.identity, new Vector3(1 / r.width, 1 / r.height, 1));
-            Matrix4x4 m2 = Matrix4x4.TRS(new Vector3(-r.x * 2 / r.width, -r.y * 2 / r.height, 0), Quaternion.identity, Vector3.one);
-            return m2 * m1 * projectionMatrix;
-        }
-
         public RenderTexture RenderToTexture(Camera.MonoOrStereoscopicEye eye, Rect viewportRect, bool renderBackface) {
             _framesSinceLastUse = 0;
 
@@ -226,12 +207,7 @@ namespace Portals {
                 _camera.projectionMatrix = CalculateObliqueProjectionMatrix(projectionMatrix);
             }
             
-            if (_portal.UseScissorRect) {
-                _camera.rect = viewportRect;
-                _camera.projectionMatrix = CalculateScissorMatrix(_camera.projectionMatrix, viewportRect);
-            } else {
-                _camera.rect = new Rect(0, 0, 1, 1);
-            }
+
 
             if (_portal.UseCullingMatrix) {
                 _camera.cullingMatrix = CalculateCullingMatrix();
@@ -247,9 +223,14 @@ namespace Portals {
 
             RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
             texture.name = System.Enum.GetName(typeof(Camera.MonoOrStereoscopicEye), eye) + " " + _camera.stereoTargetEye + " " + Time.renderedFrameCount;
-
+            
             _camera.targetTexture = texture;
-
+            if (_portal.UseScissorRect) {
+                _camera.rect = viewportRect;
+                _camera.projectionMatrix = MathUtil.ScissorsMatrix(_camera.projectionMatrix, viewportRect);
+            } else {
+                _camera.rect = new Rect(0, 0, 1, 1);
+            }
             _camera.Render();
 
             SaveFrameData(eye);
@@ -396,7 +377,7 @@ namespace Portals {
         //    return m;
         //}
 
-        Matrix4x4 CalculateCullingMatrix() {
+        private Matrix4x4 CalculateCullingMatrix() {
             _camera.ResetCullingMatrix();
 
             // Lower left of the backside of our plane in world coordinates
@@ -421,145 +402,9 @@ namespace Portals {
             if (fieldOfView > _camera.fieldOfView) {
                 return _camera.cullingMatrix;
             } else {
-                return CalculateOffAxisProjectionMatrix(_camera, pa, pb, pc, pe);
+                return MathUtil.OffAxisProjectionMatrix(_camera.nearClipPlane, _camera.farClipPlane, pa, pb, pc, pe);
             }
         }
-
-        Matrix4x4 CalculateOffAxisProjectionMatrix(Camera camera, Vector3 pa, Vector3 pb, Vector3 pc, Vector3 pe) {
-            // eye position
-            float n = camera.nearClipPlane;
-            // distance of near clipping plane
-            float f = camera.farClipPlane;
-            // distance of far clipping plane
-
-            Vector3 va; // from pe to pa
-            Vector3 vb; // from pe to pb
-            Vector3 vc; // from pe to pc
-            Vector3 vr; // right axis of screen
-            Vector3 vu; // up axis of screen
-            Vector3 vn; // normal vector of screen
-
-            float l; // distance to left screen edge
-            float r; // distance to right screen edge
-            float b; // distance to bottom screen edge
-            float t; // distance to top screen edge
-            float d; // distance from eye to screen 
-
-            vr = pb - pa;
-            vu = pc - pa;
-            va = pa - pe;
-            vb = pb - pe;
-            vc = pc - pe;
-
-            // are we looking at the backface of the plane object?
-            if (Vector3.Dot(-Vector3.Cross(va, vc), vb) < 0.0) {
-                // mirror points along the z axis (most users 
-                // probably expect the x axis to stay fixed)
-                vu = -vu;
-                pa = pc;
-                pb = pa + vr;
-                pc = pa + vu;
-                va = pa - pe;
-                vb = pb - pe;
-                vc = pc - pe;
-            }
-
-            vr.Normalize();
-            vu.Normalize();
-            vn = -Vector3.Cross(vr, vu);
-            // we need the minus sign because Unity 
-            // uses a left-handed coordinate system
-            vn.Normalize();
-
-            d = -Vector3.Dot(va, vn);
-
-            // Set near clip plane
-            n = d; // + _clippingDistance;
-            //camera.nearClipPlane = n;
-
-            l = Vector3.Dot(vr, va) * n / d;
-            r = Vector3.Dot(vr, vb) * n / d;
-            b = Vector3.Dot(vu, va) * n / d;
-            t = Vector3.Dot(vu, vc) * n / d;
-
-            Matrix4x4 p = new Matrix4x4(); // projection matrix 
-            p[0, 0] = 2.0f * n / (r - l);
-            p[0, 1] = 0.0f;
-            p[0, 2] = (r + l) / (r - l);
-            p[0, 3] = 0.0f;
-
-            p[1, 0] = 0.0f;
-            p[1, 1] = 2.0f * n / (t - b);
-            p[1, 2] = (t + b) / (t - b);
-            p[1, 3] = 0.0f;
-
-            p[2, 0] = 0.0f;
-            p[2, 1] = 0.0f;
-            p[2, 2] = (f + n) / (n - f);
-            p[2, 3] = 2.0f * f * n / (n - f);
-
-            p[3, 0] = 0.0f;
-            p[3, 1] = 0.0f;
-            p[3, 2] = -1.0f;
-            p[3, 3] = 0.0f;
-
-            Matrix4x4 rm = new Matrix4x4(); // rotation matrix;
-            rm[0, 0] = vr.x;
-            rm[0, 1] = vr.y;
-            rm[0, 2] = vr.z;
-            rm[0, 3] = 0.0f;
-
-            rm[1, 0] = vu.x;
-            rm[1, 1] = vu.y;
-            rm[1, 2] = vu.z;
-            rm[1, 3] = 0.0f;
-
-            rm[2, 0] = vn.x;
-            rm[2, 1] = vn.y;
-            rm[2, 2] = vn.z;
-            rm[2, 3] = 0.0f;
-
-            rm[3, 0] = 0.0f;
-            rm[3, 1] = 0.0f;
-            rm[3, 2] = 0.0f;
-            rm[3, 3] = 1.0f;
-
-            Matrix4x4 tm = new Matrix4x4(); // translation matrix;
-            tm[0, 0] = 1.0f;
-            tm[0, 1] = 0.0f;
-            tm[0, 2] = 0.0f;
-            tm[0, 3] = -pe.x;
-
-            tm[1, 0] = 0.0f;
-            tm[1, 1] = 1.0f;
-            tm[1, 2] = 0.0f;
-            tm[1, 3] = -pe.y;
-
-            tm[2, 0] = 0.0f;
-            tm[2, 1] = 0.0f;
-            tm[2, 2] = 1.0f;
-            tm[2, 3] = -pe.z;
-
-            tm[3, 0] = 0.0f;
-            tm[3, 1] = 0.0f;
-            tm[3, 2] = 0.0f;
-            tm[3, 3] = 1.0f;
-
-            Matrix4x4 worldToCameraMatrix = rm * tm;
-            return p * worldToCameraMatrix;
-        }
-
-
-
-        //public CameraEvent cameraEvent;
-        //void OnValidate() {
-        //    _camera.RemoveAllCommandBuffers();
-        //    CommandBuffer buf = new CommandBuffer();
-        //    buf.SetGlobalMatrix("UNITY_MATRIX_VP", Matrix4x4.identity);
-        //    buf.SetGlobalMatrix("UNITY_MATRIX_MVP", Matrix4x4.identity);
-        //    _camera.AddCommandBuffer(cameraEvent, buf);
-
-        //}
 
         //void OnPreRender() {
         //    //if (!copyGI ||

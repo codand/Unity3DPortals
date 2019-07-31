@@ -211,7 +211,7 @@ namespace Portals {
         }
 
         public float PortalScaleAverage() {
-            return Helpers.VectorInternalAverage(this.PortalScale());
+            return MathUtil.VectorInternalAverage(this.PortalScale());
         }
         
         public Vector3 PortalScale() {

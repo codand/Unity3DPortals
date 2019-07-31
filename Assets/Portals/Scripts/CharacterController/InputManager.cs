@@ -7,10 +7,11 @@ public class InputManager : MonoBehaviour {
     [SerializeField] float _mouseSensitivity = 3.0f;
 
     RigidbodyCharacterController _playerController;
+    private bool _movementEnabled;
 
     void Awake() {
         _playerController = GetComponent<RigidbodyCharacterController>();
-
+        _movementEnabled = true;
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
     }
@@ -47,7 +48,21 @@ public class InputManager : MonoBehaviour {
             _playerController.RotateHead(rotationY);
         }
 #else
-        // In game actions
+        if (Input.GetKeyDown(KeyCode.BackQuote)) {
+            _movementEnabled = !_movementEnabled;
+            if (_movementEnabled) {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            } else {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
+        }
+
+        if (!_movementEnabled) {
+            return;
+        }
+
         float rotationX = Input.GetAxis("Mouse X") * _mouseSensitivity;
         if (rotationX != 0) {
             _playerController.Rotate(rotationX);
@@ -69,19 +84,13 @@ public class InputManager : MonoBehaviour {
         if (Input.GetMouseButtonDown(0)) {
             //GetComponent<PowerKinesis>().Fire(Camera.main);
         }
-
-        if (Input.GetKeyUp(KeyCode.Escape)) {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-        }
-        if (Input.GetMouseButtonDown(0)) {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
-        }
 #endif
     }
 
     void HandleMovement() {
+        if (!_movementEnabled) {
+            return;
+        }
 #if UNITY_ANDROID || UNITY_IOS
         float vertical = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftVertical");
         float horizontal = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftHorizontal");

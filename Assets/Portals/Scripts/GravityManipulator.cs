@@ -19,7 +19,7 @@ namespace Portals {
             _rigidbody.useGravity = false;
             if (this.useGravity && !_rigidbody.isKinematic) {
                 // Gravity is scaled with the size of the object
-                float scaleFactor = Portals.Helpers.VectorInternalAverage(this.transform.localScale);
+                float scaleFactor = Portals.MathUtil.VectorInternalAverage(this.transform.localScale);
                 Vector3 gravityForce = -1 * Physics.gravity.magnitude * this.upVector;
                 _rigidbody.AddForce(gravityForce * scaleFactor, ForceMode.Acceleration);
             }

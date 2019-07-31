@@ -196,7 +196,7 @@ namespace Portals {
             // Calculate desired body rotation by projecting the desired camera rotation onto the upward plane
             // and using that rotation.
             Vector3 dstForwardVector = Vector3.ProjectOnPlane(dstHeadRotation * Vector3.forward, Vector3.up);
-            float dstBodyAngle = Util.SignedPlanarAngle(dstForwardVector, Vector3.forward, Vector3.up);
+            float dstBodyAngle = MathUtil.SignedPlanarAngle(dstForwardVector, Vector3.forward, Vector3.up);
             Quaternion srcBodyRotation = transform.rotation;
             Quaternion dstBodyRotation = Quaternion.Euler(0, dstBodyAngle, 0);
 

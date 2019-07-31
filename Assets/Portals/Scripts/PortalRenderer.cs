@@ -68,30 +68,67 @@ namespace Portals {
             RestoreMaterialProperties();
         }
 
-        private Vector2 ClampedWorldToViewportPoint(Camera cam, Vector3 worldPoint) {
+        private Vector3 ClampedWorldToViewportPoint(Camera cam, Vector3 worldPoint) {
             Vector3 viewportPoint = cam.WorldToViewportPoint(worldPoint);
-            if (viewportPoint.z < 0) {
-                // Point is behind the camera, invert
-                viewportPoint.x *= -1;
-                viewportPoint.y *= -1;
+            //if (viewportPoint.z < 0) {
+            //    if (viewportPoint.x < 0.5f) {
+            //        viewportPoint.x = 1;
+            //    } else {
+            //        viewportPoint.x = 0;
+            //    }
+            //    if (viewportPoint.y < 0.5f) {
+            //        viewportPoint.y = 1;
+            //    } else {
+            //        viewportPoint.y = 0;
+            //    }
+
+            //    //if(Vector3.Dot(cam.transform.forward, transform.forward) > 0) {
+            //    //    viewportPoint.x = viewportPoint.x - 1;
+            //    //    viewportPoint.y = viewportPoint.y - 1;
+            //    //}
+            //    Debug.Log(Vector3.Dot(cam.transform.forward, transform.forward));
+            //}
+            return viewportPoint;
+        }
+
+        private Vector3 Min(params Vector3[] vecs) {
+            Vector3 min = new Vector3(Mathf.Infinity, Mathf.Infinity, Mathf.Infinity);
+            foreach (Vector3 vec in vecs) {
+                if (vec.z > 0) {
+                    min = Vector3.Min(min, vec);
+                }
             }
-            return (Vector2)viewportPoint;
+            return min;
+        }
+
+        private Vector3 Max(params Vector3[] vecs) {
+            Vector3 max = new Vector3(Mathf.NegativeInfinity, Mathf.NegativeInfinity, Mathf.NegativeInfinity);
+            foreach (Vector3 vec in vecs) {
+                if (vec.z > 0) {
+                    max = Vector3.Max(max, vec);
+                }
+            }
+            return max;
         }
 
         private Rect CalculatePortalViewportRect(Camera cam) {
             var corners = m_Portal.WorldSpaceCorners();
-            var tl = ClampedWorldToViewportPoint(Camera.current, corners[0]);
-            var tr = ClampedWorldToViewportPoint(Camera.current, corners[1]);
-            var br = ClampedWorldToViewportPoint(Camera.current, corners[2]);
-            var bl = ClampedWorldToViewportPoint(Camera.current, corners[3]);
 
-            var min = Vector2.Min(Vector2.Min(Vector2.Min(tl, tr), br), bl);
-            var max = Vector2.Max(Vector2.Max(Vector2.Max(tl, tr), br), bl);
+            // TODO: do this shit better. cache worldspacecorners maybe
+            Vector3 tl = ClampedWorldToViewportPoint(Camera.current, corners[0]);
+            Vector3 tr = ClampedWorldToViewportPoint(Camera.current, corners[1]);
+            Vector3 br = ClampedWorldToViewportPoint(Camera.current, corners[2]);
+            Vector3 bl = ClampedWorldToViewportPoint(Camera.current, corners[3]);
+
+            Vector3 ftl = ClampedWorldToViewportPoint(Camera.current, m_Portal.transform.TransformPoint(new Vector3(-0.5f, 0.5f, 1.0f)));
+            Vector3 ftr = ClampedWorldToViewportPoint(Camera.current, m_Portal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 1.0f)));
+            Vector3 fbr = ClampedWorldToViewportPoint(Camera.current, m_Portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
+            Vector3 fbl = ClampedWorldToViewportPoint(Camera.current, m_Portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
+            
+            var min = Min(tl, tr, br, bl, ftl, ftr, fbr, fbl);
+            var max = Max(tl, tr, br, bl, ftl, ftr, fbr, fbl);
 
             Rect viewportRect = new Rect(min.x, min.y, max.x - min.x, max.y - min.y);
-            //if (max.x < 0f || min.x > 1f || max.y < 0f || min.y > 1f) {
-                // Not sure if I need to do anything here yet
-            //}
             return viewportRect;
         }
 
@@ -120,11 +157,6 @@ namespace Portals {
             if (s_Depth > 0 && currentPortalCamera != null && m_Portal == currentPortalCamera.portal.ExitPortal) {
                 return;
             }
-
-            // TODO: Split into separate method
-            // Calculate where in screen space the portal lies.
-            // We use this to only render as much of the screen as necessary, avoiding overdraw.
-            Rect viewportRect = CalculatePortalViewportRect(Camera.current);
 
             // The stencil buffer gets used by Unity in deferred rendering and must clear itself, otherwise
             // it will be full of junk. https://docs.unity3d.com/Manual/SL-Stencil.html
@@ -195,6 +227,11 @@ namespace Portals {
 
             // Get camera for next depth level
             PortalCamera portalCamera = GetOrCreatePortalCamera(Camera.current);
+
+            // TODO: Split into separate method
+            // Calculate where in screen space the portal lies.
+            // We use this to only render as much of the screen as necessary, avoiding overdraw.
+            Rect viewportRect = CalculatePortalViewportRect(Camera.current);
 
             s_Depth++;
             //RenderTexture tex = portalCamera.RenderToTexture2();
@@ -381,50 +418,6 @@ namespace Portals {
             if (localPoint.y > extents) return false;
             if (localPoint.y < -extents) return false;
             return true;
-        }
-
-        private float CalculateNearPlanePenetration(Camera camera) {
-            Vector3[] corners = new Vector3[4];
-            CalculateNearPlaneCornersNoAlloc(camera, ref corners);
-            Plane plane = m_Portal.Plane;
-            float maxPenetration = Mathf.NegativeInfinity;
-            for (int i = 0; i < corners.Length; i++) {
-                Vector3 corner = corners[i];
-                float penetration = plane.GetDistanceToPoint(corner);
-                maxPenetration = Mathf.Max(maxPenetration, penetration);
-            }
-            return maxPenetration;
-        }
-
-        private static void CalculateNearPlaneCornersNoAlloc(Camera camera, ref Vector3[] corners) {
-            // Source: https://gamedev.stackexchange.com/questions/19774/determine-corners-of-a-specific-plane-in-the-frustum
-            Transform t = camera.transform;
-            Vector3 p = t.position;
-            Vector3 v = t.forward;
-            Vector3 up = t.up;
-            Vector3 right = t.right;
-            float near = camera.nearClipPlane;
-            float far = camera.farClipPlane;
-            float fov = camera.fieldOfView * Mathf.Deg2Rad;
-            float ar = camera.aspect;
-
-            float nearHeight = 2 * Mathf.Tan(fov / 2) * near;
-            float nearWidth = nearHeight * ar;
-
-            Vector3 nearCenter = p + (v * near);
-
-            Vector3 halfHeight = up * nearHeight / 2;
-            Vector3 halfWidth = right * nearWidth / 2;
-
-            Vector3 topLeft = nearCenter + halfHeight - halfWidth;
-            Vector3 topRight = nearCenter + halfHeight + halfWidth;
-            Vector3 bottomRight = nearCenter - halfHeight + halfWidth;
-            Vector3 bottomLeft = nearCenter - halfHeight - halfWidth;
-
-            corners[0] = topLeft;
-            corners[1] = topRight;
-            corners[2] = bottomRight;
-            corners[3] = bottomLeft;
         }
 
         private PortalCamera GetOrCreatePortalCamera(Camera currentCamera) {
