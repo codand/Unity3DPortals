@@ -34,6 +34,42 @@ namespace Portals {
             return (offsetValue - (Mathf.Floor(offsetValue / width) * width)) + start;
         }
 
+        public struct ProjectionMatrixInfo {
+            public float near;
+            public float far;
+            public float bottom;
+            public float top;
+            public float left;
+            public float right;
+        }
+
+        public static ProjectionMatrixInfo DecomposeProjectionMatrix(Matrix4x4 matrix) {
+            ProjectionMatrixInfo info = new ProjectionMatrixInfo();
+            info.near = matrix.m23 / (matrix.m22 - 1);
+            info.far = matrix.m23 / (matrix.m22 + 1);
+            info.bottom = info.near * (matrix.m12 - 1) / matrix.m11;
+            info.top = info.near * (matrix.m12 + 1) / matrix.m11;
+            info.left = info.near * (matrix.m02 - 1) / matrix.m00;
+            info.right = info.near * (matrix.m02 + 1) / matrix.m00;
+            return info;
+        }
+
+        public static void MakeProjectionMatrixOblique(ref Matrix4x4 projection, Vector4 clipPlane) {
+            // Source: http://aras-p.info/texts/obliqueortho.html
+            Vector4 q = projection.inverse * new Vector4(
+                Mathf.Sign(clipPlane.x),
+                Mathf.Sign(clipPlane.y),
+                1.0f,
+                1.0f
+            );
+            Vector4 c = clipPlane * (2.0F / (Vector4.Dot(clipPlane, q)));
+            // third row = clip plane - fourth row
+            projection[2] = c.x - projection[3];
+            projection[6] = c.y - projection[7];
+            projection[10] = c.z - projection[11];
+            projection[14] = c.w - projection[15];
+        }
+
         public static Matrix4x4 ScissorsMatrix(Matrix4x4 projectionMatrix, Rect r) {
             if (r.x < 0) {
                 r.width += r.x;

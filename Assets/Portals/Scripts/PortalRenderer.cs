@@ -228,7 +228,6 @@ namespace Portals {
             // Get camera for next depth level
             PortalCamera portalCamera = GetOrCreatePortalCamera(Camera.current);
 
-            // TODO: Split into separate method
             // Calculate where in screen space the portal lies.
             // We use this to only render as much of the screen as necessary, avoiding overdraw.
             Rect viewportRect = CalculatePortalViewportRect(Camera.current);

@@ -9,12 +9,12 @@ namespace Portals {
     [ExecuteInEditMode]
     [RequireComponent(typeof(Camera))]
     public class PortalCamera : MonoBehaviour {
-        Camera _parent;
-        Camera _camera;
-        Portal _portal;
-        Scene _enterScene;
-        Scene _exitScene;
-        int _renderDepth;
+        private Camera _parent;
+        private Camera _camera;
+        private Portal _portal;
+        private Scene _enterScene;
+        private Scene _exitScene;
+        private int _renderDepth;
         private int _framesSinceLastUse = 0;
         private Material _depthPunchMaterial;
 
@@ -51,8 +51,8 @@ namespace Portals {
         }
 
         public Scene enterScene {
-            get { return _enterScene; }
-            set { _enterScene = value; }
+            get { return EnterScene; }
+            set { EnterScene = value; }
         }
 
         public Scene exitScene {
@@ -77,7 +77,9 @@ namespace Portals {
                 _renderDepth = value;
             }
         }
-        
+
+        public Scene EnterScene { get => _enterScene; set => _enterScene = value; }
+
         RenderSettingsStruct _sceneRenderSettings = new RenderSettingsStruct();
 
         public void Awake() {
@@ -198,6 +200,8 @@ namespace Portals {
             
             _camera.projectionMatrix = projectionMatrix;
             _camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
+
+            // TODO: don't need to do this eh?
             _camera.transform.position = _camera.cameraToWorldMatrix.GetPosition();
             _camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
             
@@ -329,25 +333,9 @@ namespace Portals {
                 float distanceFromPlane = Vector4.Dot(cameraSpaceNormal, cameraSpacePoint);
                 Vector4 cameraSpacePlane = new Vector4(-cameraSpaceNormal.x, -cameraSpaceNormal.y, cameraSpaceNormal.z, distanceFromPlane);
 
-                MakeProjectionMatrixOblique(ref projectionMatrix, cameraSpacePlane);
+                MathUtil.MakeProjectionMatrixOblique(ref projectionMatrix, cameraSpacePlane);
             }
             return projectionMatrix;
-        }
-
-        void MakeProjectionMatrixOblique(ref Matrix4x4 projection, Vector4 clipPlane) {
-            // Source: http://aras-p.info/texts/obliqueortho.html
-            Vector4 q = projection.inverse * new Vector4(
-                Mathf.Sign(clipPlane.x),
-                Mathf.Sign(clipPlane.y),
-                1.0f,
-                1.0f
-            );
-            Vector4 c = clipPlane * (2.0F / (Vector4.Dot(clipPlane, q)));
-            // third row = clip plane - fourth row
-            projection[2] = c.x - projection[3];
-            projection[6] = c.y - projection[7];
-            projection[10] = c.z - projection[11];
-            projection[14] = c.w - projection[15];
         }
 
         private Matrix4x4 CalculateCullingMatrix() {

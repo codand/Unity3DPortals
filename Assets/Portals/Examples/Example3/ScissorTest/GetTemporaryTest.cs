@@ -62,73 +62,74 @@ public class GetTemporaryTest : MonoBehaviour
     }
 
     void RenderNormally() {
-        camera.ResetProjectionMatrix();
-        camera.rect = viewportRect;
-        camera.projectionMatrix = MathUtil.ScissorsMatrix(camera.projectionMatrix, viewportRect);
-
-        //if (normalTemp) {
-        //    RenderTexture.ReleaseTemporary(normalTemp);
-        //}
-
-        ClearTexture(normalTemp, Color.black);
-        normalTransform.localScale = new Vector3(normalTemp.width / scale, normalTemp.height / scale, 1);
-        camera.targetTexture = normalTemp;
-        camera.Render();
-
-        normalMat.SetTexture("_MainTex", normalTemp);
-
-        //DrawProjectionFrustum(camera.projectionMatrix, Color.green);
-    }
-
-    public bool sciss;
-    public bool cull;
-    void RenderWithScissors() {
+        camera.targetTexture = null;
+        camera.rect = defaultRect;
         camera.ResetProjectionMatrix();
         var proj = camera.projectionMatrix;
         if (sciss) {
             camera.projectionMatrix = MathUtil.ScissorsMatrix(proj, viewportRect);
             camera.rect = viewportRect;
         }
-        if(cull) {
 
+        normalTemp = RenderTexture.GetTemporary(camera.pixelWidth, camera.pixelHeight, 24, RenderTextureFormat.Default);
+        ClearTexture(normalTemp, Color.black);
+        camera.targetTexture = normalTemp;
+        camera.Render();
+
+        normalMat.SetTexture("_MainTex", normalTemp);
+
+        normalTransform.localScale = new Vector3(normalTemp.width / scale, normalTemp.height / scale, 1);
+        //DrawProjectionFrustum(camera.projectionMatrix * camera.worldToCameraMatrix, Color.red);
+        RenderTexture.ReleaseTemporary(normalTemp);
+    }
+
+    public bool sciss;
+    public float depth = 10f;
+    public bool cull;
+    public float cullSize = 1;
+    void RenderWithScissors() {
+        camera.targetTexture = null;
+        camera.rect = defaultRect;
+        camera.ResetProjectionMatrix();
+        var proj = camera.projectionMatrix;
+        if (sciss) {
+            camera.projectionMatrix = MathUtil.ScissorsMatrix(proj, viewportRect);
+            camera.rect = viewportRect;
         }
 
-
-        //camera.targetTexture = null;
-        //camera.ResetProjectionMatrix();
-        //camera.rect = defaultRect;
-        //var proj = camera.projectionMatrix;
-
-        //if (scissorTemp) {
-        //    RenderTexture.ReleaseTemporary(scissorTemp);
-        //}
-        if (!scissorTemp) {
-            scissorTemp = RenderTexture.GetTemporary(Screen.width, Screen.height, 24, RenderTextureFormat.Default);
-        }
-        //scissorTemp = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.Default);
+        scissorTemp = RenderTexture.GetTemporary(Screen.width, Screen.height, 24, RenderTextureFormat.Default);
         ClearTexture(scissorTemp, Color.black);
-        scissorTransform.localScale = new Vector3(scissorTemp.width / scale, scissorTemp.height / scale, 1);
         camera.targetTexture = scissorTemp;
         camera.Render();
+        Debug.Log(scissorTemp.width);
 
         scissorMat.SetTexture("_MainTex", scissorTemp);
 
-        DrawProjectionFrustum(camera.projectionMatrix * camera.worldToCameraMatrix, Color.red);
-        //DrawProjectionFrustum(proj, Color.blue);
+        scissorTransform.localScale = new Vector3(scissorTemp.width / scale, scissorTemp.height / scale, 1);
+        //DrawProjectionFrustum(camera.projectionMatrix * camera.worldToCameraMatrix, Color.red);
+        RenderTexture.ReleaseTemporary(scissorTemp);
     }
     void Update() {
+        //RenderNormally();
         RenderWithScissors();
 
         camera.targetTexture = null;
         camera.rect = defaultRect;
         camera.ResetProjectionMatrix();
 
-        Vector3 bottomRight = new Vector3(0.5f, -0.5f, 0);
-        Vector3 bottomLeft = new Vector3(5f, -0.5f, 0);
-        Vector3 upperRight = new Vector3(0.5f, 0.5f, 0);
-        Matrix4x4 offAxisProjectionMatrix = MathUtil.OffAxisProjectionMatrix(camera.nearClipPlane, camera.farClipPlane, bottomRight, bottomLeft, upperRight, camera.transform.position);
-        DrawProjectionFrustum(offAxisProjectionMatrix, Color.blue);
-
         DrawProjectionFrustum(camera.projectionMatrix * camera.worldToCameraMatrix, Color.white);
     }
 }
+
+        //if (cull) {
+        //    Vector3 bottomRight = new Vector3(cullSize, -cullSize, depth);
+        //    Vector3 bottomLeft = new Vector3(-cullSize, -cullSize, depth);
+        //    Vector3 upperRight = new Vector3(cullSize, cullSize, depth);
+        //    Matrix4x4 offAxisProjectionMatrix = MathUtil.OffAxisProjectionMatrix(camera.nearClipPlane, camera.farClipPlane, bottomRight, bottomLeft, upperRight, camera.transform.position);
+        //    DrawProjectionFrustum(offAxisProjectionMatrix, Color.blue);
+        //    camera.ResetCullingMatrix();
+        //    camera.cullingMatrix = offAxisProjectionMatrix;
+        //} else {
+        //    camera.ResetCullingMatrix();
+        //    DrawProjectionFrustum(camera.cullingMatrix, Color.blue);
+        //}
