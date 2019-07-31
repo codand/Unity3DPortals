@@ -10,26 +10,27 @@ namespace Portals {
     [SelectionBase]
     public class Portal : MonoBehaviour {
         [Tooltip("Exit destination for this portal.")]
-        [SerializeField] private Portal m_ExitPortal;
+        [SerializeField] private Portal _exitPortal;
         [Tooltip("Default texture that will be used when this portal cannot render the exit side.")]
-        [SerializeField] private Texture m_DefaultTexture;
+        [SerializeField] private Texture _defaultTexture;
         [Tooltip("Grayscale transparency mask. Black is visible, white is transparent.")]
-        [SerializeField] private Texture m_TransparencyMask;
+        [SerializeField] private Texture _transparencyMask;
         [Tooltip("Maximum number of times this portal can recurse.")]
-        [SerializeField] private int m_MaxRecursion = 2;
+        [SerializeField] private int _maxRecursion = 2;
         [Tooltip("If enabled, uses the previous frame to draw the last recursion. Max Recursion must be 2 or greater.")]
-        [SerializeField] private bool m_FakeInfiniteRecursion = true;
+        [SerializeField] private bool _fakeInfiniteRecursion = true;
         [Tooltip("Colliders to ignore when entering this portal. Set this to the objects behind the portal.")]
-        [SerializeField] private List<Collider> m_IgnoredColliders;
-        [SerializeField] private AdvancedSettings m_AdvanceSettings = new AdvancedSettings() {
+        [SerializeField] private List<Collider> _ignoredColliders;
+        [SerializeField] private AdvancedSettings _advancedSettings = new AdvancedSettings() {
             useDepthMask = true,
             useCullingMatrix = true,
             useObliqueProjectionMatrix = true,
+            useScissorRect = true,
             clippingOffset = 0.01f,
             copyGlobalIllumination = false,
         };
 
-        private PortalRenderer m_PortalRenderer;
+        private PortalRenderer _portalRenderer;
 
         public delegate void PortalIgnoredCollidersChangedEvent(Portal portal, Collider[] oldColliders, Collider[] newColliders);
         public event PortalIgnoredCollidersChangedEvent OnIgnoredCollidersChanged;
@@ -43,10 +44,10 @@ namespace Portals {
 
         public PortalRenderer PortalRenderer {
             get {
-                if (!m_PortalRenderer) {
-                    m_PortalRenderer = GetComponentInChildren<PortalRenderer>();
+                if (!_portalRenderer) {
+                    _portalRenderer = GetComponentInChildren<PortalRenderer>();
                 }
-                return m_PortalRenderer;
+                return _portalRenderer;
             }
         }
 
@@ -58,104 +59,85 @@ namespace Portals {
 
         public Portal ExitPortal {
             get {
-                return m_ExitPortal;
+                return _exitPortal;
             }
-
             set {
-                Portal oldExitPortal = m_ExitPortal;
-
-                m_ExitPortal = value;
-
-                if (OnExitPortalChanged != null) {
-                    OnExitPortalChanged(this, oldExitPortal, m_ExitPortal);
-                }
+                Portal oldExitPortal = _exitPortal;
+                _exitPortal = value;
+                OnExitPortalChanged?.Invoke(this, oldExitPortal, _exitPortal);
             }
         }
 
         public Texture DefaultTexture {
             get {
-                return m_DefaultTexture;
+                return _defaultTexture;
             }
-
             set {
-                Texture oldTexture = m_DefaultTexture;
-
-                m_DefaultTexture = value;
-
-                if (OnDefaultTextureChanged != null) {
-                    OnDefaultTextureChanged(this, oldTexture, m_DefaultTexture);
-                }
+                Texture oldTexture = _defaultTexture;
+                _defaultTexture = value;
+                OnDefaultTextureChanged?.Invoke(this, oldTexture, _defaultTexture);
             }
         }
 
         public Texture TransparencyMask {
             get {
-                return m_TransparencyMask;
+                return _transparencyMask;
             }
-
             set {
-                Texture oldTexture = m_TransparencyMask;
-
-                m_TransparencyMask = value;
-
-                if (OnTransparencyMaskChanged != null) {
-                    OnTransparencyMaskChanged(this, oldTexture, m_TransparencyMask);
-                }
+                Texture oldTexture = _transparencyMask;
+                _transparencyMask = value;
+                OnTransparencyMaskChanged?.Invoke(this, oldTexture, _transparencyMask);
             }
         }
 
         public int MaxRecursion {
-            get { return m_MaxRecursion; }
-            set { m_MaxRecursion = value; }
+            get { return _maxRecursion; }
+            set { _maxRecursion = value; }
         }
 
         public bool FakeInfiniteRecursion {
-            get { return m_FakeInfiniteRecursion; }
-            set { m_FakeInfiniteRecursion = value; }
+            get { return _fakeInfiniteRecursion; }
+            set { _fakeInfiniteRecursion = value; }
         }
 
         public bool UseDepthMask {
-            get { return m_AdvanceSettings.useDepthMask; }
-            set { m_AdvanceSettings.useDepthMask = value; }
+            get { return _advancedSettings.useDepthMask; }
+            set { _advancedSettings.useDepthMask = value; }
         }
 
         public bool UseCullingMatrix {
-            get { return m_AdvanceSettings.useCullingMatrix; }
-            set { m_AdvanceSettings.useCullingMatrix = value; }
+            get { return _advancedSettings.useCullingMatrix; }
+            set { _advancedSettings.useCullingMatrix = value; }
         }
 
         public bool UseObliqueProjectionMatrix {
-            get { return m_AdvanceSettings.useObliqueProjectionMatrix; }
-            set { m_AdvanceSettings.useObliqueProjectionMatrix = value; }
+            get { return _advancedSettings.useObliqueProjectionMatrix; }
+            set { _advancedSettings.useObliqueProjectionMatrix = value; }
         }
 
         public bool UseScissorRect {
-            get { return m_AdvanceSettings.useScissorRect; }
-            set { m_AdvanceSettings.useScissorRect = value; }
+            get { return _advancedSettings.useScissorRect; }
+            set { _advancedSettings.useScissorRect = value; }
         }
 
         public float ClippingOffset {
-            get { return m_AdvanceSettings.clippingOffset; }
-            set { m_AdvanceSettings.clippingOffset = value; }
+            get { return _advancedSettings.clippingOffset; }
+            set { _advancedSettings.clippingOffset = value; }
         }
 
         public bool CopyGlobalIllumination {
-            get { return m_AdvanceSettings.copyGlobalIllumination; }
-            set { m_AdvanceSettings.copyGlobalIllumination = value; }
+            get { return _advancedSettings.copyGlobalIllumination; }
+            set { _advancedSettings.copyGlobalIllumination = value; }
         }
 
         public Collider[] IgnoredColliders {
             get {
-                return m_IgnoredColliders.ToArray();
+                return _ignoredColliders.ToArray();
             }
-
             set {
-                Collider[] oldColliders = m_IgnoredColliders.ToArray();
-                m_IgnoredColliders = new List<Collider>(value);
-
-                if (OnIgnoredCollidersChanged != null) {
-                    OnIgnoredCollidersChanged(this, oldColliders, IgnoredColliders);
-                }
+                Collider[] oldColliders = _ignoredColliders.ToArray();
+                _ignoredColliders = new List<Collider>(value);
+                OnIgnoredCollidersChanged?.Invoke(this, oldColliders, IgnoredColliders);
             }
         }
 
@@ -295,9 +277,9 @@ namespace Portals {
 
         private void OnValidate() {
             // Calls OnX methods
-            ExitPortal = m_ExitPortal;
-            DefaultTexture = m_DefaultTexture;
-            TransparencyMask = m_TransparencyMask;
+            ExitPortal = _exitPortal;
+            DefaultTexture = _defaultTexture;
+            TransparencyMask = _transparencyMask;
         }
 
         [System.Serializable]

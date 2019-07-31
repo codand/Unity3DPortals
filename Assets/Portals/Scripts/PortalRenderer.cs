@@ -15,41 +15,41 @@ namespace Portals {
     public class PortalRenderer : RenderedBehaviour {
         #region Members
         // Mesh spawned when walking through a portal so that you can't clip through the portal
-        private static Mesh m_Mesh;
+        private static Mesh _mesh;
 
         // Counts the number of active PortalRenderers in the scene.
-        private static int m_ActivePortalRendererCount = 0;
+        private static int _activePortalRendererCount = 0;
 
-        private Portal m_Portal;
+        private Portal _portal;
 
         // Maps cameras to their children
-        private Dictionary<Camera, PortalCamera> m_PortalCamByCam = new Dictionary<Camera, PortalCamera>();
+        private Dictionary<Camera, PortalCamera> _portalByPortalCam = new Dictionary<Camera, PortalCamera>();
 
         // Used to track current recursion depth
-        private static int s_Depth;
+        private static int _staticRenderDepth;
 
         // Instanced materials
-        private Material m_PortalMaterial;
-        private Material m_BackfaceMaterial;
+        private Material _portalMaterial;
+        private Material _backfaceMaterial;
 
         // Members used to save and restore material properties between rendering in the same frame
-        private Stack<MaterialPropertyBlock> m_PropertyBlockStack;
-        private Stack<ShaderKeyword> m_ShaderKeywordStack;
-        private ObjectPool<MaterialPropertyBlock> m_PropertyBlockObjectPool;
+        private Stack<MaterialPropertyBlock> _propertyBlockStack;
+        private Stack<ShaderKeyword> _shaderKeywordStack;
+        private ObjectPool<MaterialPropertyBlock> _propertyBlockObjectPool;
 
         // Cached components
-        private Renderer m_Renderer;
-        private MeshFilter m_MeshFilter;
-        private Transform m_Transform;
+        private Renderer _renderer;
+        private MeshFilter _meshFilter;
+        private Transform _transform;
         #endregion
 
         #region Properties
         public static Mesh Mesh {
             get {
-                if (!m_Mesh) {
-                    m_Mesh = MakePortalMesh();
+                if (!_mesh) {
+                    _mesh = MakePortalMesh();
                 }
-                return m_Mesh;
+                return _mesh;
             }
         }
         #endregion
@@ -112,7 +112,7 @@ namespace Portals {
         }
 
         private Rect CalculatePortalViewportRect(Camera cam) {
-            var corners = m_Portal.WorldSpaceCorners();
+            var corners = _portal.WorldSpaceCorners();
 
             // TODO: do this shit better. cache worldspacecorners maybe
             Vector3 tl = ClampedWorldToViewportPoint(Camera.current, corners[0]);
@@ -120,10 +120,10 @@ namespace Portals {
             Vector3 br = ClampedWorldToViewportPoint(Camera.current, corners[2]);
             Vector3 bl = ClampedWorldToViewportPoint(Camera.current, corners[3]);
 
-            Vector3 ftl = ClampedWorldToViewportPoint(Camera.current, m_Portal.transform.TransformPoint(new Vector3(-0.5f, 0.5f, 1.0f)));
-            Vector3 ftr = ClampedWorldToViewportPoint(Camera.current, m_Portal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 1.0f)));
-            Vector3 fbr = ClampedWorldToViewportPoint(Camera.current, m_Portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
-            Vector3 fbl = ClampedWorldToViewportPoint(Camera.current, m_Portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
+            Vector3 ftl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, 0.5f, 1.0f)));
+            Vector3 ftr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 1.0f)));
+            Vector3 fbr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
+            Vector3 fbl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
             
             var min = Min(tl, tr, br, bl, ftl, ftr, fbr, fbl);
             var max = Max(tl, tr, br, bl, ftl, ftr, fbr, fbl);
@@ -136,46 +136,46 @@ namespace Portals {
 #if UNITY_EDITOR
             // Workaround for Unity bug that causes Awake/Start to not be called when running in EditMode
             // https://issuetracker.unity3d.com/issues/awake-and-start-not-called-before-update-when-assembly-is-reloaded-for-executeineditmode-scripts
-            if (m_PropertyBlockObjectPool == null) {
+            if (_propertyBlockObjectPool == null) {
                 Awake();
             }
 #endif
             SaveMaterialProperties();
 
-            if (!enabled || !m_Renderer || !m_Renderer.enabled) {
+            if (!enabled || !_renderer || !_renderer.enabled) {
                 return;
             }
 
-            if (!m_Portal.ExitPortal || !m_Portal.ExitPortal.isActiveAndEnabled) {
-                m_PortalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
+            if (!_portal.ExitPortal || !_portal.ExitPortal.isActiveAndEnabled) {
+                _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
                 return;
             }
 
             PortalCamera currentPortalCamera = PortalCamera.current;
 
             // Don't ever render our own exit portal
-            if (s_Depth > 0 && currentPortalCamera != null && m_Portal == currentPortalCamera.portal.ExitPortal) {
+            if (_staticRenderDepth > 0 && currentPortalCamera != null && _portal == currentPortalCamera.portal.ExitPortal) {
                 return;
             }
 
             // The stencil buffer gets used by Unity in deferred rendering and must clear itself, otherwise
             // it will be full of junk. https://docs.unity3d.com/Manual/SL-Stencil.html
-            if (s_Depth == 0) {
+            if (_staticRenderDepth == 0) {
                 if (Camera.current.actualRenderingPath == RenderingPath.DeferredLighting || Camera.current.actualRenderingPath == RenderingPath.DeferredShading) {
                     Camera.current.clearStencilAfterLightingPass = true;
                 }
             }
 
             // Stop recursion when we reach maximum depth
-            if (s_Depth >= m_Portal.MaxRecursion) {
-                if (m_Portal.FakeInfiniteRecursion && m_Portal.MaxRecursion >= 2) {
+            if (_staticRenderDepth >= _portal.MaxRecursion) {
+                if (_portal.FakeInfiniteRecursion && _portal.MaxRecursion >= 2) {
                     // Use the previous frame's RenderTexture from the parent camera to render the bottom layer.
                     // This creates an illusion of infinite recursion, but only works with at least two real recursions
                     // because the effect is unconvincing using the Main Camera's previous frame.
                     Camera parentCam = currentPortalCamera.parent;
                     PortalCamera parentPortalCam = parentCam.GetComponent<PortalCamera>();
 
-                    if (currentPortalCamera.portal == m_Portal && parentPortalCam.portal == m_Portal) {
+                    if (currentPortalCamera.portal == _portal && parentPortalCam.portal == _portal) {
                         // This portal is currently viewing itself.
                         // Render the bottom of the stack with the parent camera's view/projection.
                         PortalCamera.FrameData frameData = parentPortalCam.PreviousFrameData;
@@ -201,25 +201,25 @@ namespace Portals {
                                 break;
                         }
 
-                        m_PortalMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
-                        m_PortalMaterial.SetMatrix("PORTAL_MATRIX_VP", projectionMatrix * worldToCameraMatrix);
-                        m_PortalMaterial.SetTexture(sampler, texture);
+                        _portalMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
+                        _portalMaterial.SetMatrix("PORTAL_MATRIX_VP", projectionMatrix * worldToCameraMatrix);
+                        _portalMaterial.SetTexture(sampler, texture);
                     } else {
                         // We are viewing another portal.
                         // Render the bottom of the stack with a base texture
-                        m_PortalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
+                        _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
                     }
                 } else {
-                    m_PortalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
-                    m_PortalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
+                    _portalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
+                    _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
                 }
                 
                 // Exit. We don't need to process any further depths.
                 return;
             }
 
-            MaterialPropertyBlock block = m_PropertyBlockObjectPool.Take();
-            m_Renderer.GetPropertyBlock(block);
+            MaterialPropertyBlock block = _propertyBlockObjectPool.Take();
+            _renderer.GetPropertyBlock(block);
 
             // Handle the player clipping through the portal's frontface
             bool renderBackface = ShouldRenderBackface(Camera.current);
@@ -233,7 +233,7 @@ namespace Portals {
             // We use this to only render as much of the screen as necessary, avoiding overdraw.
             Rect viewportRect = CalculatePortalViewportRect(Camera.current);
 
-            s_Depth++;
+            _staticRenderDepth++;
             //RenderTexture tex = portalCamera.RenderToTexture2();
             //block.SetTexture("_PortalTexture", tex);
             if (Camera.current.stereoEnabled) {
@@ -262,71 +262,71 @@ namespace Portals {
                 //        break;
                 //}
             }
-            s_Depth--;
-            m_Renderer.SetPropertyBlock(block);
-            m_PropertyBlockObjectPool.Give(block);
+            _staticRenderDepth--;
+            _renderer.SetPropertyBlock(block);
+            _propertyBlockObjectPool.Give(block);
         }
         #endregion
 
         #region Initialization
         private void Awake() {
-            m_Portal = GetComponentInParent<Portal>();
-            m_Renderer = GetComponent<MeshRenderer>();
-            m_MeshFilter = GetComponent<MeshFilter>();
+            _portal = GetComponentInParent<Portal>();
+            _renderer = GetComponent<MeshRenderer>();
+            _meshFilter = GetComponent<MeshFilter>();
 
-            m_Transform = this.transform;
-            m_PropertyBlockStack = new Stack<MaterialPropertyBlock>();
-            m_ShaderKeywordStack = new Stack<ShaderKeyword>();
-            m_PropertyBlockObjectPool = new ObjectPool<MaterialPropertyBlock>(1, () => new MaterialPropertyBlock());
+            _transform = this.transform;
+            _propertyBlockStack = new Stack<MaterialPropertyBlock>();
+            _shaderKeywordStack = new Stack<ShaderKeyword>();
+            _propertyBlockObjectPool = new ObjectPool<MaterialPropertyBlock>(1, () => new MaterialPropertyBlock());
 
             //// TODO
             //// this.gameObject.layer = PortalPhysics.PortalLayer;
 
-            m_MeshFilter.sharedMesh = PortalRenderer.Mesh;
-            if (!m_PortalMaterial || !m_BackfaceMaterial) {
+            _meshFilter.sharedMesh = PortalRenderer.Mesh;
+            if (!_portalMaterial || !_backfaceMaterial) {
                 Material portalMaterial = new Material(Shader.Find("Portal/Portal"));
                 Material backFaceMaterial = new Material(Shader.Find("Portal/PortalBackface"));
 
-                m_PortalMaterial = portalMaterial;
-                m_BackfaceMaterial = backFaceMaterial;
+                _portalMaterial = portalMaterial;
+                _backfaceMaterial = backFaceMaterial;
 
-                m_PortalMaterial.SetTexture("_TransparencyMask", m_Portal.TransparencyMask);
-                m_PortalMaterial.SetTexture("_DefaultTexture", m_Portal.DefaultTexture);
+                _portalMaterial.SetTexture("_TransparencyMask", _portal.TransparencyMask);
+                _portalMaterial.SetTexture("_DefaultTexture", _portal.DefaultTexture);
 
-                m_Renderer.sharedMaterials = new Material[] {
-                    m_PortalMaterial,
-                    m_BackfaceMaterial,
+                _renderer.sharedMaterials = new Material[] {
+                    _portalMaterial,
+                    _backfaceMaterial,
                 };
             }
         }
 
         private void OnEnable() {
-            m_Portal.OnDefaultTextureChanged += OnDefaultTextureChanged;
-            m_Portal.OnTransparencyMaskChanged += OnTransparencyMaskChanged;
+            _portal.OnDefaultTextureChanged += OnDefaultTextureChanged;
+            _portal.OnTransparencyMaskChanged += OnTransparencyMaskChanged;
 
-            if (m_ActivePortalRendererCount == 0) {
+            if (_activePortalRendererCount == 0) {
                 Camera.onPreRender += SetCurrentEyeGlobal;
                 Camera.onPostRender += RestoreCurrentEyeGlobal;
             }
-            m_ActivePortalRendererCount += 1;
+            _activePortalRendererCount += 1;
         }
 
         private void OnDisable() {
-            m_Portal.OnDefaultTextureChanged -= OnDefaultTextureChanged;
-            m_Portal.OnTransparencyMaskChanged -= OnTransparencyMaskChanged;
+            _portal.OnDefaultTextureChanged -= OnDefaultTextureChanged;
+            _portal.OnTransparencyMaskChanged -= OnTransparencyMaskChanged;
 
             // Clean up cameras in scene. This is important when using ExecuteInEditMode because
             // script recompilation will disable then enable this script causing creation of duplicate
             // cameras.
-            foreach (KeyValuePair<Camera, PortalCamera> kvp in m_PortalCamByCam) {
+            foreach (KeyValuePair<Camera, PortalCamera> kvp in _portalByPortalCam) {
                 PortalCamera child = kvp.Value;
                 if (child && child.gameObject) {
                     Util.SafeDestroy(child.gameObject);
                 }
             }
 
-            m_ActivePortalRendererCount -= 1;
-            if (m_ActivePortalRendererCount == 0) {
+            _activePortalRendererCount -= 1;
+            if (_activePortalRendererCount == 0) {
                 Camera.onPreRender -= SetCurrentEyeGlobal;
                 Camera.onPostRender -= RestoreCurrentEyeGlobal;
             }
@@ -339,11 +339,11 @@ namespace Portals {
         
         #region Callbacks
         private void OnDefaultTextureChanged(Portal portal, Texture oldTexture, Texture newTexture) {
-            m_PortalMaterial.SetTexture("_DefaultTexture", newTexture);
+            _portalMaterial.SetTexture("_DefaultTexture", newTexture);
         }
 
         private void OnTransparencyMaskChanged(Portal portal, Texture oldTexture, Texture newTexture) {
-            m_PortalMaterial.SetTexture("_TransparencyMask", newTexture);
+            _portalMaterial.SetTexture("_TransparencyMask", newTexture);
         }
 
 
@@ -364,36 +364,36 @@ namespace Portals {
 
         #region Private Methods
         private void SaveMaterialProperties() {
-            MaterialPropertyBlock block = m_PropertyBlockObjectPool.Take();
-            m_Renderer.GetPropertyBlock(block);
-            m_PropertyBlockStack.Push(block);
+            MaterialPropertyBlock block = _propertyBlockObjectPool.Take();
+            _renderer.GetPropertyBlock(block);
+            _propertyBlockStack.Push(block);
 
             ShaderKeyword keywords = ShaderKeyword.None;
-            if (m_PortalMaterial.IsKeywordEnabled("SAMPLE_PREVIOUS_FRAME")) {
+            if (_portalMaterial.IsKeywordEnabled("SAMPLE_PREVIOUS_FRAME")) {
                 keywords |= ShaderKeyword.SamplePreviousFrame;
             }
-            if (m_PortalMaterial.IsKeywordEnabled("SAMPLE_DEFAULT_TEXTURE")) {
+            if (_portalMaterial.IsKeywordEnabled("SAMPLE_DEFAULT_TEXTURE")) {
                 keywords |= ShaderKeyword.SampleDefaultTexture;
             }
-            m_ShaderKeywordStack.Push(keywords);
+            _shaderKeywordStack.Push(keywords);
         }
 
         private void RestoreMaterialProperties() {
-            MaterialPropertyBlock block = m_PropertyBlockStack.Pop();
-            m_Renderer.SetPropertyBlock(block);
-            m_PropertyBlockObjectPool.Give(block);
+            MaterialPropertyBlock block = _propertyBlockStack.Pop();
+            _renderer.SetPropertyBlock(block);
+            _propertyBlockObjectPool.Give(block);
 
-            ShaderKeyword keywords = m_ShaderKeywordStack.Pop();
+            ShaderKeyword keywords = _shaderKeywordStack.Pop();
             if ((keywords & ShaderKeyword.SamplePreviousFrame) == ShaderKeyword.SamplePreviousFrame) {
-                m_PortalMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
+                _portalMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
             } else {
-                m_PortalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
+                _portalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
             }
 
             if ((keywords & ShaderKeyword.SampleDefaultTexture) == ShaderKeyword.SampleDefaultTexture) {
-                m_PortalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
+                _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
             } else {
-                m_PortalMaterial.DisableKeyword("SAMPLE_DEFAULT_TEXTURE");
+                _portalMaterial.DisableKeyword("SAMPLE_DEFAULT_TEXTURE");
             }
         }
 
@@ -401,9 +401,9 @@ namespace Portals {
             // Decrease the size of the box in which we will render the backface when rendering stereo.
             // This will prevent the backface from appearing in one eye when near the edge of the portal.
             float scaleMultiplier = camera.stereoEnabled ? 0.9f : 1.0f;
-            if (s_Depth == 0 && LocalXYPlaneContainsPoint(Camera.current.transform.position, scaleMultiplier)) {
+            if (_staticRenderDepth == 0 && LocalXYPlaneContainsPoint(Camera.current.transform.position, scaleMultiplier)) {
                 // Camera is within the border of the camera
-                if (!m_Portal.Plane.GetSide(Camera.current.transform.position)) {
+                if (!_portal.Plane.GetSide(Camera.current.transform.position)) {
                     return true;
                 }
             }
@@ -412,7 +412,7 @@ namespace Portals {
         
         private bool LocalXYPlaneContainsPoint(Vector3 point, float scaleMultiplier) {
             float extents = 0.5f * scaleMultiplier;
-            Vector3 localPoint = m_Transform.InverseTransformPoint(point);
+            Vector3 localPoint = _transform.InverseTransformPoint(point);
             if (localPoint.x < -extents) return false;
             if (localPoint.x > extents) return false;
             if (localPoint.y > extents) return false;
@@ -422,9 +422,9 @@ namespace Portals {
 
         private PortalCamera GetOrCreatePortalCamera(Camera currentCamera) {
             PortalCamera portalCamera = null;
-            m_PortalCamByCam.TryGetValue(currentCamera, out portalCamera);
+            _portalByPortalCam.TryGetValue(currentCamera, out portalCamera);
             if (!portalCamera) {
-                GameObject go = new GameObject("~" + currentCamera.name + "->" + m_Portal.name, typeof(Camera));
+                GameObject go = new GameObject("~" + currentCamera.name + "->" + _portal.name, typeof(Camera));
                 //go.hideFlags = HideFlags.HideAndDontSave;
                 go.hideFlags = HideFlags.DontSave;
 
@@ -438,16 +438,16 @@ namespace Portals {
                 portalCamera = go.AddComponent<PortalCamera>();
                 portalCamera.Awake();
                 portalCamera.enterScene = this.gameObject.scene;
-                portalCamera.exitScene = m_Portal.ExitPortal ? m_Portal.ExitPortal.gameObject.scene : this.gameObject.scene;
+                portalCamera.exitScene = _portal.ExitPortal ? _portal.ExitPortal.gameObject.scene : this.gameObject.scene;
                 portalCamera.parent = currentCamera;
-                portalCamera.portal = m_Portal;
+                portalCamera.portal = _portal;
 
-                if (m_Portal.ExitPortal && this.gameObject.scene != m_Portal.ExitPortal.gameObject.scene) {
+                if (_portal.ExitPortal && this.gameObject.scene != _portal.ExitPortal.gameObject.scene) {
                     ////PortalCameraRenderSettings thing = go.AddComponent<PortalCameraRenderSettings>();
                     ////thing.scene = exitPortal.gameObject.scene;
                 }
 
-                m_PortalCamByCam[currentCamera] = portalCamera;
+                _portalByPortalCam[currentCamera] = portalCamera;
             }
             return portalCamera;
         }
