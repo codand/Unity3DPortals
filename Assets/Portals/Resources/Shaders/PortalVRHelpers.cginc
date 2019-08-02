@@ -26,6 +26,9 @@ sampler2D _RightEyeTexture;
 sampler2D _TransparencyMask;
 
 sampler2D _PortalTexture;
+float4x4 _PortalProjectionMatrix;
+float4x4 _PortalProjectionMatrix2;
+float useOldRenderer;
 
 #ifdef IS_BACKFACE
 float _BackfaceAlpha;
@@ -62,6 +65,7 @@ v2f vertPortal(appdata v)
 {
 	v2f o;
 	o.pos = UnityObjectToClipPos(v.vertex);
+
 	o.objUV = v.uv;
 #ifdef SAMPLE_PREVIOUS_FRAME
 	// Instead of getting the clip position of our portal from the currently rendering camera,
@@ -70,7 +74,12 @@ v2f vertPortal(appdata v)
 	clipPos.y *= _ProjectionParams.x;
 	o.screenUV = ComputeNonStereoScreenPos(clipPos);
 #else
-	o.screenUV = ComputeNonStereoScreenPos(o.pos);
+	if (useOldRenderer == 1) {
+		o.screenUV = ComputeNonStereoScreenPos(o.pos);
+	} else {
+		float4 clipPos = mul(_PortalProjectionMatrix, UnityObjectToViewPos(v.vertex));
+		o.screenUV = ComputeNonStereoScreenPos(clipPos);
+	}
 #endif
 	return o;
 }

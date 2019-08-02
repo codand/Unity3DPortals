@@ -64,9 +64,7 @@ namespace Portals {
         #endregion
 
         #region Rendering
-        protected override void PostRender() {
-            RestoreMaterialProperties();
-        }
+
 
         private Vector3 ClampedWorldToViewportPoint(Camera cam, Vector3 worldPoint) {
             Vector3 viewportPoint = cam.WorldToViewportPoint(worldPoint);
@@ -112,27 +110,288 @@ namespace Portals {
         }
 
         private Rect CalculatePortalViewportRect(Camera cam) {
-            var corners = _portal.WorldSpaceCorners();
+            // TODO: using the exit portal corners might cause issues with the backface
 
             // TODO: do this shit better. cache worldspacecorners maybe
-            Vector3 tl = ClampedWorldToViewportPoint(Camera.current, corners[0]);
-            Vector3 tr = ClampedWorldToViewportPoint(Camera.current, corners[1]);
-            Vector3 br = ClampedWorldToViewportPoint(Camera.current, corners[2]);
-            Vector3 bl = ClampedWorldToViewportPoint(Camera.current, corners[3]);
 
-            Vector3 ftl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, 0.5f, 1.0f)));
-            Vector3 ftr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 1.0f)));
-            Vector3 fbr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
-            Vector3 fbl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
-            
-            var min = Min(tl, tr, br, bl, ftl, ftr, fbr, fbl);
-            var max = Max(tl, tr, br, bl, ftl, ftr, fbr, fbl);
+            Vector3 tl, tr, br, bl;
+
+            if (useOldRenderer) {
+                var corners = _portal.WorldSpaceCorners();
+                tl = ClampedWorldToViewportPoint(Camera.current, corners[0]);
+                tr = ClampedWorldToViewportPoint(Camera.current, corners[1]);
+                br = ClampedWorldToViewportPoint(Camera.current, corners[2]);
+                bl = ClampedWorldToViewportPoint(Camera.current, corners[3]);
+            } else {
+                var corners = _portal.ExitPortal.WorldSpaceCorners();
+                tl = cam.WorldToViewportPoint(corners[0]);
+                tr = cam.WorldToViewportPoint(corners[1]);
+                br = cam.WorldToViewportPoint(corners[2]);
+                bl = cam.WorldToViewportPoint(corners[3]);
+            }
+
+
+            //Vector3 ftl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, 0.5f, 1.0f)));
+            //Vector3 ftr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 1.0f)));
+            //Vector3 fbr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
+            //Vector3 fbl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
+
+            //var min = Min(tl, tr, br, bl, ftl, ftr, fbr, fbl);
+            //var max = Max(tl, tr, br, bl, ftl, ftr, fbr, fbl);
+            var min = Min(tl, tr, br, bl);
+            var max = Max(tl, tr, br, bl);
+
+            min -= Vector3.one * buffer;
+            max += Vector3.one * buffer;
+
+            min = Vector3.Max(Vector3.zero, min);
+            max = Vector3.Min(Vector3.one, max);
 
             Rect viewportRect = new Rect(min.x, min.y, max.x - min.x, max.y - min.y);
             return viewportRect;
         }
+        public float buffer = 0f;
+        private bool IsCameraUsingDeferredShading(Camera cam) {
+            return Camera.current.actualRenderingPath == RenderingPath.DeferredLighting || Camera.current.actualRenderingPath == RenderingPath.DeferredShading;
+        }
+
+        private static Portal _currentlyRenderingPortal;
+
+        //private struct CameraContext {
+        //    public Matrix4x4 ProjectionMatrix { get; set; }
+        //    public Matrix4x4 WorldToCameraMatrix { get; set; }
+        //}
+
+        //private struct StereoCameraContext {
+        //    public CameraContext MonoEye { get => LeftEye; set => LeftEye = value; }
+        //    public CameraContext LeftEye { get; set; }
+        //    public CameraContext RightEye { get; set; }
+        //}
+
+        //private struct PortalRenderContext {
+        //    public StereoCameraContext CurrentFrame { get; set; }
+        //    public StereoCameraContext PreviousFrame { get; set; }
+
+        //    public void FinalizeFrame() {
+        //        PreviousFrame = CurrentFrame;
+        //    }
+        //}
+
+        //private PortalRenderContext _renderContext = new PortalRenderContext();
+        //private PortalRenderContext GetRenderContext() {
+        //    return _renderContext;
+        //}
+
+        //private void ReleaseRenderContext(PortalRenderContext renderContext) {
+        //    renderContext.FinalizeFrame();
+        //}
+
+        //private Dictionary<Camera, RenderTexture> _renderTexturesByCamera = new Dictionary<Camera, RenderTexture>();
+
+        private bool IsToplevelCamera() {
+            return _staticRenderDepth == 0;
+        }
+
+
+        public bool useOldRenderer = true;
+        public void Update() {
+            if (Input.GetKeyDown(KeyCode.LeftControl) || Input.touches.Length > 0) {
+                useOldRenderer = !useOldRenderer;
+                Debug.Log($"Using {(useOldRenderer ? "old" : "new")} renderer");
+            }
+            Shader.SetGlobalFloat("useOldRenderer", useOldRenderer ? 1 : 0);
+        }
+
 
         protected override void PreRender() {
+            if (useOldRenderer) {
+                PreRenderOld();
+            } else {
+                PreRenderNew();
+            }
+        }
+        protected override void PostRender() {
+            if (useOldRenderer) {
+                PostRenderOld();
+            } else {
+                PostRenderNew();
+            }
+        }
+
+
+        private static RenderTexture _renderTexture;
+        public FilterMode filterMode = FilterMode.Point;
+        protected void PreRenderNew() {
+#if UNITY_EDITOR
+            // Workaround for Unity bug that causes Awake/Start to not be called when running in EditMode
+            // https://issuetracker.unity3d.com/issues/awake-and-start-not-called-before-update-when-assembly-is-reloaded-for-executeineditmode-scripts
+            if (_propertyBlockObjectPool == null) {
+                Awake();
+            }
+#endif
+
+            if (!enabled || !_renderer || !_renderer.enabled) {
+                return;
+            }
+
+            if (Camera.current.cameraType != CameraType.Game) {
+                return;
+            }
+
+
+            if (_staticRenderDepth == 0) {
+                var gpuProjectionMatrix = GL.GetGPUProjectionMatrix(Camera.current.projectionMatrix, true);
+                Shader.SetGlobalMatrix("_PortalProjectionMatrix", gpuProjectionMatrix);
+            }
+
+            SaveMaterialProperties();
+            MaterialPropertyBlock block = _propertyBlockObjectPool.Take();
+
+
+            if (!_portal.ExitPortal || !_portal.ExitPortal.isActiveAndEnabled) {
+                _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
+                return;
+            }
+
+            // Don't ever render our own exit portal
+            if (_staticRenderDepth > 0 && _currentlyRenderingPortal == _portal.ExitPortal) {
+                // Disable renderer until the end of the frame. This prevents an extra draw call
+                _renderer.enabled = false;
+                return;
+            }
+
+            if (_staticRenderDepth == 0) {
+                if (_renderTexture != null) {
+                    RenderTexture.ReleaseTemporary(_renderTexture);
+                }
+                int w = Camera.current.pixelWidth * _portal.Downscaling;
+                int h = Camera.current.pixelHeight * _portal.Downscaling;
+                int depth = (int)_portal.DepthBufferQuality;
+                var format = RenderTextureFormat.Default;
+                var writeMode = RenderTextureReadWrite.Default;
+                int msaaSamples = 1;
+                var memoryless = RenderTextureMemoryless.None;
+                var vrUsage = VRTextureUsage.None;
+                bool useDynamicScale = false;
+
+                // TODO: figure out correct settings for VRUsage, memoryless, and dynamic scale
+                _renderTexture = RenderTexture.GetTemporary(w, h, depth, format, writeMode, msaaSamples, memoryless, vrUsage, useDynamicScale);
+                _renderTexture.filterMode = FilterMode.Point;
+            }
+
+
+            // The stencil buffer gets used by Unity in deferred rendering and must clear itself, otherwise
+            // it will be full of junk. https://docs.unity3d.com/Manual/SL-Stencil.html
+            if (_staticRenderDepth == 0 && IsCameraUsingDeferredShading(Camera.current)) {
+                Camera.current.clearStencilAfterLightingPass = true;
+            }
+
+            // Stop recursion when we reach maximum depth
+            if (_staticRenderDepth >= _portal.MaxRecursion) {
+                _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
+                return;
+            }
+
+            Camera parentCam = Camera.current;
+            Camera childCam = CreateTemporaryCamera(parentCam);
+
+            //RenderTexture tex = RenderTexture.GetTemporary(Screen.width, Screen.height, 32, RenderTextureFormat.Default);
+
+            RenderToTexture(parentCam, childCam, Camera.MonoOrStereoscopicEye.Mono, _renderTexture);
+            //Graphics.Blit(tex, _renderTexture);
+
+            //RenderTexture.ReleaseTemporary(tex);
+            ReleaseTemporaryCamera(childCam);
+
+            block.SetTexture("_LeftEyeTexture", _renderTexture);
+            _portalMaterial.DisableKeyword("SAMPLE_DEFAULT_TEXTURE");
+
+
+            block.SetFloat("_BackfaceAlpha", 0f);
+            block.SetTexture("_LeftEyeTexture", _renderTexture);
+            _backfaceMaterial.DisableKeyword("SAMPLE_DEFAULT_TEXTURE");
+
+            _renderer.SetPropertyBlock(block);
+            _propertyBlockObjectPool.Give(block);
+        }
+
+        protected void PostRenderNew() {
+            RestoreMaterialProperties();
+            //ReleaseRenderTexture();
+            _renderer.enabled = true;
+        }
+
+        public bool sw = false;
+        void RenderToTexture(Camera parent, Camera cam, Camera.MonoOrStereoscopicEye eye, RenderTexture target) {
+            PortalCamera.CopyCameraSettings(parent, cam);
+
+            Matrix4x4 parentProjectionMatrix;
+            Matrix4x4 parentWorldToCameraMatrix;
+
+
+            switch (eye) {
+                case Camera.MonoOrStereoscopicEye.Left:
+                    parentProjectionMatrix = parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left);
+                    parentWorldToCameraMatrix = parent.GetStereoViewMatrix(Camera.StereoscopicEye.Left);
+                    break;
+                case Camera.MonoOrStereoscopicEye.Right:
+                    parentProjectionMatrix = parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Right);
+                    parentWorldToCameraMatrix = parent.GetStereoViewMatrix(Camera.StereoscopicEye.Right);
+                    break;
+                case Camera.MonoOrStereoscopicEye.Mono:
+                default:
+                    parentProjectionMatrix = parent.projectionMatrix;
+                    parentWorldToCameraMatrix = parent.worldToCameraMatrix;
+                    break;
+            }
+
+            Matrix4x4 newProjectionMatrix = parentProjectionMatrix;
+            Matrix4x4 newWorldToCameraMatrix = parentWorldToCameraMatrix * _portal.PortalMatrix().inverse;
+            // cam.transform.position = _portal.TeleportPoint(parent.transform.position);
+            //cam.transform.rotation = _portal.TeleportRotation(parent.transform.rotation);
+
+
+            cam.ResetProjectionMatrix();
+            cam.rect = new Rect(0, 0, 1, 1);
+
+            //cam.projectionMatrix = newProjectionMatrix;
+            cam.worldToCameraMatrix = newWorldToCameraMatrix;
+
+            cam.targetTexture = target;
+
+
+            // Increase depth
+            var savedCurrentlyRenderingPortal = _currentlyRenderingPortal;
+            _currentlyRenderingPortal = _portal;
+            _staticRenderDepth++;
+
+            //var f = RenderTexture.active;
+            //RenderTexture.active = target;
+            //GL.Clear(true, true, _staticRenderDepth % 2 == 0? Color.red : Color.green);
+            //RenderTexture.active = f;
+
+            if (_portal.UseScissorRect) {
+                // Calculate where in screen space the portal lies.
+                // We use this to only render as much of the screen as necessary, avoiding overdraw.
+                cam.ResetProjectionMatrix();
+                cam.rect = new Rect(0, 0, 1, 1);
+                Rect viewportRect = CalculatePortalViewportRect(cam);
+
+                cam.projectionMatrix = MathUtil.ScissorsMatrix(cam.projectionMatrix, viewportRect);
+                cam.rect = viewportRect;
+
+            } else {
+                cam.rect = new Rect(0, 0, 1, 1);
+            }
+
+            cam.Render();
+            _staticRenderDepth--;
+            _currentlyRenderingPortal = savedCurrentlyRenderingPortal;
+        }
+
+
+
+        protected void PreRenderOld() {
 #if UNITY_EDITOR
             // Workaround for Unity bug that causes Awake/Start to not be called when running in EditMode
             // https://issuetracker.unity3d.com/issues/awake-and-start-not-called-before-update-when-assembly-is-reloaded-for-executeineditmode-scripts
@@ -155,6 +414,7 @@ namespace Portals {
 
             // Don't ever render our own exit portal
             if (_staticRenderDepth > 0 && currentPortalCamera != null && _portal == currentPortalCamera.portal.ExitPortal) {
+                _renderer.enabled = false;
                 return;
             }
 
@@ -213,7 +473,7 @@ namespace Portals {
                     _portalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
                     _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
                 }
-                
+
                 // Exit. We don't need to process any further depths.
                 return;
             }
@@ -264,6 +524,11 @@ namespace Portals {
             _staticRenderDepth--;
             _renderer.SetPropertyBlock(block);
             _propertyBlockObjectPool.Give(block);
+        }
+
+        protected void PostRenderOld() {
+            _renderer.enabled = true;
+            RestoreMaterialProperties();
         }
         #endregion
 
@@ -396,6 +661,18 @@ namespace Portals {
             }
         }
 
+        private void SaveMaterialProperties2() {
+            MaterialPropertyBlock block = _propertyBlockObjectPool.Take();
+            _renderer.GetPropertyBlock(block);
+            _propertyBlockStack.Push(block);
+        }
+
+        private void RestoreMaterialProperties2() {
+            MaterialPropertyBlock block = _propertyBlockStack.Pop();
+            _renderer.SetPropertyBlock(block);
+            _propertyBlockObjectPool.Give(block);
+        }
+
         private bool ShouldRenderBackface(Camera camera) {
             // Decrease the size of the box in which we will render the backface when rendering stereo.
             // This will prevent the backface from appearing in one eye when near the edge of the portal.
@@ -417,6 +694,29 @@ namespace Portals {
             if (localPoint.y > extents) return false;
             if (localPoint.y < -extents) return false;
             return true;
+        }
+
+        static Dictionary<Camera, Camera> _cameraMap = new Dictionary<Camera, Camera>();
+        private Camera CreateTemporaryCamera(Camera currentCamera) {
+            Camera camera;
+            if (!_cameraMap.TryGetValue(currentCamera, out camera)) {
+                GameObject go = new GameObject("~" + currentCamera.name + "->" + _portal.name, typeof(Camera));
+                //go.hideFlags = HideFlags.HideAndDontSave;
+                go.hideFlags = HideFlags.DontSave;
+
+                camera = go.GetComponent<Camera>();
+                camera.enabled = false;
+                camera.gameObject.AddComponent<FlareLayer>();
+
+                //camera.CopyFrom(currentCamera);
+                _cameraMap[currentCamera] = camera;
+            }
+
+            return camera;
+        }
+
+        private void ReleaseTemporaryCamera(Camera cam) {
+            //Util.SafeDestroy(cam.gameObject);
         }
 
         private PortalCamera GetOrCreatePortalCamera(Camera currentCamera) {

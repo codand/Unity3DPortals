@@ -67,8 +67,8 @@ public class GetTemporaryTest : MonoBehaviour
         camera.ResetProjectionMatrix();
         var proj = camera.projectionMatrix;
         if (sciss) {
-            camera.projectionMatrix = MathUtil.ScissorsMatrix(proj, viewportRect);
-            camera.rect = viewportRect;
+            camera.projectionMatrix = GetObliqueMatrix();
+            //camera.rect = viewportRect;
         }
 
         normalTemp = RenderTexture.GetTemporary(camera.pixelWidth, camera.pixelHeight, 24, RenderTextureFormat.Default);
@@ -87,6 +87,19 @@ public class GetTemporaryTest : MonoBehaviour
     public float depth = 10f;
     public bool cull;
     public float cullSize = 1;
+
+    public MeshRenderer obliqueBounds;
+
+    Matrix4x4 GetObliqueMatrix() {
+        Vector3 bottomRight = obliqueBounds.transform.TransformPoint(new Vector3(0.5f, -0.5f, 0));
+        Vector3 bottomLeft = obliqueBounds.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 0));
+        Vector3 upperRight = obliqueBounds.transform.TransformPoint(new Vector3(0.5f, 0.5f, 0));
+        Matrix4x4 offAxisProjectionMatrix = MathUtil.OffAxisProjectionMatrix(camera.nearClipPlane, camera.farClipPlane, bottomRight, bottomLeft, upperRight, camera.transform.position);
+        DrawProjectionFrustum(offAxisProjectionMatrix, Color.blue);
+        return offAxisProjectionMatrix;
+    }
+
+
     void RenderWithScissors() {
         camera.targetTexture = null;
         camera.rect = defaultRect;
@@ -110,8 +123,8 @@ public class GetTemporaryTest : MonoBehaviour
         RenderTexture.ReleaseTemporary(scissorTemp);
     }
     void Update() {
-        //RenderNormally();
-        RenderWithScissors();
+        RenderNormally();
+        //RenderWithScissors();
 
         camera.targetTexture = null;
         camera.rect = defaultRect;
@@ -121,15 +134,15 @@ public class GetTemporaryTest : MonoBehaviour
     }
 }
 
-        //if (cull) {
-        //    Vector3 bottomRight = new Vector3(cullSize, -cullSize, depth);
-        //    Vector3 bottomLeft = new Vector3(-cullSize, -cullSize, depth);
-        //    Vector3 upperRight = new Vector3(cullSize, cullSize, depth);
-        //    Matrix4x4 offAxisProjectionMatrix = MathUtil.OffAxisProjectionMatrix(camera.nearClipPlane, camera.farClipPlane, bottomRight, bottomLeft, upperRight, camera.transform.position);
-        //    DrawProjectionFrustum(offAxisProjectionMatrix, Color.blue);
-        //    camera.ResetCullingMatrix();
-        //    camera.cullingMatrix = offAxisProjectionMatrix;
-        //} else {
-        //    camera.ResetCullingMatrix();
-        //    DrawProjectionFrustum(camera.cullingMatrix, Color.blue);
-        //}
+//if (cull) {
+//    Vector3 bottomRight = new Vector3(cullSize, -cullSize, depth);
+//    Vector3 bottomLeft = new Vector3(-cullSize, -cullSize, depth);
+//    Vector3 upperRight = new Vector3(cullSize, cullSize, depth);
+//    Matrix4x4 offAxisProjectionMatrix = MathUtil.OffAxisProjectionMatrix(camera.nearClipPlane, camera.farClipPlane, bottomRight, bottomLeft, upperRight, camera.transform.position);
+//    DrawProjectionFrustum(offAxisProjectionMatrix, Color.blue);
+//    camera.ResetCullingMatrix();
+//    camera.cullingMatrix = offAxisProjectionMatrix;
+//} else {
+//    camera.ResetCullingMatrix();
+//    DrawProjectionFrustum(camera.cullingMatrix, Color.blue);
+//}

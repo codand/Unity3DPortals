@@ -6,6 +6,10 @@ using Portals;
 public class InputManager : MonoBehaviour {
     [SerializeField] float _mouseSensitivity = 3.0f;
 
+    // TODO: Remove;
+    [SerializeField] bool _autowalk = false;
+
+
     RigidbodyCharacterController _playerController;
     private bool _movementEnabled;
 
@@ -88,32 +92,35 @@ public class InputManager : MonoBehaviour {
     }
 
     void HandleMovement() {
-        if (!_movementEnabled) {
-            return;
-        }
-#if UNITY_ANDROID || UNITY_IOS
-        float vertical = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftVertical");
-        float horizontal = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftHorizontal");
-
-        Vector3 movement = Camera.main.transform.forward * vertical + Camera.main.transform.right * horizontal;
-        _playerController.Move(movement);
-#else
         Vector3 moveDir = Vector3.zero;
         bool moved = false;
-        if (Input.GetKey(KeyCode.W)) {
+        if (_movementEnabled) {
+#if UNITY_ANDROID || UNITY_IOS
+            float vertical = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftVertical");
+            float horizontal = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftHorizontal");
+
+            Vector3 movement = Camera.main.transform.forward * vertical + Camera.main.transform.right * horizontal;
+            _playerController.Move(movement);
+#else
+            if (Input.GetKey(KeyCode.W)) {
+                moveDir += Camera.main.transform.forward;
+                moved = true;
+            }
+            if (Input.GetKey(KeyCode.A)) {
+                moveDir -= Camera.main.transform.right;
+                moved = true;
+            }
+            if (Input.GetKey(KeyCode.S)) {
+                moveDir -= Camera.main.transform.forward;
+                moved = true;
+            }
+            if (Input.GetKey(KeyCode.D)) {
+                moveDir += Camera.main.transform.right;
+                moved = true;
+            }
+        }
+        if (_autowalk) {
             moveDir += Camera.main.transform.forward;
-            moved = true;
-        }
-        if (Input.GetKey(KeyCode.A)) {
-            moveDir -= Camera.main.transform.right;
-            moved = true;
-        }
-        if (Input.GetKey(KeyCode.S)) {
-            moveDir -= Camera.main.transform.forward;
-            moved = true;
-        }
-        if (Input.GetKey(KeyCode.D)) {
-            moveDir += Camera.main.transform.right;
             moved = true;
         }
 

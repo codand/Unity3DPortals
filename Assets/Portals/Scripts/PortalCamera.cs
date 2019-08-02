@@ -169,6 +169,7 @@ namespace Portals {
             }
         }
 
+
         public RenderTexture RenderToTexture(Camera.MonoOrStereoscopicEye eye, Rect viewportRect, bool renderBackface) {
             _framesSinceLastUse = 0;
 
@@ -225,6 +226,17 @@ namespace Portals {
             }
 
             RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
+            //RenderTexture texture = RenderTexture.GetTemporary(Screen.width, Screen.height, 24, RenderTextureFormat.Default);
+            texture.filterMode = FilterMode.Point;
+
+
+            //var f = RenderTexture.active;
+            //RenderTexture.active = texture;
+            //GL.Clear(true, true, Color.white);
+            //RenderTexture.active = f;
+
+
+
             texture.name = System.Enum.GetName(typeof(Camera.MonoOrStereoscopicEye), eye) + " " + _camera.stereoTargetEye + " " + Time.renderedFrameCount;
             
             _camera.targetTexture = texture;
@@ -267,7 +279,7 @@ namespace Portals {
             }
         }
 
-        void CopyCameraSettings(Camera src, Camera dst) {
+        public static void CopyCameraSettings(Camera src, Camera dst) {
             dst.clearFlags = src.clearFlags;
             dst.backgroundColor = src.backgroundColor;
             dst.farClipPlane = src.farClipPlane;
@@ -293,22 +305,6 @@ namespace Portals {
                 // Can't set FoV while in VR
                 dst.fieldOfView = src.fieldOfView;
             }
-        }
-
-        void DecomposeMatrix4x4(Matrix4x4 matrix) {
-            float near = matrix.m23 / (matrix.m22 - 1);
-            float far = matrix.m23 / (matrix.m22 + 1);
-            float bottom = near * (matrix.m12 - 1) / matrix.m11;
-            float top = near * (matrix.m12 + 1) / matrix.m11;
-            float left = near * (matrix.m02 - 1) / matrix.m00;
-            float right = near * (matrix.m02 + 1) / matrix.m00;
-
-            Debug.Log("near: " + near);
-            Debug.Log("far: " + far);
-            Debug.Log("bottom: " + bottom);
-            Debug.Log("top: " + top);
-            Debug.Log("left: " + left);
-            Debug.Log("right: " + right);
         }
 
         Matrix4x4 CalculateObliqueProjectionMatrix(Matrix4x4 projectionMatrix) {
@@ -398,29 +394,6 @@ namespace Portals {
         //    //RenderSettings.ambientSkyColor = Color.white;
         //}
 
-        Vector3 Plane3Intersect(Plane p1, Plane p2, Plane p3) { //get the intersection point of 3 planes
-            return ((-p1.distance * Vector3.Cross(p2.normal, p3.normal)) +
-                    (-p2.distance * Vector3.Cross(p3.normal, p1.normal)) +
-                    (-p3.distance * Vector3.Cross(p1.normal, p2.normal))) /
-                (Vector3.Dot(p1.normal, Vector3.Cross(p2.normal, p3.normal)));
-        }
-
-        void DrawFrustumGizmo(Matrix4x4 matrix) {
-            Vector3[] nearCorners = new Vector3[4]; //Approx'd nearplane corners
-            Vector3[] farCorners = new Vector3[4]; //Approx'd farplane corners
-            Plane[] camPlanes = GeometryUtility.CalculateFrustumPlanes(matrix); //get planes from matrix
-            Plane temp = camPlanes[1]; camPlanes[1] = camPlanes[2]; camPlanes[2] = temp; //swap [1] and [2] so the order is better for the loop
-
-            for (int i = 0; i < 4; i++) {
-                nearCorners[i] = Plane3Intersect(camPlanes[4], camPlanes[i], camPlanes[(i + 1) % 4]); //near corners on the created projection matrix
-                farCorners[i] = Plane3Intersect(camPlanes[5], camPlanes[i], camPlanes[(i + 1) % 4]); //far corners on the created projection matrix
-            }
-            for (int i = 0; i < 4; i++) {
-                Gizmos.DrawLine(nearCorners[i], nearCorners[(i + 1) % 4]); //near corners on the created projection matrix
-                Gizmos.DrawLine(farCorners[i], farCorners[(i + 1) % 4]); //far corners on the created projection matrix
-                Gizmos.DrawLine(nearCorners[i], farCorners[i]); //sides of the created projection matrix
-            }
-        }
 
         //void OnDrawGizmosSelected() {
         //    Gizmos.color = new Color(1.0f, 0.0f, 0.0f, 1.0f);

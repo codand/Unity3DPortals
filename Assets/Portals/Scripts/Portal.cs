@@ -21,7 +21,11 @@ namespace Portals {
         [SerializeField] private bool _fakeInfiniteRecursion = true;
         [Tooltip("Colliders to ignore when entering this portal. Set this to the objects behind the portal.")]
         [SerializeField] private List<Collider> _ignoredColliders;
-        [SerializeField] private AdvancedSettings _advancedSettings = new AdvancedSettings() {
+        [SerializeField] private PortalQualitySettings _qualitySettings = new PortalQualitySettings() {
+            downscaling = 1,
+            depthBufferQuality = PortalDepthBufferQuality._32
+        };
+        [SerializeField] private PortalAdvancedSettings _advancedSettings = new PortalAdvancedSettings() {
             useDepthMask = true,
             useCullingMatrix = true,
             useObliqueProjectionMatrix = true,
@@ -128,6 +132,17 @@ namespace Portals {
         public bool CopyGlobalIllumination {
             get { return _advancedSettings.copyGlobalIllumination; }
             set { _advancedSettings.copyGlobalIllumination = value; }
+        }
+
+        // TODO: match style
+        public int Downscaling {
+            get => _qualitySettings.downscaling;
+            set => _qualitySettings.downscaling = value;
+        }
+
+        public PortalDepthBufferQuality DepthBufferQuality {
+            get => _qualitySettings.depthBufferQuality;
+            set => _qualitySettings.depthBufferQuality = value;
         }
 
         public Collider[] IgnoredColliders {
@@ -282,8 +297,26 @@ namespace Portals {
             TransparencyMask = _transparencyMask;
         }
 
+        public enum PortalDepthBufferQuality {
+            _0 = 0,
+            _16 = 16,
+            _24 = 24,
+            _32 = 32
+        }
+
         [System.Serializable]
-        private struct AdvancedSettings {
+        private struct PortalQualitySettings {
+            [Tooltip("Reduce portal rendering resolution. Use 1 for the best quality, use higher numbers for better performance.")]
+            [Range(1, 4)]
+            public int downscaling;
+
+            // TODO: Tooltip
+            [Tooltip("blank")]
+            public PortalDepthBufferQuality depthBufferQuality;
+        }
+
+        [System.Serializable]
+        private struct PortalAdvancedSettings {
             public bool useDepthMask;
             [Tooltip("If enabled, uses a custom culling matrix to reduce number of objects drawn through a portal.")]
             public bool useCullingMatrix;
