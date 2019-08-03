@@ -12,6 +12,7 @@ namespace Portals {
             }
         }
 
+
         public static void DrawDebugFrustum(Matrix4x4 matrix, Color color) {
             Vector3[] nearCorners = new Vector3[4]; //Approx'd nearplane corners
             Vector3[] farCorners = new Vector3[4]; //Approx'd farplane corners

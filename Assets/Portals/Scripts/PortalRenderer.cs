@@ -195,7 +195,7 @@ namespace Portals {
 
         public bool useOldRenderer = true;
         public void Update() {
-            if (Input.GetKeyDown(KeyCode.LeftControl) || Input.touches.Length > 0) {
+            if (Input.GetKeyDown(KeyCode.LeftControl)) {
                 useOldRenderer = !useOldRenderer;
                 Debug.Log($"Using {(useOldRenderer ? "old" : "new")} renderer");
             }
@@ -207,15 +207,115 @@ namespace Portals {
             if (useOldRenderer) {
                 PreRenderOld();
             } else {
-                PreRenderNew();
+                PreRender3();
             }
         }
         protected override void PostRender() {
             if (useOldRenderer) {
                 PostRenderOld();
             } else {
-                PostRenderNew();
+                PostRender3();
             }
+        }
+
+        protected void PreRender3() {
+#if UNITY_EDITOR
+            // Workaround for Unity bug that causes Awake/Start to not be called when running in EditMode
+            // https://issuetracker.unity3d.com/issues/awake-and-start-not-called-before-update-when-assembly-is-reloaded-for-executeineditmode-scripts
+            if (_propertyBlockObjectPool == null) {
+                Awake();
+            }
+#endif
+
+            if (!enabled || !_renderer || !_renderer.enabled) {
+                return;
+            }
+
+            if (Camera.current.cameraType != CameraType.Game) {
+                return;
+            }
+
+
+            if (_staticRenderDepth == 0) {
+                var gpuProjectionMatrix = GL.GetGPUProjectionMatrix(Camera.current.projectionMatrix, true);
+                Shader.SetGlobalMatrix("_PortalProjectionMatrix", gpuProjectionMatrix);
+            }
+
+            SaveMaterialProperties();
+            MaterialPropertyBlock block = _propertyBlockObjectPool.Take();
+
+
+            if (!_portal.ExitPortal || !_portal.ExitPortal.isActiveAndEnabled) {
+                _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
+                return;
+            }
+
+            // Don't ever render our own exit portal
+            if (_staticRenderDepth > 0 && _currentlyRenderingPortal == _portal.ExitPortal) {
+                // Disable renderer until the end of the frame. This prevents an extra draw call
+                _renderer.enabled = false;
+                return;
+            }
+
+            if (_staticRenderDepth == 0) {
+                if (_renderTexture != null) {
+                    RenderTexture.ReleaseTemporary(_renderTexture);
+                }
+                int w = Camera.current.pixelWidth * _portal.Downscaling;
+                int h = Camera.current.pixelHeight * _portal.Downscaling;
+                int depth = (int)_portal.DepthBufferQuality;
+                var format = RenderTextureFormat.Default;
+                var writeMode = RenderTextureReadWrite.Default;
+                int msaaSamples = 1;
+                var memoryless = RenderTextureMemoryless.None;
+                var vrUsage = VRTextureUsage.None;
+                bool useDynamicScale = false;
+
+                // TODO: figure out correct settings for VRUsage, memoryless, and dynamic scale
+                _renderTexture = RenderTexture.GetTemporary(w, h, depth, format, writeMode, msaaSamples, memoryless, vrUsage, useDynamicScale);
+                _renderTexture.filterMode = FilterMode.Point;
+            }
+
+
+            // The stencil buffer gets used by Unity in deferred rendering and must clear itself, otherwise
+            // it will be full of junk. https://docs.unity3d.com/Manual/SL-Stencil.html
+            if (_staticRenderDepth == 0 && IsCameraUsingDeferredShading(Camera.current)) {
+                Camera.current.clearStencilAfterLightingPass = true;
+            }
+
+            // Stop recursion when we reach maximum depth
+            if (_staticRenderDepth >= _portal.MaxRecursion) {
+                _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
+                return;
+            }
+
+            Camera parentCam = Camera.current;
+            Camera childCam = CreateTemporaryCamera(parentCam);
+
+            //RenderTexture temp = RenderTexture.GetTemporary(Screen.width, Screen.height, 32, RenderTextureFormat.Default);
+
+            RenderToTexture(parentCam, childCam, Camera.MonoOrStereoscopicEye.Mono, _renderTexture);
+            //Graphics.Blit(temp, _renderTexture);
+
+            //RenderTexture.ReleaseTemporary(temp);
+            ReleaseTemporaryCamera(childCam);
+
+            block.SetTexture("_LeftEyeTexture", _renderTexture);
+            _portalMaterial.DisableKeyword("SAMPLE_DEFAULT_TEXTURE");
+
+
+            block.SetFloat("_BackfaceAlpha", 0f);
+            block.SetTexture("_LeftEyeTexture", _renderTexture);
+            _backfaceMaterial.DisableKeyword("SAMPLE_DEFAULT_TEXTURE");
+
+            _renderer.SetPropertyBlock(block);
+            _propertyBlockObjectPool.Give(block);
+        }
+
+        protected void PostRender3() {
+            RestoreMaterialProperties();
+            //ReleaseRenderTexture();
+            _renderer.enabled = true;
         }
 
 
@@ -295,12 +395,12 @@ namespace Portals {
             Camera parentCam = Camera.current;
             Camera childCam = CreateTemporaryCamera(parentCam);
 
-            //RenderTexture tex = RenderTexture.GetTemporary(Screen.width, Screen.height, 32, RenderTextureFormat.Default);
+            //RenderTexture temp = RenderTexture.GetTemporary(Screen.width, Screen.height, 32, RenderTextureFormat.Default);
 
             RenderToTexture(parentCam, childCam, Camera.MonoOrStereoscopicEye.Mono, _renderTexture);
-            //Graphics.Blit(tex, _renderTexture);
+            //Graphics.Blit(temp, _renderTexture);
 
-            //RenderTexture.ReleaseTemporary(tex);
+            //RenderTexture.ReleaseTemporary(temp);
             ReleaseTemporaryCamera(childCam);
 
             block.SetTexture("_LeftEyeTexture", _renderTexture);

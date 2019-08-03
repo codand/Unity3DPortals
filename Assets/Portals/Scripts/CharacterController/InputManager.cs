@@ -92,16 +92,13 @@ public class InputManager : MonoBehaviour {
     }
 
     void HandleMovement() {
+
+#if UNITY_ANDROID || UNITY_IOS
+        MobileMovement();
+#else
         Vector3 moveDir = Vector3.zero;
         bool moved = false;
         if (_movementEnabled) {
-#if UNITY_ANDROID || UNITY_IOS
-            float vertical = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftVertical");
-            float horizontal = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftHorizontal");
-
-            Vector3 movement = Camera.main.transform.forward * vertical + Camera.main.transform.right * horizontal;
-            _playerController.Move(movement);
-#else
             if (Input.GetKey(KeyCode.W)) {
                 moveDir += Camera.main.transform.forward;
                 moved = true;
@@ -118,6 +115,7 @@ public class InputManager : MonoBehaviour {
                 moveDir += Camera.main.transform.right;
                 moved = true;
             }
+
         }
         if (_autowalk) {
             moveDir += Camera.main.transform.forward;
@@ -128,6 +126,14 @@ public class InputManager : MonoBehaviour {
             _playerController.Move(moveDir);
         }
 #endif
+    }
+
+    void MobileMovement() {
+        float vertical = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftVertical");
+        float horizontal = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftHorizontal");
+
+        Vector3 movement = Camera.main.transform.forward * vertical + Camera.main.transform.right * horizontal;
+        _playerController.Move(movement);
     }
 
     void FixedUpdate() {
