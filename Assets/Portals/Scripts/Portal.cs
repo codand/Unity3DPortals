@@ -30,6 +30,7 @@ namespace Portals {
             useCullingMatrix = true,
             useObliqueProjectionMatrix = true,
             useScissorRect = true,
+            copyGBuffer = true,
             clippingOffset = 0.01f,
             copyGlobalIllumination = false,
         };
@@ -132,6 +133,11 @@ namespace Portals {
         public bool CopyGlobalIllumination {
             get { return _advancedSettings.copyGlobalIllumination; }
             set { _advancedSettings.copyGlobalIllumination = value; }
+        }
+
+        public bool CopyGBuffer {
+            get { return _advancedSettings.copyGBuffer; }
+            set { _advancedSettings.copyGBuffer = value; }
         }
 
         // TODO: match style
@@ -324,6 +330,7 @@ namespace Portals {
             public bool useObliqueProjectionMatrix;
             [Tooltip("Enabling reduces overdraw by not rendering any pixels outside of a portal frame.")]
             public bool useScissorRect;
+            public bool copyGBuffer;
             [Tooltip("Offset at which the custom projection matrix will be disabled.Increase this value if you experience Z-Fighting issues. Decrease this if you can see objects behind the portal.")]
             public float clippingOffset;
             [Tooltip("If enabled, global illumination settings will be copied if the exit portal is in a different scene.")]

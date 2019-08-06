@@ -237,7 +237,7 @@ namespace Portals {
 
 
 
-            texture.name = System.Enum.GetName(typeof(Camera.MonoOrStereoscopicEye), eye) + " " + _camera.stereoTargetEye + " " + Time.renderedFrameCount;
+            //texture.name = System.Enum.GetName(typeof(Camera.MonoOrStereoscopicEye), eye) + " " + _camera.stereoTargetEye + " " + Time.renderedFrameCount;
             
             _camera.targetTexture = texture;
             if (_portal.UseScissorRect) {

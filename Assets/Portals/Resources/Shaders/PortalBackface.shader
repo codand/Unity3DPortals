@@ -11,7 +11,32 @@ Shader "Portal/PortalBackface"
 
 	SubShader
 	{
-		Tags{ "RenderType" = "Transparent" "Queue" = "Transparent+1" }
+		Tags{ "RenderType" = "Opaque" "Queue" = "Geometry+101" }
+
+		//Pass
+		//{
+		//	Name "PORTAL DEFERRED"
+		//	Tags { "LightMode" = "Deferred" }
+
+		//	Blend SrcAlpha OneMinusSrcAlpha
+		//	ZWrite Off
+		//	ZTest Always
+		//	Lighting Off
+		//	Cull Off
+
+		//	CGPROGRAM
+		//	#pragma target 3.0
+		//	#pragma exclude_renderers nomrt
+
+		//	#include "UnityCG.cginc"
+		//	#include "PortalVRHelpers.cginc"
+
+		//	#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
+
+		//	#pragma vertex vertPortal
+		//	#pragma fragment fragDeferred
+		//	ENDCG
+		//}
 
 		Pass
 		{

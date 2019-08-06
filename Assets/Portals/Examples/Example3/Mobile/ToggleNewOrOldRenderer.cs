@@ -11,8 +11,6 @@ public class ToggleNewOrOldRenderer : MonoBehaviour
     }
 
     private void OnToggle(bool toggled) {
-        foreach (var renderer in GameObject.FindObjectsOfType<Portals.PortalRenderer>()) {
-            renderer.useOldRenderer = toggled;
-        }
+        //Portals.PortalRenderer.useOldRenderer = toggled;
     }
 }
