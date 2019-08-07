@@ -1,4 +1,4 @@
-﻿Shader "Unlit/ViewStencil"
+﻿Shader "Portals/Debug/ViewStencil"
 {
 	Properties
 	{

@@ -1,6 +1,6 @@
 // Upgrade NOTE: replaced 'mul(UNITY_MATRIX_MVP,*)' with 'UnityObjectToClipPos(*)'
 
-Shader "Custom/DepthGrayscale" {
+Shader "Portals/Debug/ViewDepth" {
 SubShader {
 Tags { "RenderType"="Opaque" }
 

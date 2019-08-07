@@ -98,6 +98,7 @@ fixed4 fragPortal(v2f i, fixed face : VFACE) : SV_Target
 	return col;
 }
 
+sampler2D _CameraDepthTexture;
 
 sampler2D _PortalGBuffer0;
 sampler2D _PortalGBuffer1;
@@ -121,10 +122,14 @@ void fragDeferred(
 	outGBuffer2 = tex2Dproj(_PortalGBuffer2, i.screenUV);
 	outEmission = tex2Dproj(_PortalGBuffer3, i.screenUV);
 	outDepth = tex2Dproj(_PortalDepthBuffer, i.screenUV);
+
+	//float sceneDepth = tex2Dproj(_CameraDepthTexture, i.screenUV);
+	//float actualDepth = i.pos.z;
+	////clip (actualDepth - sceneDepth);
+	//outDepth = sceneDepth;
 #if defined(SHADOWS_SHADOWMASK) && (UNITY_ALLOWED_MRT_COUNT > 4)
 	outShadowMask = 0;
 #endif
 }
-
 
 #endif // PORTAL_VR_HELPERS_INCLUDED

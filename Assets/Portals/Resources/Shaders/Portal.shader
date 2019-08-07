@@ -78,12 +78,22 @@ Shader "Portal/Portal"
 		//	ENDCG
 		//}
 
+		//Pass
+		//{
+		//	Name "PORTAL DEFERRED STENCIL"
+		//	Tags { "LightMode" = "Deferred" }
+
+		//	ZWrite Off
+		//	ZTest Always
+		//	ColorMask 0
+		//}
+
 		Pass
 		{
 			Name "PORTAL DEFERRED"
 			Tags { "LightMode" = "Deferred" }
 
-			Blend SrcAlpha OneMinusSrcAlpha
+			//Blend SrcAlpha OneMinusSrcAlpha
 			ZWrite On
 			ZTest Always
 			Lighting Off

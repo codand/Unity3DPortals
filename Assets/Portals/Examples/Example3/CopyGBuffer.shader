@@ -3,15 +3,15 @@
     SubShader
     {
         Tags { "RenderType"="Opaque" }
-        LOD 100
 
         Pass
         {
 			ZTest Always
 			
             CGPROGRAM
-// Upgrade NOTE: excluded shader from OpenGL ES 2.0 because it uses non-square matrices
-#pragma exclude_renderers gles
+			// Upgrade NOTE: excluded shader from OpenGL ES 2.0 because it uses non-square matrices
+			#pragma exclude_renderers gles
+
             #pragma vertex vert
             #pragma fragment frag
 
@@ -41,11 +41,11 @@
 #endif
 			};
 
-			sampler2D _CameraGBufferTexture0;
-			sampler2D _CameraGBufferTexture1;
-			sampler2D _CameraGBufferTexture2;
-			sampler2D _CameraGBufferTexture3;
-			sampler2D_float _CameraDepthTexture;
+			uniform sampler2D _CameraGBufferTexture0;
+			uniform sampler2D _CameraGBufferTexture1;
+			uniform sampler2D _CameraGBufferTexture2;
+			uniform sampler2D _CameraGBufferTexture3;
+			uniform sampler2D_float _CameraDepthTexture;
 
 			uniform float4x4 _PortalMatrix_I;
 
