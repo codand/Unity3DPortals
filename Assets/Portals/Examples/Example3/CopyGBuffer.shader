@@ -47,14 +47,7 @@
 			sampler2D _CameraGBufferTexture3;
 			sampler2D_float _CameraDepthTexture;
 
-			float4x4 _PortalMatrix;
-			float4x4 _PortalMatrix_I;
-
-			float4x4 _PortalViewMatrix;
-			float4x4 _PortalViewMatrix_I;
-
-			float4x4 _PortalParentViewMatrix;
-			float4x4 _PortalParentViewMatrix_I;
+			uniform float4x4 _PortalMatrix_I;
 
             v2f vert (appdata v)
             {
@@ -64,18 +57,26 @@
                 return o;
             }
 
+			float4 FixNormals(float4 packedNormal) {
+				// GBuffer 2 contains WORLD space normals from the perspective of the portal camera.
+				// When we apply the portal transformation, those normals get transformed too,
+				// so we must apply the inverse portal transformation to undo that.
+				// Normals are packed in the gbuffer, and must be unpacked before applying the
+				// correction, and must be repacked afterwards.
+
+				float3 normal = packedNormal * 2 - 1;
+				normal = mul((float3x3)_PortalMatrix_I, normal);
+				normal = (normal + 1) * 0.5;
+
+				return float4(normal, packedNormal.w);
+			}
+
 			FrameData frag (v2f i)
             {
 				FrameData o;
 				o.gbuffer0 = tex2Dproj(_CameraGBufferTexture0, i.screenUV);
 				o.gbuffer1 = tex2Dproj(_CameraGBufferTexture1, i.screenUV);
-
-				float4 normal = tex2Dproj(_CameraGBufferTexture2, i.screenUV);
-				normal = normal * 2.0 - 1.0;
-				normal.xyz = mul((float3x3)_PortalMatrix_I, normal.xyz).xyz;
-				normal = (normal + 1) * 0.5;
-
-				o.gbuffer2 = normal;
+				o.gbuffer2 = FixNormals(tex2Dproj(_CameraGBufferTexture2, i.screenUV));
 				o.gbuffer3 = tex2Dproj(_CameraGBufferTexture3, i.screenUV);
 				o.depth = tex2Dproj(_CameraDepthTexture, i.screenUV);
 
