@@ -311,11 +311,11 @@ namespace Portals {
                 _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
                 return;
             }
-
+            
             // Don't ever render our own exit portal
             if (_staticRenderDepth > 0 && _currentlyRenderingPortal == _portal.ExitPortal) {
                 // Disable renderer until the end of the frame. This prevents an extra draw call
-                //_renderer.enabled = false;
+                _renderer.enabled = false;
                 return;
             }
 
@@ -409,7 +409,7 @@ namespace Portals {
             cam.enabled = true;
             cam.depth = _staticRenderDepth;
             //_staticRenderDepth--;
-            _currentlyRenderingPortal = savedCurrentlyRenderingPortal;
+            //_currentlyRenderingPortal = savedCurrentlyRenderingPortal;
         }
 
 
@@ -527,18 +527,21 @@ namespace Portals {
             _renderer.enabled = true;
         }
 
+        public BuiltinRenderTextureType depthType = BuiltinRenderTextureType.Depth;
+        public RenderTextureFormat depthFormat = RenderTextureFormat.Depth;
         private static class CommandBuffers {
             public static CommandBuffer CopyGBuffer { get; }
 
-            static CommandBuffers () {
-                CopyGBuffer = new CommandBuffer();
-                CopyGBuffer.name = "CODY IS COPYING THE GBUFFER";
+            private static Material _copyGBufferMaterial;
+            private static RenderTexture[] _gBufferTextures;
 
-                //var gbuffer0ID = Shader.PropertyToID("_PortalGBuffer0");
-                //var gbuffer0 = new RenderTargetIdentifier(gbuffer0ID);
-                //CopyGBuffer.GetTemporaryRT(gbuffer0ID, Screen.width, Screen.height, 0, FilterMode.Point, UnityEngine.Experimental.Rendering.GraphicsFormat.R8G8B8A8_UNorm);
-                //CopyGBuffer.Blit(BuiltinRenderTextureType.GBuffer0, gbuffer0);
-                //CopyGBuffer.SetGlobalTexture(gbuffer0ID, gbuffer0);
+            static CommandBuffers() {
+                _copyGBufferMaterial = new Material(Shader.Find("Portals/CopyGBuffer"));
+            }
+
+            public static CommandBuffer CopyGBuffer2(Matrix4x4 viewMatrix, Matrix4x4 matrix, BuiltinRenderTextureType depthType, RenderTextureFormat depthFormat) {
+                var CopyGBuffer = new CommandBuffer();
+                CopyGBuffer.name = "Copy GBuffer for Portals";
 
                 var gbuffer0ID = Shader.PropertyToID("_PortalGBuffer0");
                 var gbuffer1ID = Shader.PropertyToID("_PortalGBuffer1");
@@ -546,20 +549,31 @@ namespace Portals {
                 var gbuffer3ID = Shader.PropertyToID("_PortalGBuffer3");
                 var depthbufferID = Shader.PropertyToID("_PortalDepthBuffer");
 
+
                 // Credit to bgolus https://forum.unity.com/threads/confused-by-gbuffer.634918/
                 CopyGBuffer.GetTemporaryRT(gbuffer0ID, -1, -1, 0, FilterMode.Point, RenderTextureFormat.ARGB32);
                 CopyGBuffer.GetTemporaryRT(gbuffer1ID, -1, -1, 0, FilterMode.Point, RenderTextureFormat.ARGB32);
                 CopyGBuffer.GetTemporaryRT(gbuffer2ID, -1, -1, 0, FilterMode.Point, RenderTextureFormat.ARGB2101010);
-                CopyGBuffer.GetTemporaryRT(gbuffer3ID, -1, -1, 0, FilterMode.Point, RenderTextureFormat.ARGBHalf);
-                CopyGBuffer.GetTemporaryRT(depthbufferID, -1, -1, 24, FilterMode.Point, RenderTextureFormat.ARGB32);
+                CopyGBuffer.GetTemporaryRT(gbuffer3ID, -1, -1, 24, FilterMode.Point, RenderTextureFormat.DefaultHDR);
+                CopyGBuffer.GetTemporaryRT(depthbufferID, -1, -1, 24, FilterMode.Point, depthFormat);
 
-                //CopyGBuffer.SetRenderTarget(gbuffers, gbuffer3ID);
+                RenderTargetIdentifier[] gbuffers = {
+                    new RenderTargetIdentifier(gbuffer0ID),
+                    new RenderTargetIdentifier(gbuffer1ID),
+                    new RenderTargetIdentifier(gbuffer2ID),
+                    new RenderTargetIdentifier(gbuffer3ID)
+                };
 
-                CopyGBuffer.Blit(BuiltinRenderTextureType.GBuffer0, gbuffer0ID);
-                CopyGBuffer.Blit(BuiltinRenderTextureType.GBuffer1, gbuffer1ID);
-                CopyGBuffer.Blit(BuiltinRenderTextureType.GBuffer2, gbuffer2ID);
-                CopyGBuffer.Blit(BuiltinRenderTextureType.CameraTarget, gbuffer3ID);
-                CopyGBuffer.Blit(BuiltinRenderTextureType.ResolvedDepth, depthbufferID);
+                CopyGBuffer.SetRenderTarget(gbuffers, depthbufferID);
+
+                CopyGBuffer.SetViewMatrix(viewMatrix);
+                CopyGBuffer.DrawMesh(PortalRenderer.Mesh, matrix, _copyGBufferMaterial, 0);
+                //CopyGBuffer.DrawMesh(PortalRenderer.Mesh, matrix, _copyGBufferMaterial, 1);
+
+                //CopyGBuffer.CopyTexture(BuiltinRenderTextureType.GBuffer0, gbuffer0ID);
+                //CopyGBuffer.CopyTexture(BuiltinRenderTextureType.GBuffer1, gbuffer1ID);
+                //CopyGBuffer.CopyTexture(BuiltinRenderTextureType.GBuffer2, gbuffer2ID);
+                //CopyGBuffer.CopyTexture(BuiltinRenderTextureType.CameraTarget, gbuffer3ID); // GBuffer3 not set when rendering in HDR
 
                 CopyGBuffer.SetGlobalTexture(gbuffer0ID, gbuffer0ID);
                 CopyGBuffer.SetGlobalTexture(gbuffer1ID, gbuffer1ID);
@@ -567,20 +581,7 @@ namespace Portals {
                 CopyGBuffer.SetGlobalTexture(gbuffer3ID, gbuffer3ID);
                 CopyGBuffer.SetGlobalTexture(depthbufferID, depthbufferID);
 
-                //var gbufferArray = Shader.PropertyToID("GBufferArray");
-                //CopyGBuffer.GetTemporaryRTArray(gbufferArray, Screen.width, Screen.height, 4);
-
-                //CopyGBuffer.SetRenderTarget(gbuffers, BuiltinRenderTextureType.ResolvedDepth);
-
-                //CopyGBuffer.Blit(BuiltinRenderTextureType.GBuffer0, gbufferArray, 0, 0, );
-                //CopyGBuffer.Blit(BuiltinRenderTextureType.GBuffer1, gbufferArray, 0, 1);
-                //CopyGBuffer.Blit(BuiltinRenderTextureType.GBuffer2, gbufferArray, 0, 2);
-                //CopyGBuffer.Blit(BuiltinRenderTextureType.GBuffer3, gbufferArray, 0, 3);
-
-                ////CopyGBuffer.SetGlobalTexture(gbuffer0ID, gbuffers[0]);
-                ////CopyGBuffer.SetGlobalTexture(gbuffer1ID, gbuffers[1]);
-                ////CopyGBuffer.SetGlobalTexture(gbuffer2ID, gbuffers[2]);
-                ////CopyGBuffer.SetGlobalTexture(gbuffer3ID, gbuffers[3]);
+                return CopyGBuffer;
             }
         }
 
@@ -655,8 +656,18 @@ namespace Portals {
                 //}
                 
                 cam.RemoveAllCommandBuffers();
-                cam.AddCommandBuffer(evt, CommandBuffers.CopyGBuffer);
+                //cam.AddCommandBuffer(evt, CommandBuffers.CopyGBuffer);
+                cam.AddCommandBuffer(evt, CommandBuffers.CopyGBuffer2(parent.worldToCameraMatrix, transform.localToWorldMatrix, depthType, depthFormat));
 
+                Shader.SetGlobalMatrix("_PortalMatrix", _portal.PortalMatrix());
+                Shader.SetGlobalMatrix("_PortalMatrix_I", _portal.PortalMatrix().inverse);
+                Shader.SetGlobalMatrix("_PortalViewMatrix", cam.worldToCameraMatrix);
+                Shader.SetGlobalMatrix("_PortalViewMatrix_I", cam.worldToCameraMatrix.inverse);
+
+                Shader.SetGlobalMatrix("_PortalParentViewMatrix", parent.worldToCameraMatrix);
+                Shader.SetGlobalMatrix("_PortalParentViewMatrix_I", parent.worldToCameraMatrix.inverse);
+            } else {
+                cam.RemoveAllCommandBuffers();
             }
 
             cam.Render();

@@ -57,6 +57,7 @@ v2f vertPortal(appdata v)
 	// calculate the clip position of the portal from a higher level portal. PORTAL_MATRIX_VP == camera.projectionMatrix.
 	float4 clipPos = mul(PORTAL_MATRIX_VP, mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1.0)));
 	clipPos.y *= _ProjectionParams.x;
+	//clipPos.z = 1;
 	o.screenUV = ComputeNonStereoScreenPos(clipPos);
 #else
 	if (useOldRenderer == 1) {

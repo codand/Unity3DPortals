@@ -78,51 +78,52 @@ Shader "Portal/Portal"
 		//	ENDCG
 		//}
 
-		//Pass
-		//{
-		//	Name "PORTAL DEFERRED"
-		//	Tags { "LightMode" = "Deferred" }
-
-		//	Blend SrcAlpha OneMinusSrcAlpha
-		//	ZWrite Off
-		//	Lighting Off
-
-		//	CGPROGRAM
-		//	#pragma target 3.0
-		//	#pragma exclude_renderers nomrt
-		//	
-		//	#include "UnityCG.cginc"
-		//	#include "PortalVRHelpers.cginc"
-
-		//	#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
-
-		//	#pragma vertex vertPortal
-		//	#pragma fragment fragDeferred
-		//	ENDCG
-		//}
-
 		Pass
 		{
-			// Stencil prevents the backface from rendering if we've already seen the frontface
-			Stencil{
-				Comp Always
-				Pass IncrSat
-				ZFail IncrSat
-			}
+			Name "PORTAL DEFERRED"
+			Tags { "LightMode" = "Deferred" }
+
 			Blend SrcAlpha OneMinusSrcAlpha
-			ZWrite Off
+			ZWrite On
+			ZTest Always
 			Lighting Off
 
 			CGPROGRAM
+			#pragma target 3.0
+			#pragma exclude_renderers nomrt
+			
 			#include "UnityCG.cginc"
 			#include "PortalVRHelpers.cginc"
 
 			#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
 
 			#pragma vertex vertPortal
-			#pragma fragment fragPortal
+			#pragma fragment fragDeferred
 			ENDCG
 		}
+
+		//Pass
+		//{
+		//	// Stencil prevents the backface from rendering if we've already seen the frontface
+		//	Stencil{
+		//		Comp Always
+		//		Pass IncrSat
+		//		ZFail IncrSat
+		//	}
+		//	Blend SrcAlpha OneMinusSrcAlpha
+		//	ZWrite Off
+		//	Lighting Off
+
+		//	CGPROGRAM
+		//	#include "UnityCG.cginc"
+		//	#include "PortalVRHelpers.cginc"
+
+		//	#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
+
+		//	#pragma vertex vertPortal
+		//	#pragma fragment fragPortal
+		//	ENDCG
+		//}
 	}
 	FallBack "VertexLit"
 }
