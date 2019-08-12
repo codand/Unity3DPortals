@@ -80,37 +80,47 @@ Shader "Portal/Portal"
 
 		//Pass
 		//{
-		//	Name "PORTAL DEFERRED STENCIL"
-		//	Tags { "LightMode" = "Deferred" }
+		//	Name "Portal Depth Only"
 
 		//	ZWrite Off
-		//	ZTest Always
 		//	ColorMask 0
 		//}
 
 		Pass
 		{
-			Name "PORTAL DEFERRED"
-			Tags { "LightMode" = "Deferred" }
-
-			//Blend SrcAlpha OneMinusSrcAlpha
-			ZWrite On
-			ZTest Always
-			Lighting Off
-
-			CGPROGRAM
-			#pragma target 3.0
-			#pragma exclude_renderers nomrt
-			
-			#include "UnityCG.cginc"
-			#include "PortalVRHelpers.cginc"
-
-			#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
-
-			#pragma vertex vertPortal
-			#pragma fragment fragDeferred
-			ENDCG
+			Stencil {
+				Ref 100
+				Pass Replace
+			}			
+			Name "Portal ShadowCaster"
+			Tags { "LightMode" = "ShadowCaster" }
+			ZWrite Off
+			ColorMask 0
 		}
+
+		//Pass
+		//{
+		//	Name "PORTAL DEFERRED"
+		//	Tags { "LightMode" = "Deferred" }
+
+		//	//Blend SrcAlpha OneMinusSrcAlpha
+		//	ZWrite On
+		//	ZTest Always
+		//	Lighting Off
+
+		//	CGPROGRAM
+		//	#pragma target 3.0
+		//	#pragma exclude_renderers nomrt
+		//	
+		//	#include "UnityCG.cginc"
+		//	#include "PortalVRHelpers.cginc"
+
+		//	#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
+
+		//	#pragma vertex vertPortal
+		//	#pragma fragment fragDeferred
+		//	ENDCG
+		//}
 
 		//Pass
 		//{

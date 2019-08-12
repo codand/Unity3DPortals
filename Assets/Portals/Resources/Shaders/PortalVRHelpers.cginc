@@ -112,6 +112,7 @@ void fragDeferred(
 	out half4 outGBuffer1 : SV_Target1,
 	out half4 outGBuffer2 : SV_Target2,
 	out half4 outEmission : SV_Target3,          // RT3: emission (rgb), --unused-- (a)
+	out float extraDepth : SV_Target4,
 	out float outDepth : SV_DEPTH
 #if defined(SHADOWS_SHADOWMASK) && (UNITY_ALLOWED_MRT_COUNT > 4)
 	, out half4 outShadowMask : SV_Target4       // RT4: shadowmask (rgba)
@@ -127,6 +128,7 @@ void fragDeferred(
 	//float actualDepth = i.pos.z;
 	////clip (actualDepth - sceneDepth);
 	//outDepth = sceneDepth;
+	extraDepth = i.pos.z;
 #if defined(SHADOWS_SHADOWMASK) && (UNITY_ALLOWED_MRT_COUNT > 4)
 	outShadowMask = 0;
 #endif

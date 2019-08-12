@@ -7,27 +7,27 @@ using PortalExtensions;
 
 namespace Portals {
     //[ExecuteInEditMode]
-    public class PortalLight : MonoBehaviour {
-        [SerializeField] private LightShadows _shadowType = LightShadows.Soft;
+    public class PortalLightOld : MonoBehaviour {
+        Portal _portal;
+        //[SerializeField] Material _clearDepthMaterial;
+        
+        Light _light;
+        PortalLightOld _parentLight;
+        CommandBuffer _commandBuffer;
+        List<Portal> _allPortals;
+        Dictionary<Portal, PortalLightOld> _portalToChild;
 
-        private Portal _portal;
-        private Light _light;
-        private PortalLight _parentLight;
-        private CommandBuffer _commandBuffer;
-        private List<Portal> _allPortals;
-        private Dictionary<Portal, PortalLight> _children;
+        //static List<Renderer> _shadowRenderers;
 
-        public int PortalDepth { get; private set; }
-        public LightShadows ShadowType { get => _shadowType; set => _shadowType = value; }
-
-        PortalLight SpawnChild(Portal portal) {
+        PortalLightOld SpawnLight(Portal portal) {
             GameObject obj = new GameObject();
-            obj.hideFlags = HideFlags.DontSave;
+            //obj.hideFlags = HideFlags.HideAndDontSave;
             obj.name = "~" + this.name + "->" + portal.name;
             Light light = obj.AddComponent<Light>();
-            PortalLight portalLight = obj.AddComponent<PortalLight>();
+            PortalLightOld portalLight = obj.AddComponent<PortalLightOld>();
             portalLight._parentLight = this;
             portalLight._portal = portal;
+
             portalLight.CopyLight(this._light);
             //portalLight.SpawnShadowCasters();
             portal.ApplyWorldToPortalTransform(portalLight.transform, this.transform);
@@ -53,54 +53,25 @@ namespace Portals {
             return _shadowCamera;
         }
 
-        private int GetShadowMapResolution() {
-            switch (QualitySettings.shadowResolution) {
-                case ShadowResolution.Low:
-                    return 256;
-                case ShadowResolution.Medium:
-                    return 512;
-                case ShadowResolution.High:
-                    return 1024;
-                case ShadowResolution.VeryHigh:
-                default:
-                    return 2048;
-            }
-        }
-
-        private RenderTexture RenderSpotLightShadowmap(float angle, float near, float far) {
+        private RenderTexture RenderSpotLightShadowmap(Camera camera, float angle, float near, float far) {
             Camera cam = GetShadowmapCamera();
 
-
-            float bias = _light.shadowBias;
-            var biasMatrix = new Matrix4x4() {
+            var bias = new Matrix4x4() {
                 m00 = 0.5f, m01 = 0,    m02 = 0,    m03 = 0.5f,
                 m10 = 0,    m11 = 0.5f, m12 = 0,    m13 = 0.5f,
                 m20 = 0,    m21 = 0,    m22 = 0.5f, m23 = 0.5f,
                 m30 = 0,    m31 = 0,    m32 = 0,    m33 = 1,
             };
+        
+            Matrix4x4 view = cam.worldToCameraMatrix;
+            Matrix4x4 proj = cam.projectionMatrix;
+            Matrix4x4 mtx = bias * proj * view;
 
-            //Matrix4x4 view = cam.worldToCameraMatrix;
-            //Matrix4x4 proj = cam.projectionMatrix;
-            //Matrix4x4 mtx = bias * proj * view;
-
-
-            int resolution = GetShadowMapResolution();
-            RenderTexture shadowmap = RenderTexture.GetTemporary(resolution, resolution, 32, RenderTextureFormat.Shadowmap, RenderTextureReadWrite.Linear);
-            shadowmap.isPowerOfTwo = true;
-            shadowmap.wrapMode = TextureWrapMode.Clamp;
-            shadowmap.filterMode = FilterMode.Bilinear;
-            shadowmap.autoGenerateMips = false;
-            shadowmap.useMipMap = false;
-
+            RenderTexture shadowmap = RenderTexture.GetTemporary(Screen.width, Screen.height, 24, RenderTextureFormat.Depth, RenderTextureReadWrite.Linear);
             cam.targetTexture = shadowmap;
 
-            // TODO: bias
             cam.projectionMatrix = Matrix4x4.Perspective(angle, 1.0f, near, far);
-            //cam.worldToCameraMatrix = Matrix4x4.TRS(transform.position, transform.rotation, transform.lossyScale);
-            cam.transform.position = transform.position;
-            cam.transform.rotation = transform.rotation;
-
-
+            cam.worldToCameraMatrix = Matrix4x4.TRS(_light.transform.position, _light.transform.rotation, _light.transform.localScale);
             cam.Render();
 
             return shadowmap;
@@ -133,7 +104,7 @@ namespace Portals {
                 CopyLight(_parentLight._light);
             }
 
-            foreach (KeyValuePair<Portal, PortalLight> kvp in _children) {
+            foreach (KeyValuePair<Portal, PortalLightOld> kvp in _portalToChild) {
                 kvp.Value.CopyParentLightRecursive();
             }
         }
@@ -247,7 +218,7 @@ namespace Portals {
 
         void Awake() {
             _light = GetComponent<Light>();
-            _children = new Dictionary<Portal, PortalLight>();
+            _portalToChild = new Dictionary<Portal, PortalLightOld>();
             //_shadowRenderers = new List<Renderer>();
         }
 
@@ -273,8 +244,8 @@ namespace Portals {
             }
 
             // Destroy children - this will cause recursion so the children destroy their children too
-            foreach (KeyValuePair<Portal, PortalLight> kvp in _children.ToArray()) {
-                _children.Remove(kvp.Key);
+            foreach (KeyValuePair<Portal, PortalLightOld> kvp in _portalToChild.ToArray()) {
+                _portalToChild.Remove(kvp.Key);
                 if (kvp.Value && kvp.Value.gameObject) {
                     Util.SafeDestroy(kvp.Value.gameObject);
                 }
@@ -283,6 +254,30 @@ namespace Portals {
             // If we don't set this here, it is possible to leave this value non-zero in the main scene
             // which will cause normal lights to use the portal shadows when they shouldn't.
             Shader.SetGlobalFloat("_UseShadowPlanes", 0);
+        }
+
+        void FixedUpdate() {
+            foreach (Portal portal in _allPortals) {
+                PortalLightOld child;
+                _portalToChild.TryGetValue(portal, out child);
+
+                // Check every portal in the scene if we're in range
+                if (portal.ExitPortal && IsInRange(portal.transform.position)) {
+                    // Don't recurse on our own portal
+                    if (!_portal || _portal.ExitPortal != portal) {
+                        // If there isn't a child, let's spawn a new one.
+                        if (!child) {
+                            _portalToChild[portal] = SpawnLight(portal);
+                        }
+                    }
+                } else {
+                    // If there is a child, but we're no longer in range, remove and destroy the child
+                    if (child) {
+                        _portalToChild.Remove(portal);
+                        Util.SafeDestroy(child.gameObject);
+                    }
+                }
+            }
         }
 
         Vector3 RayPlaneIntersection(Vector3 rayOrigin, Vector3 rayDirection, Vector4 plane) {
@@ -296,50 +291,20 @@ namespace Portals {
         }
 
         void Update() {
-            //UpdateCommandBuffer();
+            UpdateCommandBuffer();
             
             //if (!_portal) return;
             //Vector3 intersection = RayPlaneIntersection(transform.position, _portal.exitPortal.transform.position - transform.position, GetShadowPlanes()[0]);
             //Debug.Log(intersection);
         }
 
-        private void LateUpdate() {
-            // TODO: Better portal culling
-            foreach (Portal portal in _allPortals) {
-                _children.TryGetValue(portal, out PortalLight child);
-
-                // Check every portal in the scene if we're in range
-                if (portal.ExitPortal && IsInRange(portal.transform.position)) {
-                    // Don't recurse on our own portal
-                    if (!_portal || _portal.ExitPortal != portal) {
-                        // If there isn't a child, let's spawn a new one.
-                        if (!child) {
-                            _children[portal] = SpawnChild(portal);
-                        }
-                    }
-                } else {
-                    // If there is a child, but we're no longer in range, remove and destroy the child
-                    if (child) {
-                        _children.Remove(portal);
-                        Util.SafeDestroy(child.gameObject);
-                    }
-                }
-            }
-
-
+        void LateUpdate() {
             if (_parentLight) {
                 CopyParentLightRecursive();
                 if (_portal && _portal.ExitPortal) {
                     _portal.ApplyWorldToPortalTransform(this.transform, _parentLight.transform);
                 }
             }
-
-            if (_shadowmap != null) {
-                RenderTexture.ReleaseTemporary(_shadowmap);
-            }
-            _shadowmap = RenderSpotLightShadowmap(_light.spotAngle, _light.shadowNearPlane, _light.range);
-
-            Shader.SetGlobalTexture("_ShadowMapTexture", _shadowmap);
         }
     }
 }
