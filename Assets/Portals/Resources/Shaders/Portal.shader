@@ -7,12 +7,11 @@ Shader "Portal/Portal"
 		_RightEyeTexture("RightEyeTexture", 2D) = "red" {}
 		_TransparencyMask("TransparencyMask", 2D) = "white" {}
 	}
-
 	SubShader
 	{
 		Tags{
 			"RenderType" = "Opaque"
-			"Queue" = "Geometry+100"
+			"Queue" = "Geometry-100"
 			"IgnoreProjector" = "True"
 		}
 
@@ -88,14 +87,36 @@ Shader "Portal/Portal"
 
 		Pass
 		{
-			Stencil {
+			/*Stencil {
 				Ref 100
 				Pass Replace
-			}			
+			}			*/
+			//Tags { "Queue" = "Geometry-1000"}
 			Name "Portal ShadowCaster"
 			Tags { "LightMode" = "ShadowCaster" }
-			ZWrite Off
+			ZWrite On
+			ZTest Always
 			ColorMask 0
+			Cull Front
+
+			CGPROGRAM
+			#include "UnityCG.cginc"
+
+			#pragma vertex vert
+			#pragma fragment frag
+
+			#pragma multi_compile_shadowcaster
+
+			float4 vert(in float4 vertex : POSITION) : POSITION {
+				// Bias scales the portal slightly when rendering depth to prevent shadow bleeding
+				float bias = 1.01;
+				return UnityObjectToClipPos(vertex * bias);
+			}
+
+			float frag() : DEPTH{
+				return 0;
+			}
+			ENDCG
 		}
 
 		//Pass

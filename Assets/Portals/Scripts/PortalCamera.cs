@@ -203,8 +203,8 @@ namespace Portals {
             _camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
 
             // TODO: don't need to do this eh?
-            _camera.transform.position = _camera.cameraToWorldMatrix.GetPosition();
-            _camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
+            //_camera.transform.position = _camera.cameraToWorldMatrix.GetPosition();
+            //_camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
             
 
             if (_portal.UseObliqueProjectionMatrix) {

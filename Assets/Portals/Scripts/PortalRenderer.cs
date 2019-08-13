@@ -259,6 +259,7 @@ namespace Portals {
             //    default:
             //        break;
             //}
+            PreRenderNew();
         }
         protected override void PostRender() {
             //switch (whichRenderer) {
@@ -274,9 +275,10 @@ namespace Portals {
             //    default:
             //        break;
             //}
+            PostRenderNew();
         }
 
-        protected void PreRenderStencil() {
+        private void Initialize() {
 #if UNITY_EDITOR
             // Workaround for Unity bug that causes Awake/Start to not be called when running in EditMode
             // https://issuetracker.unity3d.com/issues/awake-and-start-not-called-before-update-when-assembly-is-reloaded-for-executeineditmode-scripts
@@ -284,185 +286,41 @@ namespace Portals {
                 Awake();
             }
 #endif
-
-            if (!enabled || !_renderer || !_renderer.enabled) {
-                return;
-            }
-
-            if (Camera.current.cameraType != CameraType.Game) {
-                return;
-            }
-
-            if (Camera.current == Camera.main) {
-                _staticRenderDepth = 0;
-            }
-
-            if (_staticRenderDepth == 0) {
-                var gpuProjectionMatrix = GL.GetGPUProjectionMatrix(Camera.current.projectionMatrix, true);
-                Shader.SetGlobalMatrix("_PortalProjectionMatrix", gpuProjectionMatrix);
-            }
-
-            SaveMaterialProperties();
-            MaterialPropertyBlock block = _propertyBlockObjectPool.Take();
-
-
-            if (!_portal.ExitPortal || !_portal.ExitPortal.isActiveAndEnabled) {
-                _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
-                return;
-            }
-            
-            // Don't ever render our own exit portal
-            if (_staticRenderDepth > 0 && _currentlyRenderingPortal == _portal.ExitPortal) {
-                // Disable renderer until the end of the frame. This prevents an extra draw call
-                _renderer.enabled = false;
-                return;
-            }
-
-            // The stencil buffer gets used by Unity in deferred rendering and must clear itself, otherwise
-            // it will be full of junk. https://docs.unity3d.com/Manual/SL-Stencil.html
-            if (_staticRenderDepth == 0 && IsCameraUsingDeferredShading(Camera.current)) {
-//                Camera.current.clearStencilAfterLightingPass = true;
-            }
-
-            // Stop recursion when we reach maximum depth
-            if (_staticRenderDepth >= _portal.MaxRecursion) {
-                _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
-                return;
-            }
-
-            Camera parentCam = Camera.current;
-            Camera childCam = CreateTemporaryCamera(parentCam);
-
-            RenderPortalCameraStencil(parentCam, childCam, Camera.MonoOrStereoscopicEye.Mono);
-
-            ReleaseTemporaryCamera(childCam);
-
-            _renderer.SetPropertyBlock(block);
-            _propertyBlockObjectPool.Give(block);
         }
 
-        protected void PostRenderStencil() {
-            RestoreMaterialProperties();
-            //ReleaseRenderTexture();
-            _renderer.enabled = true;
+        private bool ShouldRenderPortal(Camera camera) {
+            // Don't render if renderer disabled. Not sure if this is possible anyway, but better to be safe.
+            bool isRendererEnabled = enabled && _renderer && _renderer.enabled;
+
+            // Don't render non-supported camera types (preview cameras can cause issues)
+            bool isCameraSupported = _portal.SupportedCameraTypes.HasFlag(camera.cameraType);
+
+            // Only render if an exit portal is set
+            bool isExitPortalSet = _portal.ExitPortal != null;
+
+            // Don't ever render an exit portal
+            // TODO: Disable portal until end of frame
+            bool isRenderingExitPortal = _staticRenderDepth > 0 && _currentlyRenderingPortal == _portal.ExitPortal;
+
+            return isRendererEnabled && isCameraSupported && isExitPortalSet && !isRenderingExitPortal;
         }
-
-        void RenderPortalCameraStencil(Camera parent, Camera cam, Camera.MonoOrStereoscopicEye eye) {
-            PortalCamera.CopyCameraSettings(parent, cam);
-            cam.clearFlags = CameraClearFlags.Depth;
-
-            Matrix4x4 parentProjectionMatrix;
-            Matrix4x4 parentWorldToCameraMatrix;
-
-
-            switch (eye) {
-                case Camera.MonoOrStereoscopicEye.Left:
-                    parentProjectionMatrix = parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left);
-                    parentWorldToCameraMatrix = parent.GetStereoViewMatrix(Camera.StereoscopicEye.Left);
-                    break;
-                case Camera.MonoOrStereoscopicEye.Right:
-                    parentProjectionMatrix = parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Right);
-                    parentWorldToCameraMatrix = parent.GetStereoViewMatrix(Camera.StereoscopicEye.Right);
-                    break;
-                case Camera.MonoOrStereoscopicEye.Mono:
-                default:
-                    parentProjectionMatrix = parent.projectionMatrix;
-                    parentWorldToCameraMatrix = parent.worldToCameraMatrix;
-                    break;
-            }
-
-            Matrix4x4 newProjectionMatrix = parentProjectionMatrix;
-            Matrix4x4 newWorldToCameraMatrix = parentWorldToCameraMatrix * _portal.PortalMatrix().inverse;
-
-            cam.ResetProjectionMatrix();
-            cam.rect = new Rect(0, 0, 1, 1);
-
-            //cam.projectionMatrix = newProjectionMatrix;
-            cam.worldToCameraMatrix = newWorldToCameraMatrix;
-
-            // Increase depth
-            var savedCurrentlyRenderingPortal = _currentlyRenderingPortal;
-            _currentlyRenderingPortal = _portal;
-            _staticRenderDepth++;
-
-            //var f = RenderTexture.active;
-            //RenderTexture.active = target;
-            //GL.Clear(true, true, _staticRenderDepth % 2 == 0 ? Color.red : Color.green);
-            //RenderTexture.active = f;
-
-            if (_portal.UseScissorRect) {
-                // Calculate where in screen space the portal lies.
-                // We use this to only render as much of the screen as necessary, avoiding overdraw.
-                cam.ResetProjectionMatrix();
-                cam.rect = new Rect(0, 0, 1, 1);
-                Rect viewportRect = CalculatePortalViewportRect(cam);
-
-                cam.projectionMatrix = MathUtil.ScissorsMatrix(cam.projectionMatrix, viewportRect);
-                cam.rect = viewportRect;
-
-            } else {
-                cam.rect = new Rect(0, 0, 1, 1);
-            }
-
-            cam.targetTexture = null;
-            cam.enabled = true;
-            cam.depth = _staticRenderDepth;
-            //_staticRenderDepth--;
-            //_currentlyRenderingPortal = savedCurrentlyRenderingPortal;
-        }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         private static RenderTexture _renderTexture;
         public FilterMode filterMode = FilterMode.Point;
         protected void PreRenderNew() {
-#if UNITY_EDITOR
-            // Workaround for Unity bug that causes Awake/Start to not be called when running in EditMode
-            // https://issuetracker.unity3d.com/issues/awake-and-start-not-called-before-update-when-assembly-is-reloaded-for-executeineditmode-scripts
-            if (_propertyBlockObjectPool == null) {
-                Awake();
-            }
-#endif
-
-            if (!enabled || !_renderer || !_renderer.enabled) {
-                return;
-            }
-
-            if (Camera.current.cameraType != CameraType.Game) {
-                return;
-            }
-
-
-            if (_staticRenderDepth == 0) {
-                var gpuProjectionMatrix = GL.GetGPUProjectionMatrix(Camera.current.projectionMatrix, true);
-                Shader.SetGlobalMatrix("_PortalProjectionMatrix", gpuProjectionMatrix);
-            }
+            Initialize();
 
             SaveMaterialProperties();
             MaterialPropertyBlock block = _propertyBlockObjectPool.Take();
 
-
-            if (!_portal.ExitPortal || !_portal.ExitPortal.isActiveAndEnabled) {
+            if (!ShouldRenderPortal(Camera.current)) {
                 _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
                 return;
             }
 
-            // Don't ever render our own exit portal
-            if (_staticRenderDepth > 0 && _currentlyRenderingPortal == _portal.ExitPortal) {
-                // Disable renderer until the end of the frame. This prevents an extra draw call
-                //_renderer.enabled = false;
-                return;
+            if (_staticRenderDepth == 0) {
+                var gpuProjectionMatrix = GL.GetGPUProjectionMatrix(Camera.current.projectionMatrix, true);
+                Shader.SetGlobalMatrix("_PortalProjectionMatrix", gpuProjectionMatrix);
             }
 
             if (_staticRenderDepth == 0) {
@@ -488,7 +346,7 @@ namespace Portals {
             // The stencil buffer gets used by Unity in deferred rendering and must clear itself, otherwise
             // it will be full of junk. https://docs.unity3d.com/Manual/SL-Stencil.html
             if (_staticRenderDepth == 0 && IsCameraUsingDeferredShading(Camera.current)) {
-                //Camera.current.clearStencilAfterLightingPass = true;
+                Camera.current.clearStencilAfterLightingPass = true;
             }
 
             // Stop recursion when we reach maximum depth
@@ -599,6 +457,7 @@ namespace Portals {
 
                 // Draw portal from the view of the parent
                 cmd.SetViewMatrix(viewMatrix);
+                cmd.DrawMesh(PortalRenderer.Mesh, modelMatrix, _copyGBufferMaterial, 0, 2);
                 cmd.DrawMesh(PortalRenderer.Mesh, modelMatrix, _copyGBufferMaterial, 0, 1);
                 //CopyGBuffer.DrawMesh(PortalRenderer.Mesh, matrix, _copyGBufferMaterial, 1);
 
@@ -694,21 +553,22 @@ namespace Portals {
                 //}
                 //_renderer.materials = new Material[]{ };
 
-                _copyGBufferCmds.TryGetValue(cam, out CommandBuffer copyCmd);
-                if (copyCmd != null) {
-                    cam.RemoveCommandBuffer(CameraEvent.BeforeLighting, copyCmd);
-                }
-                copyCmd = CommandBuffers.CopyGBuffer(parent.worldToCameraMatrix, transform.localToWorldMatrix, cam.allowHDR);
-                cam.AddCommandBuffer(CameraEvent.BeforeLighting, copyCmd);
-                _copyGBufferCmds[cam] = copyCmd;
 
                 _pasteGBufferCmds.TryGetValue(parent, out CommandBuffer pasteCmd);
                 if (pasteCmd != null) {
-                    parent.RemoveCommandBuffer(CameraEvent.BeforeLighting, pasteCmd);
+                    parent.RemoveCommandBuffer(CameraEvent.AfterSkybox, pasteCmd);
                 }
                 pasteCmd = CommandBuffers.PasteGBuffer(parent.worldToCameraMatrix, transform.localToWorldMatrix, cam.allowHDR);
-                parent.AddCommandBuffer(CameraEvent.BeforeLighting, pasteCmd);
+                parent.AddCommandBuffer(CameraEvent.AfterSkybox, pasteCmd);
                 _pasteGBufferCmds[parent] = pasteCmd;
+
+                _copyGBufferCmds.TryGetValue(cam, out CommandBuffer copyCmd);
+                if (copyCmd != null) {
+                    cam.RemoveCommandBuffer(CameraEvent.AfterEverything, copyCmd);
+                }
+                copyCmd = CommandBuffers.CopyGBuffer(parent.worldToCameraMatrix, transform.localToWorldMatrix, cam.allowHDR);
+                cam.AddCommandBuffer(CameraEvent.AfterEverything, copyCmd);
+                _copyGBufferCmds[cam] = copyCmd;
 
             } else {
                 cam.RemoveAllCommandBuffers();
@@ -717,11 +577,7 @@ namespace Portals {
             Shader.SetGlobalMatrix("_PortalMatrix", _portal.PortalMatrix());
             Shader.SetGlobalMatrix("_PortalMatrix_I", _portal.PortalMatrix().inverse);
 
-            if (sw) {
-                cam.RenderDontRestore();
-            } else {
-                cam.Render();
-            }
+            cam.Render();
 
             _staticRenderDepth--;
             _currentlyRenderingPortal = savedCurrentlyRenderingPortal;

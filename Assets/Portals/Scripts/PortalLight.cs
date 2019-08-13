@@ -100,8 +100,7 @@ namespace Portals {
             cam.transform.position = transform.position;
             cam.transform.rotation = transform.rotation;
 
-
-            cam.Render();
+            cam.RenderWithShader(replacement, replacementTag);
 
             return shadowmap;
         
@@ -109,6 +108,9 @@ namespace Portals {
             //Shader.SetGlobalTexture("_ShadowTex", _shadowmap);
             //Shader.SetGlobalFloat("_ShadowBias", 0.5f);
         }
+
+        public Shader replacement;
+        public string replacementTag;
 
         void CopyLight(Light light) {
             _light.bounceIntensity = light.bounceIntensity;
@@ -303,6 +305,20 @@ namespace Portals {
             //Debug.Log(intersection);
         }
 
+        void CmdBufferThing() {
+            if (!_parentLight) {
+                return;
+            }
+            if (_commandBuffer == null) {
+                _commandBuffer = new CommandBuffer();
+                _commandBuffer.name = "Shadow Stuff";
+                _light.AddCommandBuffer(LightEvent.BeforeShadowMapPass, _commandBuffer);
+            }
+            _commandBuffer.Clear();
+
+            _commandBuffer.ClearRenderTarget(true, false, Color.black, 0.0f);
+        }
+
         private void LateUpdate() {
             // TODO: Better portal culling
             foreach (Portal portal in _allPortals) {
@@ -334,12 +350,14 @@ namespace Portals {
                 }
             }
 
-            if (_shadowmap != null) {
-                RenderTexture.ReleaseTemporary(_shadowmap);
-            }
-            _shadowmap = RenderSpotLightShadowmap(_light.spotAngle, _light.shadowNearPlane, _light.range);
+            CmdBufferThing();
 
-            Shader.SetGlobalTexture("_ShadowMapTexture", _shadowmap);
+            //if (_shadowmap != null) {
+            //    RenderTexture.ReleaseTemporary(_shadowmap);
+            //}
+            //_shadowmap = RenderSpotLightShadowmap(_light.spotAngle, _light.shadowNearPlane, _light.range);
+
+            //Shader.SetGlobalTexture("_ShadowMapTexture", _shadowmap);
         }
     }
 }

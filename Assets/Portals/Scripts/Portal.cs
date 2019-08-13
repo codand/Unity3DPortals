@@ -33,6 +33,7 @@ namespace Portals {
             copyGBuffer = true,
             clippingOffset = 0.01f,
             copyGlobalIllumination = false,
+            supportedCameraTypes = CameraType.Game | CameraType.SceneView,
         };
 
         private PortalRenderer _portalRenderer;
@@ -149,6 +150,11 @@ namespace Portals {
         public PortalDepthBufferQuality DepthBufferQuality {
             get => _qualitySettings.depthBufferQuality;
             set => _qualitySettings.depthBufferQuality = value;
+        }
+
+        public CameraType SupportedCameraTypes {
+            get { return _advancedSettings.supportedCameraTypes; }
+            set { _advancedSettings.supportedCameraTypes = value; }
         }
 
         public Collider[] IgnoredColliders {
@@ -335,6 +341,8 @@ namespace Portals {
             public float clippingOffset;
             [Tooltip("If enabled, global illumination settings will be copied if the exit portal is in a different scene.")]
             public bool copyGlobalIllumination;
+            [Tooltip("Should portals be rendered in Scene view or in reflections?")]
+            public CameraType supportedCameraTypes;
         }
     }
 }

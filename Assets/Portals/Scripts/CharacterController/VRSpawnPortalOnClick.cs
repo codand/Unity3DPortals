@@ -51,17 +51,19 @@ public class VRSpawnPortalOnClick : MonoBehaviour {
 
         _currentPortal = _leftPortal;
 
-        var trackedController = GetComponent<SteamVR_TrackedController>();
-        if (trackedController == null) {
-            trackedController = gameObject.AddComponent<SteamVR_TrackedController>();
-        }
 
-        trackedController.TriggerClicked += new ClickedEventHandler(DoClick);
+        // TODO: SteamVR
+        //var trackedController = GetComponent<SteamVR_TrackedController>();
+        //if (trackedController == null) {
+        //    trackedController = gameObject.AddComponent<SteamVR_TrackedController>();
+        //}
+
+        //trackedController.TriggerClicked += new ClickedEventHandler(DoClick);
     }
 
-    void DoClick(object sender, ClickedEventArgs e) {
-        OnClick();
-    }
+    //void DoClick(object sender, ClickedEventArgs e) {
+    //    OnClick();
+    //}
 
     //void Update() {
     //    if (Input.GetMouseButtonDown(0)) {
