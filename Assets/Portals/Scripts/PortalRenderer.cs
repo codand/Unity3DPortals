@@ -31,6 +31,8 @@ namespace Portals {
         // Instanced materials
         private Material _portalMaterial;
         private Material _backfaceMaterial;
+        private static Material _stencilMaskMaterial;
+        private static Material _depthMaskMaterial;
 
         // Members used to save and restore material properties between rendering in the same frame
         private Stack<MaterialPropertyBlock> _propertyBlockStack;
@@ -66,35 +68,29 @@ namespace Portals {
         #region Rendering
 
 
-        private Vector3 ClampedWorldToViewportPoint(Camera cam, Vector3 worldPoint) {
-            Vector3 viewportPoint = cam.WorldToViewportPoint(worldPoint);
-            //if (viewportPoint.z < 0) {
-            //    if (viewportPoint.x < 0.5f) {
-            //        viewportPoint.x = 1;
-            //    } else {
-            //        viewportPoint.x = 0;
-            //    }
-            //    if (viewportPoint.y < 0.5f) {
-            //        viewportPoint.y = 1;
-            //    } else {
-            //        viewportPoint.y = 0;
-            //    }
-
-            //    //if(Vector3.Dot(cam.transform.forward, transform.forward) > 0) {
-            //    //    viewportPoint.x = viewportPoint.x - 1;
-            //    //    viewportPoint.y = viewportPoint.y - 1;
-            //    //}
-            //    Debug.Log(Vector3.Dot(cam.transform.forward, transform.forward));
-            //}
-            return viewportPoint;
+        private Vector4 ClampedWorldToViewportPoint(Camera cam, Vector3 worldPoint) {
+            //Vector3 viewportPoint = cam.WorldToViewportPoint(worldPoint);
+            cam.ResetWorldToCameraMatrix();
+            Matrix4x4 p = cam.projectionMatrix;
+            Matrix4x4 v = cam.worldToCameraMatrix;
+            Matrix4x4 vp = p * v;
+            Vector4 point = new Vector4(worldPoint.x, worldPoint.y, worldPoint.z, 1);
+            Vector4 hPoint = vp * point;
+            Vector3 ndcPoint;
+            if (hPoint.w > 0) {
+                ndcPoint = ((Vector3)hPoint) / hPoint.w;
+            } else {
+                ndcPoint = new Vector3(Mathf.Sign(hPoint.x), Mathf.Sign(hPoint.y), 0);
+            }
+            
+            Vector3 viewPoint = new Vector3(ndcPoint.x / 2 + 0.5f, ndcPoint.y / 2 + 0.5f, hPoint.w);
+            return viewPoint;
         }
 
         private Vector3 Min(params Vector3[] vecs) {
             Vector3 min = new Vector3(Mathf.Infinity, Mathf.Infinity, Mathf.Infinity);
             foreach (Vector3 vec in vecs) {
-                if (vec.z > 0) {
-                    min = Vector3.Min(min, vec);
-                }
+                min = Vector3.Min(min, vec);
             }
             return min;
         }
@@ -102,9 +98,7 @@ namespace Portals {
         private Vector3 Max(params Vector3[] vecs) {
             Vector3 max = new Vector3(Mathf.NegativeInfinity, Mathf.NegativeInfinity, Mathf.NegativeInfinity);
             foreach (Vector3 vec in vecs) {
-                if (vec.z > 0) {
-                    max = Vector3.Max(max, vec);
-                }
+                max = Vector3.Max(max, vec);
             }
             return max;
         }
@@ -114,38 +108,33 @@ namespace Portals {
 
             // TODO: do this shit better. cache worldspacecorners maybe
 
-            Vector3 tl, tr, br, bl;
+            Vector4 tl, tr, br, bl;
+            
+            var corners = _portal.WorldSpaceCorners();
+            tl = ClampedWorldToViewportPoint(Camera.current, corners[0]);
+            tr = ClampedWorldToViewportPoint(Camera.current, corners[1]);
+            br = ClampedWorldToViewportPoint(Camera.current, corners[2]);
+            bl = ClampedWorldToViewportPoint(Camera.current, corners[3]);
+            Debug.Log($"TL: {tl}, TR: {tr}, BR: {br}, BL: {bl}");
 
-            if (whichRenderer == PortalRenderType.OLD) {
-                var corners = _portal.WorldSpaceCorners();
-                tl = ClampedWorldToViewportPoint(Camera.current, corners[0]);
-                tr = ClampedWorldToViewportPoint(Camera.current, corners[1]);
-                br = ClampedWorldToViewportPoint(Camera.current, corners[2]);
-                bl = ClampedWorldToViewportPoint(Camera.current, corners[3]);
-            } else {
-                var corners = _portal.ExitPortal.WorldSpaceCorners();
-                tl = cam.WorldToViewportPoint(corners[0]);
-                tr = cam.WorldToViewportPoint(corners[1]);
-                br = cam.WorldToViewportPoint(corners[2]);
-                bl = cam.WorldToViewportPoint(corners[3]);
-            }
+            Vector3 ftl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, 0.5f, 1.0f)));
+            Vector3 ftr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 1.0f)));
+            Vector3 fbr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
+            Vector3 fbl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
+            Debug.Log($"FTL: {ftl}, FTR: {ftr}, FBR: {fbr}, FBL: {fbl}");
 
-
-            //Vector3 ftl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, 0.5f, 1.0f)));
-            //Vector3 ftr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 1.0f)));
-            //Vector3 fbr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
-            //Vector3 fbl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
-
-            //var min = Min(tl, tr, br, bl, ftl, ftr, fbr, fbl);
-            //var max = Max(tl, tr, br, bl, ftl, ftr, fbr, fbl);
-            var min = Min(tl, tr, br, bl);
-            var max = Max(tl, tr, br, bl);
+            var min = Min(tl, tr, br, bl, ftl, ftr, fbr, fbl);
+            var max = Max(tl, tr, br, bl, ftl, ftr, fbr, fbl);
+            //var min = Min(tl, tr, br, bl);
+            //var max = Max(tl, tr, br, bl);
 
             min -= Vector3.one * buffer;
             max += Vector3.one * buffer;
 
             min = Vector3.Max(Vector3.zero, min);
             max = Vector3.Min(Vector3.one, max);
+
+            Debug.Log("Min: " + min + " Max: " + max);
 
             Rect viewportRect = new Rect(min.x, min.y, max.x - min.x, max.y - min.y);
             return viewportRect;
@@ -192,47 +181,6 @@ namespace Portals {
             return _staticRenderDepth == 0;
         }
 
-        public enum PortalRenderType {
-            OLD = 0,
-            NEW = 1,
-            STENCIL = 2
-        }
-
-        public static PortalRenderType whichRenderer = PortalRenderType.NEW;
-        public static bool hasChangedRendererThisFrame = false;
-        public void Update() {
-            if (!hasChangedRendererThisFrame && Input.GetKeyDown(KeyCode.LeftControl)) {
-                whichRenderer++;
-                whichRenderer = (PortalRenderType) ((int)whichRenderer % 3);
-                string type = "UNKNOWN";
-                switch (whichRenderer) {
-                    case PortalRenderType.OLD:
-                        type = "OLD";
-                        break;
-                    case PortalRenderType.NEW:
-                        type = "NEW";
-                        break;
-                    case PortalRenderType.STENCIL:
-                        type = "STENCIL";
-                        break;
-                    default:
-                        break;
-                }
-                Debug.Log($"Using {type} renderer");
-                hasChangedRendererThisFrame = true;
-
-                foreach (var kvp in _cameraMap) {
-                    if(kvp.Value) {
-                        Util.SafeDestroy(kvp.Value.gameObject);
-                    }
-                }
-                _cameraMap.Clear();
-                _staticRenderDepth = 0;
-
-                Shader.SetGlobalFloat("useOldRenderer", whichRenderer == PortalRenderType.OLD ? 1 : 0);
-            }
-        }
-
         public void OnDestroy() {
             foreach (var kvp in _cameraMap) {
                 if (kvp.Value) {
@@ -241,42 +189,15 @@ namespace Portals {
             }
         }
 
-        public void LateUpdate() {
-            hasChangedRendererThisFrame = false;
-        }
-
         protected override void PreRender() {
-            //switch (whichRenderer) {
-            //    case PortalRenderType.OLD:
-            //        PreRenderOld();
-            //        break;
-            //    case PortalRenderType.NEW:
-            //        PreRenderNew();
-            //        break;
-            //    case PortalRenderType.STENCIL:
-            //        PreRenderStencil();
-            //        break;
-            //    default:
-            //        break;
-            //}
-            PreRenderNew();
+            PreRenderOld();
         }
         protected override void PostRender() {
-            //switch (whichRenderer) {
-            //    case PortalRenderType.OLD:
-            //        PostRenderOld();
-            //        break;
-            //    case PortalRenderType.NEW:
-            //        PostRenderNew();
-            //        break;
-            //    case PortalRenderType.STENCIL:
-            //        PostRenderStencil();
-            //        break;
-            //    default:
-            //        break;
-            //}
-            PostRenderNew();
+            PostRenderOld();
         }
+
+        private static RenderTexture _renderTexture;
+        public FilterMode filterMode = FilterMode.Point;
 
         private void Initialize() {
 #if UNITY_EDITOR
@@ -302,24 +223,41 @@ namespace Portals {
             // TODO: Disable portal until end of frame
             bool isRenderingExitPortal = _staticRenderDepth > 0 && _currentlyRenderingPortal == _portal.ExitPortal;
 
-            return isRendererEnabled && isCameraSupported && isExitPortalSet && !isRenderingExitPortal;
+            // Don't render too deep
+            bool isAtMaxDepth = _staticRenderDepth >= _portal.MaxRecursion;
+
+            return isRendererEnabled && isCameraSupported && isExitPortalSet && !isRenderingExitPortal && !isAtMaxDepth;
         }
 
-        private static RenderTexture _renderTexture;
-        public FilterMode filterMode = FilterMode.Point;
-        protected void PreRenderNew() {
-            Initialize();
+        private RenderTexture GetTemporaryRT() {
+            int w = Camera.current.pixelWidth * _portal.Downscaling;
+            int h = Camera.current.pixelHeight * _portal.Downscaling;
+            int depth = (int)_portal.DepthBufferQuality;
+            var format = RenderTextureFormat.Default;
+            var writeMode = RenderTextureReadWrite.Default;
+            int msaaSamples = 1;
+            var memoryless = RenderTextureMemoryless.None;
+            var vrUsage = VRTextureUsage.None;
+            bool useDynamicScale = false;
 
-            SaveMaterialProperties();
-            MaterialPropertyBlock block = _propertyBlockObjectPool.Take();
+            // TODO: figure out correct settings for VRUsage, memoryless, and dynamic scale
+            RenderTexture rt = RenderTexture.GetTemporary(w, h, depth, format, writeMode, msaaSamples, memoryless, vrUsage, useDynamicScale);
+            rt.filterMode = FilterMode.Point;
 
-            if (!ShouldRenderPortal(Camera.current)) {
+            return rt;
+        }
+
+        private void RenderWithRenderTexture(Camera camera) {
+            if (!ShouldRenderPortal(camera)) {
                 _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
                 return;
             }
 
+            SaveMaterialProperties();
+            MaterialPropertyBlock block = _propertyBlockObjectPool.Take();
+
             if (_staticRenderDepth == 0) {
-                var gpuProjectionMatrix = GL.GetGPUProjectionMatrix(Camera.current.projectionMatrix, true);
+                var gpuProjectionMatrix = GL.GetGPUProjectionMatrix(camera.projectionMatrix, true);
                 Shader.SetGlobalMatrix("_PortalProjectionMatrix", gpuProjectionMatrix);
             }
 
@@ -327,44 +265,25 @@ namespace Portals {
                 if (_renderTexture != null) {
                     RenderTexture.ReleaseTemporary(_renderTexture);
                 }
-                int w = Camera.current.pixelWidth * _portal.Downscaling;
-                int h = Camera.current.pixelHeight * _portal.Downscaling;
-                int depth = (int)_portal.DepthBufferQuality;
-                var format = RenderTextureFormat.Default;
-                var writeMode = RenderTextureReadWrite.Default;
-                int msaaSamples = 1;
-                var memoryless = RenderTextureMemoryless.None;
-                var vrUsage = VRTextureUsage.None;
-                bool useDynamicScale = false;
-
-                // TODO: figure out correct settings for VRUsage, memoryless, and dynamic scale
-                _renderTexture = RenderTexture.GetTemporary(w, h, depth, format, writeMode, msaaSamples, memoryless, vrUsage, useDynamicScale);
-                _renderTexture.filterMode = FilterMode.Point;
+                _renderTexture = GetTemporaryRT();
             }
 
 
-            // The stencil buffer gets used by Unity in deferred rendering and must clear itself, otherwise
-            // it will be full of junk. https://docs.unity3d.com/Manual/SL-Stencil.html
-            if (_staticRenderDepth == 0 && IsCameraUsingDeferredShading(Camera.current)) {
-                Camera.current.clearStencilAfterLightingPass = true;
-            }
+            //// The stencil buffer gets used by Unity in deferred rendering and must clear itself, otherwise
+            //// it will be full of junk. https://docs.unity3d.com/Manual/SL-Stencil.html
+            //if (_staticRenderDepth == 0 && IsCameraUsingDeferredShading(Camera.current)) {
+            //    Camera.current.clearStencilAfterLightingPass = true;
+            //}
 
-            // Stop recursion when we reach maximum depth
-            if (_staticRenderDepth >= _portal.MaxRecursion) {
-                _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
-                return;
-            }
+            Camera portalCamera = CreateTemporaryCamera(camera);
 
-            Camera parentCam = Camera.current;
-            Camera childCam = CreateTemporaryCamera(parentCam);
+            RenderTexture temp = RenderTexture.GetTemporary(Screen.width, Screen.height, 32, RenderTextureFormat.Default);
 
-            //RenderTexture temp = RenderTexture.GetTemporary(Screen.width, Screen.height, 32, RenderTextureFormat.Default);
-
-            RenderToTextureNew(parentCam, childCam, Camera.MonoOrStereoscopicEye.Mono, _renderTexture);
+            //RenderToTextureNew(camera, portalCamera, Camera.MonoOrStereoscopicEye.Mono, _renderTexture);
             //Graphics.Blit(temp, _renderTexture);
 
             //RenderTexture.ReleaseTemporary(temp);
-            ReleaseTemporaryCamera(childCam);
+            //ReleaseTemporaryCamera(portalCamera);
 
             block.SetTexture("_LeftEyeTexture", _renderTexture);
             _portalMaterial.DisableKeyword("SAMPLE_DEFAULT_TEXTURE");
@@ -379,7 +298,7 @@ namespace Portals {
         }
 
         protected void PostRenderNew() {
-            RestoreMaterialProperties();
+            //RestoreMaterialProperties();
             //ReleaseRenderTexture();
             _renderer.enabled = true;
         }
@@ -698,6 +617,9 @@ namespace Portals {
             // Calculate where in screen space the portal lies.
             // We use this to only render as much of the screen as necessary, avoiding overdraw.
             Rect viewportRect = CalculatePortalViewportRect(Camera.current);
+            //if (viewportRect.width == 0 || viewportRect.height == 0) {
+            //    return;
+            //}
 
             _staticRenderDepth++;
             //RenderTexture tex = portalCamera.RenderToTexture2();
@@ -768,6 +690,13 @@ namespace Portals {
                     _portalMaterial,
                     _backfaceMaterial,
                 };
+            }
+
+            if (!_stencilMaskMaterial) {
+                _stencilMaskMaterial = new Material(Shader.Find("Portals/StencilMask"));
+            }
+            if (!_depthMaskMaterial) {
+                _depthMaskMaterial = new Material(Shader.Find("Portals/DepthMask"));
             }
         }
 
@@ -938,7 +867,7 @@ namespace Portals {
                 camera.enabled = false;
                 camera.transform.position = transform.position;
                 camera.transform.rotation = transform.rotation;
-                camera.gameObject.AddComponent<FlareLayer>();
+                //camera.gameObject.AddComponent<FlareLayer>();
 
                 // TODO: Awake doesn't get called when using ExecuteInEditMode
                 portalCamera = go.AddComponent<PortalCamera>();

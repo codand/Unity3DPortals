@@ -22,36 +22,6 @@ public class InputManager : MonoBehaviour {
 
 
     void Update() {
-#if UNITY_IOS || UNITY_ANDROID
-        //foreach (Touch touch in Input.touches) {
-        //    switch (touch.phase) {
-        //        case TouchPhase.Began:
-        //            break;
-        //        case TouchPhase.Canceled:
-        //            break;
-        //        case TouchPhase.Ended:
-        //            break;
-        //        case TouchPhase.Moved:
-        //            float rotationX = touch.deltaPosition.x * _mouseSensitivity;
-        //            _playerController.Rotate(rotationX);
-
-        //            float rotationY = touch.deltaPosition.y * _mouseSensitivity;
-        //            _playerController.RotateHead(rotationY);
-        //            break;
-        //        case TouchPhase.Stationary:
-        //            break;
-        //    }
-        //}
-        float rotationX = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("RightHorizontal") * _mouseSensitivity;
-        if (rotationX != 0) {
-            _playerController.Rotate(rotationX);
-        }
-
-        float rotationY = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("RightVertical") * _mouseSensitivity;
-        if (rotationY != 0) {
-            _playerController.RotateHead(rotationY);
-        }
-#else
         if (Input.GetKeyDown(KeyCode.BackQuote)) {
             _movementEnabled = !_movementEnabled;
             if (_movementEnabled) {
@@ -84,18 +54,9 @@ public class InputManager : MonoBehaviour {
         if (Input.GetKeyDown(KeyCode.Q)) {
             _playerController.ToggleNoClip();
         }
-
-        if (Input.GetMouseButtonDown(0)) {
-            //GetComponent<PowerKinesis>().Fire(Camera.main);
-        }
-#endif
     }
 
     void HandleMovement() {
-
-#if UNITY_ANDROID || UNITY_IOS
-        MobileMovement();
-#else
         Vector3 moveDir = Vector3.zero;
         bool moved = false;
         if (_movementEnabled) {
@@ -125,15 +86,6 @@ public class InputManager : MonoBehaviour {
         if (moved) {
             _playerController.Move(moveDir);
         }
-#endif
-    }
-
-    void MobileMovement() {
-        float vertical = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftVertical");
-        float horizontal = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager.GetAxis("LeftHorizontal");
-
-        Vector3 movement = Camera.main.transform.forward * vertical + Camera.main.transform.right * horizontal;
-        _playerController.Move(movement);
     }
 
     void FixedUpdate() {

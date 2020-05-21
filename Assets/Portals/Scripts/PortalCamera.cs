@@ -253,6 +253,22 @@ namespace Portals {
             return texture;
         }
 
+        public void PrepareForStencilRender() {
+            _framesSinceLastUse = 0;
+
+            CopyCameraSettings(_parent, _camera);
+            //_camera.depthTextureMode = DepthTextureMode.Depth;
+            _camera.clearFlags = CameraClearFlags.Nothing;
+            _camera.enabled = true;
+            _camera.depth = _renderDepth;
+
+            Matrix4x4 projectionMatrix = _parent.projectionMatrix;
+            Matrix4x4 worldToCameraMatrix = _parent.worldToCameraMatrix * _portal.PortalMatrix().inverse;
+
+            _camera.projectionMatrix = projectionMatrix;
+            _camera.worldToCameraMatrix = worldToCameraMatrix;
+        }
+
         private void DrawDepthPunchMesh(bool renderBackface) {
             if (!_depthPunchMaterial) {
                 Shader shader = Shader.Find("Portals/DepthPunch");

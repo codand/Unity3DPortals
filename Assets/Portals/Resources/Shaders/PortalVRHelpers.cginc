@@ -28,7 +28,6 @@ sampler2D _TransparencyMask;
 sampler2D _PortalTexture;
 float4x4 _PortalProjectionMatrix;
 float4x4 _PortalProjectionMatrix2;
-float useOldRenderer;
 
 #ifdef IS_BACKFACE
 float _BackfaceAlpha;
@@ -60,12 +59,7 @@ v2f vertPortal(appdata v)
 	//clipPos.z = 1;
 	o.screenUV = ComputeNonStereoScreenPos(clipPos);
 #else
-	if (useOldRenderer == 1) {
-		o.screenUV = ComputeNonStereoScreenPos(o.pos);
-	} else {
-		float4 clipPos = mul(_PortalProjectionMatrix, UnityObjectToViewPos(v.vertex));
-		o.screenUV = ComputeNonStereoScreenPos(clipPos);
-	}
+	o.screenUV = ComputeNonStereoScreenPos(o.pos);
 #endif
 	return o;
 }

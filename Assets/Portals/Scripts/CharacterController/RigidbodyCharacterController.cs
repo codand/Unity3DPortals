@@ -99,7 +99,11 @@ namespace Portals {
         public void Rotate(float angle) {
             if (disable_stuff) return;
             Quaternion rotation = Quaternion.AngleAxis(angle, Vector3.up);
+
+            // TODO: This causes jittering
             this.transform.localRotation = this.transform.localRotation * rotation;
+
+            // And this causes lethargic movement
             //_rigidbody.MoveRotation(_rigidbody.rotation * rotation);
         }
 
@@ -200,7 +204,7 @@ namespace Portals {
             Quaternion srcBodyRotation = transform.rotation;
             Quaternion dstBodyRotation = Quaternion.Euler(0, dstBodyAngle, 0);
 
-            transform.rotation = Quaternion.Slerp(srcBodyRotation, dstBodyRotation, ratio) * frameXRotation;
+            _rigidbody.rotation = Quaternion.Slerp(srcBodyRotation, dstBodyRotation, ratio) * frameXRotation;
             _head.rotation     = Quaternion.Slerp(srcHeadRotation, dstHeadRotation, ratio) * frameYRotation * frameXRotation;
 
             //// TODO: this doesn't account for body

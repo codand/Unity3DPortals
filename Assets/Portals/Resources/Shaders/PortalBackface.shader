@@ -38,40 +38,40 @@ Shader "Portal/PortalBackface"
 		//	ENDCG
 		//}
 
-		Pass {
-			ColorMask 0
-			ZWrite Off
-		}
-
-		//Pass
-		//{
-		//	// Stencil prevents the backface from rendering if we've already seen the frontface
-		//	// Don't render unless Stencil == 0. The value is decremented when we fail (saw a frontface)
-		//	// so that a recursive layer above us won't be prevented from rendering.
-		//	Stencil{
-		//		Ref 0
-		//		Comp Equal
-		//		Fail DecrSat
-		//		Pass IncrSat
-		//	}	
-
-		//	Blend SrcAlpha OneMinusSrcAlpha
+		//Pass {
+		//	ColorMask 0
 		//	ZWrite Off
-		//	ZTest Always
-		//	Lighting Off
-		//	Cull Off
-
-		//	CGPROGRAM
-		//	#define IS_BACKFACE
-
-		//	#include "PortalVRHelpers.cginc"
-
-		//	#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
-
-		//	#pragma vertex vertPortal
-		//	#pragma fragment fragPortal
-		//	ENDCG
 		//}
+
+		Pass
+		{
+			// Stencil prevents the backface from rendering if we've already seen the frontface
+			// Don't render unless Stencil == 0. The value is decremented when we fail (saw a frontface)
+			// so that a recursive layer above us won't be prevented from rendering.
+			Stencil{
+				Ref 0
+				Comp Equal
+				Fail DecrSat
+				Pass IncrSat
+			}	
+
+			Blend SrcAlpha OneMinusSrcAlpha
+			ZWrite On
+			ZTest LEqual
+			Lighting Off
+			Cull Back
+
+			CGPROGRAM
+			#define IS_BACKFACE
+
+			#include "PortalVRHelpers.cginc"
+
+			#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
+
+			#pragma vertex vertPortal
+			#pragma fragment fragPortal
+			ENDCG
+		}
 	}
 	FallBack "VertexLit"
 }

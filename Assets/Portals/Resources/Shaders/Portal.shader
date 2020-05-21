@@ -11,7 +11,7 @@ Shader "Portal/Portal"
 	{
 		Tags{
 			"RenderType" = "Opaque"
-			"Queue" = "Geometry-100"
+			"Queue" = "Geometry+100"
 			"IgnoreProjector" = "True"
 		}
 
@@ -84,40 +84,101 @@ Shader "Portal/Portal"
 		//	ZWrite Off
 		//	ColorMask 0
 		//}
+		//Pass
+		//{
+		//	Stencil {
+		//		Ref 5
+		//		Comp Always
+		//		Pass Replace
+		//		ZFail Keep
+		//	}			
+		//	Name "Portal Increment Stencil"
+		//	Tags { "LightMode" = "ForwardBase" }
+		//	ZWrite On
+		//	ZTest LEqual
+		//	ColorMask 0
+		//}
 
-		Pass
-		{
-			/*Stencil {
-				Ref 100
-				Pass Replace
-			}			*/
-			//Tags { "Queue" = "Geometry-1000"}
-			Name "Portal ShadowCaster"
-			Tags { "LightMode" = "ShadowCaster" }
-			ZWrite On
-			ZTest Always
-			ColorMask 0
-			Cull Front
+		//Pass
+		//{
+		//	Name "Portal Zero Depth"
+		//	Tags { "LightMode" = "ForwardBase" }
+		//	ZWrite On
+		//	ZTest LEqual
+		//	//ColorMask 0
 
-			CGPROGRAM
-			#include "UnityCG.cginc"
+		//	CGPROGRAM
 
-			#pragma vertex vert
-			#pragma fragment frag
+		//	#include "UnityCG.cginc"
 
-			#pragma multi_compile_shadowcaster
+		//	#pragma vertex Vertex
+		//	#pragma fragment Fragment
 
-			float4 vert(in float4 vertex : POSITION) : POSITION {
-				// Bias scales the portal slightly when rendering depth to prevent shadow bleeding
-				float bias = 1.01;
-				return UnityObjectToClipPos(vertex * bias);
-			}
+		//	struct VertexInput
+		//	{
+		//		float4 vertex : POSITION;
+		//		float4 uv : TEXCOORD0;
+		//	};
 
-			float frag() : DEPTH{
-				return 0;
-			}
-			ENDCG
-		}
+		//	struct Varyings {
+		//		float4 pos : SV_POSITION;
+		//		float4 screenUV : TEXCOORD0;
+		//		float4 objUV : TEXCOORD1;
+		//	};
+
+		//	Varyings Vertex(VertexInput input) {
+		//		Varyings output = (Varyings)0;
+
+		//		output.pos = UnityObjectToClipPos(input.vertex);
+		//		output.objUV = input.uv;
+		//		output.screenUV = ComputeNonStereoScreenPos(output.pos);
+
+		//		return output;
+		//	}
+
+		//	float Fragment(Varyings input, out float depth : SV_Depth) : SV_Target {
+		//		depth = 1;
+		//		return 0;
+		//	}
+
+
+		//	ENDCG
+		//}
+
+
+		//Pass
+		//{
+		//	/*Stencil {
+		//		Ref 100
+		//		Pass Replace
+		//	}			*/
+		//	//Tags { "Queue" = "Geometry-1000"}
+		//	Name "Portal ShadowCaster"
+		//	Tags { "LightMode" = "ShadowCaster" }
+		//	ZWrite On
+		//	ZTest Always
+		//	ColorMask 0
+		//	Cull Front
+
+		//	CGPROGRAM
+		//	#include "UnityCG.cginc"
+
+		//	#pragma vertex vert
+		//	#pragma fragment frag
+
+		//	#pragma multi_compile_shadowcaster
+
+		//	float4 vert(in float4 vertex : POSITION) : POSITION {
+		//		// Bias scales the portal slightly when rendering depth to prevent shadow bleeding
+		//		float bias = 1.01;
+		//		return UnityObjectToClipPos(vertex * bias);
+		//	}
+
+		//	float frag() : DEPTH{
+		//		return 0;
+		//	}
+		//	ENDCG
+		//}
 
 		//Pass
 		//{
@@ -143,28 +204,32 @@ Shader "Portal/Portal"
 		//	ENDCG
 		//}
 
-		//Pass
-		//{
-		//	// Stencil prevents the backface from rendering if we've already seen the frontface
-		//	Stencil{
-		//		Comp Always
-		//		Pass IncrSat
-		//		ZFail IncrSat
-		//	}
-		//	Blend SrcAlpha OneMinusSrcAlpha
-		//	ZWrite Off
-		//	Lighting Off
+		Pass
+		{
+			// Stencil prevents the backface from rendering if we've already seen the frontface
+			Stencil{
+				Comp Always
+				Pass IncrSat
+				ZFail IncrSat
+			}
 
-		//	CGPROGRAM
-		//	#include "UnityCG.cginc"
-		//	#include "PortalVRHelpers.cginc"
+			Blend SrcAlpha OneMinusSrcAlpha
+			ZWrite On
+			ZTest LEqual
+			Lighting Off
+			Cull Back
+			Offset -1,-1
 
-		//	#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
+			CGPROGRAM
+			#include "UnityCG.cginc"
+			#include "PortalVRHelpers.cginc"
 
-		//	#pragma vertex vertPortal
-		//	#pragma fragment fragPortal
-		//	ENDCG
-		//}
+			#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
+
+			#pragma vertex vertPortal
+			#pragma fragment fragPortal
+			ENDCG
+		}
 	}
 	FallBack "VertexLit"
 }
