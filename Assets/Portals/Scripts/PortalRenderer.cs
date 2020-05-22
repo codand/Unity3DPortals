@@ -67,10 +67,13 @@ namespace Portals {
 
         #region Rendering
 
+        private struct CameraData {
+
+        }
+
 
         private Vector4 ClampedWorldToViewportPoint(Camera cam, Vector3 worldPoint) {
             //Vector3 viewportPoint = cam.WorldToViewportPoint(worldPoint);
-            cam.ResetWorldToCameraMatrix();
             Matrix4x4 p = cam.projectionMatrix;
             Matrix4x4 v = cam.worldToCameraMatrix;
             Matrix4x4 vp = p * v;
@@ -115,13 +118,13 @@ namespace Portals {
             tr = ClampedWorldToViewportPoint(Camera.current, corners[1]);
             br = ClampedWorldToViewportPoint(Camera.current, corners[2]);
             bl = ClampedWorldToViewportPoint(Camera.current, corners[3]);
-            Debug.Log($"TL: {tl}, TR: {tr}, BR: {br}, BL: {bl}");
+            //Debug.Log($"TL: {tl}, TR: {tr}, BR: {br}, BL: {bl}");
 
             Vector3 ftl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, 0.5f, 1.0f)));
             Vector3 ftr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 1.0f)));
             Vector3 fbr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
             Vector3 fbl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
-            Debug.Log($"FTL: {ftl}, FTR: {ftr}, FBR: {fbr}, FBL: {fbl}");
+           // Debug.Log($"FTL: {ftl}, FTR: {ftr}, FBR: {fbr}, FBL: {fbl}");
 
             var min = Min(tl, tr, br, bl, ftl, ftr, fbr, fbl);
             var max = Max(tl, tr, br, bl, ftl, ftr, fbr, fbl);
@@ -134,7 +137,7 @@ namespace Portals {
             min = Vector3.Max(Vector3.zero, min);
             max = Vector3.Min(Vector3.one, max);
 
-            Debug.Log("Min: " + min + " Max: " + max);
+            //Debug.Log("Min: " + min + " Max: " + max);
 
             Rect viewportRect = new Rect(min.x, min.y, max.x - min.x, max.y - min.y);
             return viewportRect;
@@ -191,6 +194,7 @@ namespace Portals {
 
         protected override void PreRender() {
             PreRenderOld();
+            //RenderWithRenderTexture(Camera.current);
         }
         protected override void PostRender() {
             PostRenderOld();
@@ -268,18 +272,11 @@ namespace Portals {
                 _renderTexture = GetTemporaryRT();
             }
 
-
-            //// The stencil buffer gets used by Unity in deferred rendering and must clear itself, otherwise
-            //// it will be full of junk. https://docs.unity3d.com/Manual/SL-Stencil.html
-            //if (_staticRenderDepth == 0 && IsCameraUsingDeferredShading(Camera.current)) {
-            //    Camera.current.clearStencilAfterLightingPass = true;
-            //}
-
             Camera portalCamera = CreateTemporaryCamera(camera);
 
             RenderTexture temp = RenderTexture.GetTemporary(Screen.width, Screen.height, 32, RenderTextureFormat.Default);
 
-            //RenderToTextureNew(camera, portalCamera, Camera.MonoOrStereoscopicEye.Mono, _renderTexture);
+            RenderToTexture(camera, portalCamera, Camera.MonoOrStereoscopicEye.Mono, _renderTexture);
             //Graphics.Blit(temp, _renderTexture);
 
             //RenderTexture.ReleaseTemporary(temp);
@@ -297,113 +294,7 @@ namespace Portals {
             _propertyBlockObjectPool.Give(block);
         }
 
-        protected void PostRenderNew() {
-            //RestoreMaterialProperties();
-            //ReleaseRenderTexture();
-            _renderer.enabled = true;
-        }
-
-        public BuiltinRenderTextureType depthType = BuiltinRenderTextureType.Depth;
-        public RenderTextureFormat depthFormat = RenderTextureFormat.Depth;
-        private static class CommandBuffers {
-            private static Material _copyGBufferMaterial;
-            private static RenderTexture[] _gBufferTextures;
-
-            private static readonly int gBuffer0ID = Shader.PropertyToID("_PortalGBufferTexture0");
-            private static readonly int gBuffer1ID = Shader.PropertyToID("_PortalGBufferTexture1");
-            private static readonly int gBuffer2ID = Shader.PropertyToID("_PortalGBufferTexture2");
-            private static readonly int gBuffer3ID = Shader.PropertyToID("_PortalGBufferTexture3");
-            private static readonly int depthBufferID = Shader.PropertyToID("_PortalDepthTexture");
-
-            //private static int clippingDepthBufferID = Shader.PropertyToID("_PortalClippingDepthBuffer");
-            private static RenderTargetIdentifier[] portalGBuffers = {
-                new RenderTargetIdentifier(gBuffer0ID),
-                new RenderTargetIdentifier(gBuffer1ID),
-                new RenderTargetIdentifier(gBuffer2ID),
-                new RenderTargetIdentifier(gBuffer3ID),
-                //new RenderTargetIdentifier(clippingDepthBufferID)
-            };
-
-            private static RenderTargetIdentifier[] builtinGBuffers = {
-                BuiltinRenderTextureType.GBuffer0,
-                BuiltinRenderTextureType.GBuffer1,
-                BuiltinRenderTextureType.GBuffer2,
-                BuiltinRenderTextureType.CameraTarget,
-            };
-
-            static CommandBuffers() {
-                _copyGBufferMaterial = new Material(Shader.Find("Portals/CopyGBuffer"));
-                //CopyGBuffer = new CommandBuffer();
-                //CopyGBuffer.name = "Copy GBuffer for Portals";
-                //PasteGBuffer = new CommandBuffer();
-                //PasteGBuffer.name = "Paste GBuffer for Portals";
-            }
-
-            public static CommandBuffer CopyGBuffer(Matrix4x4 viewMatrix, Matrix4x4 modelMatrix, bool hdr) {
-                var cmd = new CommandBuffer();
-                cmd.name = "Copy GBuffer for Portals";
-
-                // Credit to bgolus https://forum.unity.com/threads/confused-by-gbuffer.634918/
-                cmd.GetTemporaryRT(gBuffer0ID, -1, -1, 0, FilterMode.Point, RenderTextureFormat.ARGB32);
-                cmd.GetTemporaryRT(gBuffer1ID, -1, -1, 0, FilterMode.Point, RenderTextureFormat.ARGB32);
-                cmd.GetTemporaryRT(gBuffer2ID, -1, -1, 0, FilterMode.Point, RenderTextureFormat.ARGB2101010);
-                cmd.GetTemporaryRT(gBuffer3ID, -1, -1, 0, FilterMode.Point, hdr ? RenderTextureFormat.DefaultHDR : RenderTextureFormat.ARGB2101010);
-                //CopyGBuffer.GetTemporaryRT(clippingDepthBufferID, -1, -1, 24, FilterMode.Point, RenderTextureFormat.Depth);
-                cmd.GetTemporaryRT(depthBufferID, -1, -1, 24, FilterMode.Point, RenderTextureFormat.Depth);
-
-                cmd.SetRenderTarget(portalGBuffers, depthBufferID);
-
-                // Draw portal from the view of the parent
-                cmd.SetViewMatrix(viewMatrix);
-                cmd.ClearRenderTarget(true, true, Color.black);
-                cmd.DrawMesh(PortalRenderer.Mesh, modelMatrix, _copyGBufferMaterial, 0, 0);
-                //CopyGBuffer.DrawMesh(PortalRenderer.Mesh, matrix, _copyGBufferMaterial, 1);
-
-                cmd.SetGlobalTexture(gBuffer0ID, gBuffer0ID);
-                cmd.SetGlobalTexture(gBuffer1ID, gBuffer1ID);
-                cmd.SetGlobalTexture(gBuffer2ID, gBuffer2ID);
-                cmd.SetGlobalTexture(gBuffer3ID, gBuffer3ID);
-                cmd.SetGlobalTexture(depthBufferID, depthBufferID);
-
-                return cmd;
-            }
-
-            public static CommandBuffer PasteGBuffer(Matrix4x4 viewMatrix, Matrix4x4 modelMatrix, bool hdr) {
-                var cmd = new CommandBuffer();
-                cmd.name = "Paste GBuffer for Portals";
-                
-                cmd.SetRenderTarget(builtinGBuffers, BuiltinRenderTextureType.ResolvedDepth);
-
-                // Draw portal from the view of the parent
-                cmd.SetViewMatrix(viewMatrix);
-                cmd.DrawMesh(PortalRenderer.Mesh, modelMatrix, _copyGBufferMaterial, 0, 2);
-                cmd.DrawMesh(PortalRenderer.Mesh, modelMatrix, _copyGBufferMaterial, 0, 1);
-                //CopyGBuffer.DrawMesh(PortalRenderer.Mesh, matrix, _copyGBufferMaterial, 1);
-
-                return cmd;
-            }
-
-            public static CommandBuffer AfterLighting() {
-                var cmd = new CommandBuffer();
-                cmd.name = "Bake Lighting Into GBuffer";
-
-                //cmd.SetGlobalTexture(currentCameraTargetID, BuiltinRenderTextureType.CurrentActive);
-                //cmd.SetRenderTarget(gbuffer3ID, depthbufferID);
-
-                // Draw portal from the view of the parent
-                //cmd.Blit(BuiltinRenderTextureType.CurrentActive, gbuffer3ID);
-
-                cmd.SetGlobalTexture(gBuffer3ID, BuiltinRenderTextureType.CurrentActive);
-
-                return cmd;
-            }
-        }
-
-        private static Dictionary<Camera, CommandBuffer> _copyGBufferCmds = new Dictionary<Camera, CommandBuffer>();
-        private static Dictionary<Camera, CommandBuffer> _pasteGBufferCmds = new Dictionary<Camera, CommandBuffer>();
-
-        public bool sw = false;
-        void RenderToTextureNew(Camera parent, Camera cam, Camera.MonoOrStereoscopicEye eye, RenderTexture target) {
+        void RenderToTexture(Camera parent, Camera cam, Camera.MonoOrStereoscopicEye eye, RenderTexture target) {
             PortalCamera.CopyCameraSettings(parent, cam);
 
             Matrix4x4 parentProjectionMatrix;
@@ -428,9 +319,6 @@ namespace Portals {
 
             Matrix4x4 newProjectionMatrix = parentProjectionMatrix;
             Matrix4x4 newWorldToCameraMatrix = parentWorldToCameraMatrix * _portal.PortalMatrix().inverse;
-            // cam.transform.position = _portal.TeleportPoint(parent.transform.position);
-            //cam.transform.rotation = _portal.TeleportRotation(parent.transform.rotation);
-
 
             cam.ResetProjectionMatrix();
             cam.rect = new Rect(0, 0, 1, 1);
@@ -463,34 +351,6 @@ namespace Portals {
 
             } else {
                 cam.rect = new Rect(0, 0, 1, 1);
-            }
-
-            if (_portal.CopyGBuffer) {
-                //if (cam.commandBufferCount == 0) {
-                //    cam.AddCommandBuffer(CameraEvent.BeforeDepthTexture, CommandBuffers.CopyGBuffer);
-                //    Debug.Log("Added cmdbuffer");
-                //}
-                //_renderer.materials = new Material[]{ };
-
-
-                _pasteGBufferCmds.TryGetValue(parent, out CommandBuffer pasteCmd);
-                if (pasteCmd != null) {
-                    parent.RemoveCommandBuffer(CameraEvent.AfterSkybox, pasteCmd);
-                }
-                pasteCmd = CommandBuffers.PasteGBuffer(parent.worldToCameraMatrix, transform.localToWorldMatrix, cam.allowHDR);
-                parent.AddCommandBuffer(CameraEvent.AfterSkybox, pasteCmd);
-                _pasteGBufferCmds[parent] = pasteCmd;
-
-                _copyGBufferCmds.TryGetValue(cam, out CommandBuffer copyCmd);
-                if (copyCmd != null) {
-                    cam.RemoveCommandBuffer(CameraEvent.AfterEverything, copyCmd);
-                }
-                copyCmd = CommandBuffers.CopyGBuffer(parent.worldToCameraMatrix, transform.localToWorldMatrix, cam.allowHDR);
-                cam.AddCommandBuffer(CameraEvent.AfterEverything, copyCmd);
-                _copyGBufferCmds[cam] = copyCmd;
-
-            } else {
-                cam.RemoveAllCommandBuffers();
             }
 
             Shader.SetGlobalMatrix("_PortalMatrix", _portal.PortalMatrix());
@@ -620,6 +480,8 @@ namespace Portals {
             //if (viewportRect.width == 0 || viewportRect.height == 0) {
             //    return;
             //}
+            
+            Shader.SetGlobalVector("_ClippingPlane", _portal.ExitPortal.VectorPlane);
 
             _staticRenderDepth++;
             //RenderTexture tex = portalCamera.RenderToTexture2();
@@ -657,6 +519,7 @@ namespace Portals {
 
         protected void PostRenderOld() {
             _renderer.enabled = true;
+            Shader.DisableKeyword("PLANAR_CLIPPING_ENABLED");
             RestoreMaterialProperties();
         }
         #endregion

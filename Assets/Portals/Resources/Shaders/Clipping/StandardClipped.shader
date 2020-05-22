@@ -83,7 +83,7 @@ Shader "Portals/StandardClipped"
 			#pragma shader_feature _ _SPECULARHIGHLIGHTS_OFF
 			#pragma shader_feature _ _GLOSSYREFLECTIONS_OFF
 			#pragma shader_feature _PARALLAXMAP
-			//#pragma shader_feature PLANAR_CLIPPING_ENABLED;
+			#pragma shader_feature _ PLANAR_CLIPPING_ENABLED
 
 			#pragma multi_compile_fwdbase
 			#pragma multi_compile_fog
@@ -337,5 +337,5 @@ Shader "Portals/StandardClipped"
 
 
 	//FallBack "VertexLit"
-	CustomEditor "StandardShaderGUI"
+	//CustomEditor "StandardShaderGUI"
 }

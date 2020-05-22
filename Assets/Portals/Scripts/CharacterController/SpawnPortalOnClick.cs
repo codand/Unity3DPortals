@@ -163,14 +163,15 @@ public class SpawnPortalOnClick : MonoBehaviour {
         }
     }
     
-    int RaycastCorners(Collider collider, Vector3[] corners, Vector3 offset, Vector3 direction, float normalOffset, bool[] outHits) {
+    int RaycastCorners(Collider collider, Vector3[] corners, Vector3 offset, Vector3 direction, bool[] outHits) {
         int numHits = 0;
         for (int i = 0; i < corners.Length; i++) {
             Vector3 corner = corners[i] + offset;
 
             // Perform raycast from a tiny bit back from the contact point to a little bit through the contact point
+            float normalOffset = 0.01f;
             Ray ray = new Ray(corner - direction * normalOffset, direction);
-            outHits[i] = collider.Raycast(ray, out RaycastHit hitInfo, _normalOffset * 2);
+            outHits[i] = collider.Raycast(ray, out RaycastHit hitInfo, normalOffset * 2);
             if (outHits[i]) {
                 numHits++;
             }
@@ -184,7 +185,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
         offset = Vector3.zero;
         int currentIteration = 0;
         for (currentIteration = 0; currentIteration < iterations; currentIteration++) {
-            numHits = RaycastCorners(collider, corners, offset, forward, _normalOffset, hits);
+            numHits = RaycastCorners(collider, corners, offset, forward, hits);
 
             // Success
             if (numHits == 4) {
@@ -219,7 +220,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
         }
 
         // Test again with the latest offset
-        numHits = RaycastCorners(collider, corners, offset, forward, _normalOffset, hits);
+        numHits = RaycastCorners(collider, corners, offset, forward, hits);
 
         // If viable solution is found, try to improve it with remaining iterations by creeping backwards
         if (numHits == 4) {
@@ -230,7 +231,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
                 Vector3 newOffset = offset - stepOffset;
 
                 // Check new offset
-                int foo = RaycastCorners(collider, corners, newOffset, forward, _normalOffset, hits);
+                int foo = RaycastCorners(collider, corners, newOffset, forward, hits);
                 if (foo == 4) {
                     offset = newOffset;
                 }

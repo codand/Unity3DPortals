@@ -210,8 +210,6 @@ namespace Portals {
             if (_portal.UseObliqueProjectionMatrix) {
                 _camera.projectionMatrix = CalculateObliqueProjectionMatrix(projectionMatrix);
             }
-            
-
 
             if (_portal.UseCullingMatrix) {
                 _camera.cullingMatrix = CalculateCullingMatrix();
@@ -246,6 +244,7 @@ namespace Portals {
             } else {
                 _camera.rect = new Rect(0, 0, 1, 1);
             }
+
             _camera.Render();
 
             SaveFrameData(eye);
