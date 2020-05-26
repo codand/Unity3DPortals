@@ -169,6 +169,23 @@ namespace Portals {
             }
         }
 
+        private RenderTexture GetTemporaryRT() {
+            int w = Camera.current.pixelWidth / _portal.Downscaling;
+            int h = Camera.current.pixelHeight / _portal.Downscaling;
+            int depth = (int)_portal.DepthBufferQuality;
+            var format = RenderTextureFormat.Default;
+            var writeMode = RenderTextureReadWrite.Default;
+            int msaaSamples = 1;
+            var memoryless = RenderTextureMemoryless.None;
+            var vrUsage = VRTextureUsage.None;
+            bool useDynamicScale = false;
+
+            // TODO: figure out correct settings for VRUsage, memoryless, and dynamic scale
+            RenderTexture rt = RenderTexture.GetTemporary(w, h, depth, format, writeMode, msaaSamples, memoryless, vrUsage, useDynamicScale);
+            rt.filterMode = FilterMode.Point;
+
+            return rt;
+        }
 
         public RenderTexture RenderToTexture(Camera.MonoOrStereoscopicEye eye, Rect viewportRect, bool renderBackface) {
             _framesSinceLastUse = 0;
@@ -193,19 +210,8 @@ namespace Portals {
                     worldToCameraMatrix = _parent.worldToCameraMatrix;
                     break;
             }
-
-            //_camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
-            //_camera.projectionMatrix = projectionMatrix;
-            //_camera.transform.position = _portal.TeleportPoint(_parent.transform.position);
-            //_camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
-            
             _camera.projectionMatrix = projectionMatrix;
             _camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
-
-            // TODO: don't need to do this eh?
-            //_camera.transform.position = _camera.cameraToWorldMatrix.GetPosition();
-            //_camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
-            
 
             if (_portal.UseObliqueProjectionMatrix) {
                 _camera.projectionMatrix = CalculateObliqueProjectionMatrix(projectionMatrix);
@@ -217,25 +223,10 @@ namespace Portals {
                 _camera.ResetCullingMatrix();
             }
 
-            if (_portal.UseDepthMask) {
-                DrawDepthPunchMesh(renderBackface);
-            } else {
-                _camera.RemoveAllCommandBuffers();
-            }
-
-            RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
+            //RenderTexture texture = RenderTexture.GetTemporary(_parent.pixelWidth, _parent.pixelHeight, 24, RenderTextureFormat.Default);
             //RenderTexture texture = RenderTexture.GetTemporary(Screen.width, Screen.height, 24, RenderTextureFormat.Default);
+            RenderTexture texture = GetTemporaryRT();
             texture.filterMode = FilterMode.Point;
-
-
-            //var f = RenderTexture.active;
-            //RenderTexture.active = texture;
-            //GL.Clear(true, true, Color.white);
-            //RenderTexture.active = f;
-
-
-
-            //texture.name = System.Enum.GetName(typeof(Camera.MonoOrStereoscopicEye), eye) + " " + _camera.stereoTargetEye + " " + Time.renderedFrameCount;
             
             _camera.targetTexture = texture;
             if (_portal.UseScissorRect) {

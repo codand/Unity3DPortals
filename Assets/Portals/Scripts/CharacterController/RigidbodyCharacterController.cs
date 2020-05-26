@@ -34,6 +34,10 @@ namespace Portals {
         private LayerMask _collisionMask = -1;
         [SerializeField]
         private bool _correctRotationOnTeleport = true;
+        [SerializeField]
+        private float _correctRotationDuration = 0.5f;
+        [SerializeField]
+        private AnimationCurve _correctRotationEasing = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
         private bool _grounded = false;
 
@@ -97,7 +101,8 @@ namespace Portals {
         }
 
         public void Rotate(float angle) {
-            if (disable_stuff) return;
+            if (_disableControls) return;
+
             Quaternion rotation = Quaternion.AngleAxis(angle, Vector3.up);
 
             // TODO: This causes jittering
@@ -112,7 +117,7 @@ namespace Portals {
                 return;
             }
 
-            if (disable_stuff) return;
+            if (_disableControls) return;
 
             //float currentAngle = normalizeAngle(_head.localEulerAngles.x, -180, 180);
             //float newAngle = currentAngle - angle;
@@ -144,38 +149,30 @@ namespace Portals {
                 if (correctRotation != null) {
                     StopCoroutine(correctRotation);
                 }
-                correctRotation = StartCoroutine(CorrectionRotation(0.2f));
+                correctRotation = StartCoroutine(CorrectionRotationRoutine(_correctRotationDuration));
             }
         }
         
-        bool disable_stuff = false;
-        IEnumerator CorrectionRotation(float duration) {
-            disable_stuff = true;
-
-            float timeScale = 0.1f;
-            Time.timeScale = timeScale;
-            Time.fixedDeltaTime *= timeScale;
+        bool _disableControls = false;
+        IEnumerator CorrectionRotationRoutine(float duration) {
+            _disableControls = true;
 
             float elapsed = 0;
             while (elapsed < duration) {
                 float ratio = elapsed / duration;
+                float easing = _correctRotationEasing.Evaluate(ratio);
+                float angle = CorrectRotation(easing);
 
-                float angle = DoStuff(ratio * ratio);
-                if (angle <= 1.0f) {
-                    break;
-                }
                 yield return null;
                 elapsed += Time.deltaTime;
             }
 
-            DoStuff(1.0f);
+            CorrectRotation(1.0f);
 
-            Time.timeScale = 1.0f;
-            Time.fixedDeltaTime /= timeScale;
-            disable_stuff = false;
+            _disableControls = false;
         }
 
-        float DoStuff(float ratio) {
+        float CorrectRotation(float ratio) {
             // TODO: Make this independent of input
             float xRot = Input.GetAxis("Mouse X") * 3;
             float yRot = Input.GetAxis("Mouse Y") * 3;
@@ -204,8 +201,8 @@ namespace Portals {
             Quaternion srcBodyRotation = transform.rotation;
             Quaternion dstBodyRotation = Quaternion.Euler(0, dstBodyAngle, 0);
 
-            _rigidbody.rotation = Quaternion.Slerp(srcBodyRotation, dstBodyRotation, ratio) * frameXRotation;
-            _head.rotation     = Quaternion.Slerp(srcHeadRotation, dstHeadRotation, ratio) * frameYRotation * frameXRotation;
+            transform.rotation = Quaternion.Slerp(srcBodyRotation, dstBodyRotation, ratio) * frameXRotation;
+            _head.rotation = Quaternion.Slerp(srcHeadRotation, dstHeadRotation, ratio) * frameYRotation * frameXRotation;
 
             //// TODO: this doesn't account for body
             //if (Quaternion.Angle(correctedHeadRotation, dstHeadRotation) < 0.1f) {

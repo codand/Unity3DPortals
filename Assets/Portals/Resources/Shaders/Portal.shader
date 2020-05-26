@@ -180,30 +180,6 @@ Shader "Portal/Portal"
 		//	ENDCG
 		//}
 
-		//Pass
-		//{
-		//	Name "PORTAL DEFERRED"
-		//	Tags { "LightMode" = "Deferred" }
-
-		//	//Blend SrcAlpha OneMinusSrcAlpha
-		//	ZWrite On
-		//	ZTest Always
-		//	Lighting Off
-
-		//	CGPROGRAM
-		//	#pragma target 3.0
-		//	#pragma exclude_renderers nomrt
-		//	
-		//	#include "UnityCG.cginc"
-		//	#include "PortalVRHelpers.cginc"
-
-		//	#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
-
-		//	#pragma vertex vertPortal
-		//	#pragma fragment fragDeferred
-		//	ENDCG
-		//}
-
 		Pass
 		{
 			// Stencil prevents the backface from rendering if we've already seen the frontface
@@ -224,7 +200,7 @@ Shader "Portal/Portal"
 			#include "UnityCG.cginc"
 			#include "PortalVRHelpers.cginc"
 
-			#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
+			#pragma multi_compile _ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
 
 			#pragma vertex vertPortal
 			#pragma fragment fragPortal

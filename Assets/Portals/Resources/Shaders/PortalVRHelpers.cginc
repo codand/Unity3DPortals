@@ -77,55 +77,21 @@ float4 sampleCurrentTextureProj(float4 uv)
 
 fixed4 fragPortal(v2f i, fixed face : VFACE) : SV_Target
 {
+#ifdef IS_BACKFACE
+    clip(_BackfaceAlpha - 0.1);
+#endif
+
 #ifdef SAMPLE_DEFAULT_TEXTURE
 	float4 col = tex2Dproj(_DefaultTexture, i.objUV);
 #else 
 	float4 col = sampleCurrentTextureProj(i.screenUV);
 #endif
 
-#ifdef IS_BACKFACE
-	col.a = _BackfaceAlpha;
-#else
+#ifndef IS_BACKFACE
 	col.a = tex2D(_TransparencyMask, i.objUV).r;
 #endif
 
 	return col;
-}
-
-sampler2D _CameraDepthTexture;
-
-sampler2D _PortalGBuffer0;
-sampler2D _PortalGBuffer1;
-sampler2D _PortalGBuffer2;
-sampler2D _PortalGBuffer3;
-sampler2D _PortalDepthBuffer;
-
-void fragDeferred(
-	v2f i,
-	out half4 outGBuffer0 : SV_Target0,
-	out half4 outGBuffer1 : SV_Target1,
-	out half4 outGBuffer2 : SV_Target2,
-	out half4 outEmission : SV_Target3,          // RT3: emission (rgb), --unused-- (a)
-	out float extraDepth : SV_Target4,
-	out float outDepth : SV_DEPTH
-#if defined(SHADOWS_SHADOWMASK) && (UNITY_ALLOWED_MRT_COUNT > 4)
-	, out half4 outShadowMask : SV_Target4       // RT4: shadowmask (rgba)
-#endif
-) {
-	outGBuffer0 = tex2Dproj(_PortalGBuffer0, i.screenUV);
-	outGBuffer1 = tex2Dproj(_PortalGBuffer1, i.screenUV);
-	outGBuffer2 = tex2Dproj(_PortalGBuffer2, i.screenUV);
-	outEmission = tex2Dproj(_PortalGBuffer3, i.screenUV);
-	outDepth = tex2Dproj(_PortalDepthBuffer, i.screenUV);
-
-	//float sceneDepth = tex2Dproj(_CameraDepthTexture, i.screenUV);
-	//float actualDepth = i.pos.z;
-	////clip (actualDepth - sceneDepth);
-	//outDepth = sceneDepth;
-	extraDepth = i.pos.z;
-#if defined(SHADOWS_SHADOWMASK) && (UNITY_ALLOWED_MRT_COUNT > 4)
-	outShadowMask = 0;
-#endif
 }
 
 #endif // PORTAL_VR_HELPERS_INCLUDED

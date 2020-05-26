@@ -192,14 +192,6 @@ namespace Portals {
             }
         }
 
-        protected override void PreRender() {
-            PreRenderOld();
-            //RenderWithRenderTexture(Camera.current);
-        }
-        protected override void PostRender() {
-            PostRenderOld();
-        }
-
         private static RenderTexture _renderTexture;
         public FilterMode filterMode = FilterMode.Point;
 
@@ -233,151 +225,12 @@ namespace Portals {
             return isRendererEnabled && isCameraSupported && isExitPortalSet && !isRenderingExitPortal && !isAtMaxDepth;
         }
 
-        private RenderTexture GetTemporaryRT() {
-            int w = Camera.current.pixelWidth * _portal.Downscaling;
-            int h = Camera.current.pixelHeight * _portal.Downscaling;
-            int depth = (int)_portal.DepthBufferQuality;
-            var format = RenderTextureFormat.Default;
-            var writeMode = RenderTextureReadWrite.Default;
-            int msaaSamples = 1;
-            var memoryless = RenderTextureMemoryless.None;
-            var vrUsage = VRTextureUsage.None;
-            bool useDynamicScale = false;
-
-            // TODO: figure out correct settings for VRUsage, memoryless, and dynamic scale
-            RenderTexture rt = RenderTexture.GetTemporary(w, h, depth, format, writeMode, msaaSamples, memoryless, vrUsage, useDynamicScale);
-            rt.filterMode = FilterMode.Point;
-
-            return rt;
+        private bool ShouldRenderPreviousFrame(Camera camera) {
+            // Stop recursion when we reach maximum depth
+            return _portal.FakeInfiniteRecursion && _portal.MaxRecursion >= 2 && _staticRenderDepth >= _portal.MaxRecursion;
         }
 
-        private void RenderWithRenderTexture(Camera camera) {
-            if (!ShouldRenderPortal(camera)) {
-                _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
-                return;
-            }
-
-            SaveMaterialProperties();
-            MaterialPropertyBlock block = _propertyBlockObjectPool.Take();
-
-            if (_staticRenderDepth == 0) {
-                var gpuProjectionMatrix = GL.GetGPUProjectionMatrix(camera.projectionMatrix, true);
-                Shader.SetGlobalMatrix("_PortalProjectionMatrix", gpuProjectionMatrix);
-            }
-
-            if (_staticRenderDepth == 0) {
-                if (_renderTexture != null) {
-                    RenderTexture.ReleaseTemporary(_renderTexture);
-                }
-                _renderTexture = GetTemporaryRT();
-            }
-
-            Camera portalCamera = CreateTemporaryCamera(camera);
-
-            RenderTexture temp = RenderTexture.GetTemporary(Screen.width, Screen.height, 32, RenderTextureFormat.Default);
-
-            RenderToTexture(camera, portalCamera, Camera.MonoOrStereoscopicEye.Mono, _renderTexture);
-            //Graphics.Blit(temp, _renderTexture);
-
-            //RenderTexture.ReleaseTemporary(temp);
-            //ReleaseTemporaryCamera(portalCamera);
-
-            block.SetTexture("_LeftEyeTexture", _renderTexture);
-            _portalMaterial.DisableKeyword("SAMPLE_DEFAULT_TEXTURE");
-
-
-            block.SetFloat("_BackfaceAlpha", 0f);
-            block.SetTexture("_LeftEyeTexture", _renderTexture);
-            _backfaceMaterial.DisableKeyword("SAMPLE_DEFAULT_TEXTURE");
-
-            _renderer.SetPropertyBlock(block);
-            _propertyBlockObjectPool.Give(block);
-        }
-
-        void RenderToTexture(Camera parent, Camera cam, Camera.MonoOrStereoscopicEye eye, RenderTexture target) {
-            PortalCamera.CopyCameraSettings(parent, cam);
-
-            Matrix4x4 parentProjectionMatrix;
-            Matrix4x4 parentWorldToCameraMatrix;
-
-
-            switch (eye) {
-                case Camera.MonoOrStereoscopicEye.Left:
-                    parentProjectionMatrix = parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left);
-                    parentWorldToCameraMatrix = parent.GetStereoViewMatrix(Camera.StereoscopicEye.Left);
-                    break;
-                case Camera.MonoOrStereoscopicEye.Right:
-                    parentProjectionMatrix = parent.GetStereoProjectionMatrix(Camera.StereoscopicEye.Right);
-                    parentWorldToCameraMatrix = parent.GetStereoViewMatrix(Camera.StereoscopicEye.Right);
-                    break;
-                case Camera.MonoOrStereoscopicEye.Mono:
-                default:
-                    parentProjectionMatrix = parent.projectionMatrix;
-                    parentWorldToCameraMatrix = parent.worldToCameraMatrix;
-                    break;
-            }
-
-            Matrix4x4 newProjectionMatrix = parentProjectionMatrix;
-            Matrix4x4 newWorldToCameraMatrix = parentWorldToCameraMatrix * _portal.PortalMatrix().inverse;
-
-            cam.ResetProjectionMatrix();
-            cam.rect = new Rect(0, 0, 1, 1);
-
-            //cam.projectionMatrix = newProjectionMatrix;
-            cam.worldToCameraMatrix = newWorldToCameraMatrix;
-
-            cam.targetTexture = target;
-
-
-            // Increase depth
-            var savedCurrentlyRenderingPortal = _currentlyRenderingPortal;
-            _currentlyRenderingPortal = _portal;
-            _staticRenderDepth++;
-
-            //var f = RenderTexture.active;
-            //RenderTexture.active = target;
-            //GL.Clear(true, true, _staticRenderDepth % 2 == 0? Color.red : Color.green);
-            //RenderTexture.active = f;
-
-            if (_portal.UseScissorRect) {
-                // Calculate where in screen space the portal lies.
-                // We use this to only render as much of the screen as necessary, avoiding overdraw.
-                cam.ResetProjectionMatrix();
-                cam.rect = new Rect(0, 0, 1, 1);
-                Rect viewportRect = CalculatePortalViewportRect(cam);
-
-                cam.projectionMatrix = MathUtil.ScissorsMatrix(cam.projectionMatrix, viewportRect);
-                cam.rect = viewportRect;
-
-            } else {
-                cam.rect = new Rect(0, 0, 1, 1);
-            }
-
-            Shader.SetGlobalMatrix("_PortalMatrix", _portal.PortalMatrix());
-            Shader.SetGlobalMatrix("_PortalMatrix_I", _portal.PortalMatrix().inverse);
-
-            cam.Render();
-
-            _staticRenderDepth--;
-            _currentlyRenderingPortal = savedCurrentlyRenderingPortal;
-        }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        protected void PreRenderOld() {
+        private void InitializeIfNeeded() {
 #if UNITY_EDITOR
             // Workaround for Unity bug that causes Awake/Start to not be called when running in EditMode
             // https://issuetracker.unity3d.com/issues/awake-and-start-not-called-before-update-when-assembly-is-reloaded-for-executeineditmode-scripts
@@ -385,82 +238,19 @@ namespace Portals {
                 Awake();
             }
 #endif
+        }
+
+        protected override void PreRender() {
+            InitializeIfNeeded();
             SaveMaterialProperties();
 
-            if (!enabled || !_renderer || !_renderer.enabled) {
-                return;
-            }
-
-            if (!_portal.ExitPortal || !_portal.ExitPortal.isActiveAndEnabled) {
-                _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
-                return;
-            }
-
-            PortalCamera currentPortalCamera = PortalCamera.current;
-
-            // Don't ever render our own exit portal
-            if (_staticRenderDepth > 0 && currentPortalCamera != null && _portal == currentPortalCamera.portal.ExitPortal) {
-                //_renderer.enabled = false;
-                return;
-            }
-
-            // The stencil buffer gets used by Unity in deferred rendering and must clear itself, otherwise
-            // it will be full of junk. https://docs.unity3d.com/Manual/SL-Stencil.html
-            if (_staticRenderDepth == 0) {
-                if (Camera.current.actualRenderingPath == RenderingPath.DeferredLighting || Camera.current.actualRenderingPath == RenderingPath.DeferredShading) {
-                   // Camera.current.clearStencilAfterLightingPass = true;
-                }
-            }
-
-            // Stop recursion when we reach maximum depth
-            if (_staticRenderDepth >= _portal.MaxRecursion) {
-                if (_portal.FakeInfiniteRecursion && _portal.MaxRecursion >= 2) {
-                    // Use the previous frame's RenderTexture from the parent camera to render the bottom layer.
-                    // This creates an illusion of infinite recursion, but only works with at least two real recursions
-                    // because the effect is unconvincing using the Main Camera's previous frame.
-                    Camera parentCam = currentPortalCamera.parent;
-                    PortalCamera parentPortalCam = parentCam.GetComponent<PortalCamera>();
-
-                    if (currentPortalCamera.portal == _portal && parentPortalCam.portal == _portal) {
-                        // This portal is currently viewing itself.
-                        // Render the bottom of the stack with the parent camera's view/projection.
-                        PortalCamera.FrameData frameData = parentPortalCam.PreviousFrameData;
-                        Matrix4x4 projectionMatrix;
-                        Matrix4x4 worldToCameraMatrix;
-                        Texture texture;
-                        string sampler;
-                        switch (parentCam.stereoTargetEye) {
-                            case StereoTargetEyeMask.Right:
-                                projectionMatrix = frameData.rightEyeProjectionMatrix;
-                                worldToCameraMatrix = frameData.rightEyeWorldToCameraMatrix;
-                                texture = frameData.rightEyeTexture;
-                                sampler = "_RightEyeTexture";
-                                break;
-                            case StereoTargetEyeMask.Left:
-                            case StereoTargetEyeMask.Both:
-                            case StereoTargetEyeMask.None:
-                            default:
-                                projectionMatrix = frameData.leftEyeProjectionMatrix;
-                                worldToCameraMatrix = frameData.leftEyeWorldToCameraMatrix;
-                                texture = frameData.leftEyeTexture;
-                                sampler = "_LeftEyeTexture";
-                                break;
-                        }
-
-                        _portalMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
-                        _portalMaterial.SetMatrix("PORTAL_MATRIX_VP", projectionMatrix * worldToCameraMatrix);
-                        _portalMaterial.SetTexture(sampler, texture);
-                    } else {
-                        // We are viewing another portal.
-                        // Render the bottom of the stack with a base texture
-                        _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
-                    }
+            Camera currentCam = Camera.current;
+            if (!ShouldRenderPortal(currentCam)) {
+                if (ShouldRenderPreviousFrame(currentCam)) {
+                    RenderPreviousFrame(currentCam);
                 } else {
-                    _portalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
-                    _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
+                    RenderDefaultTexture();
                 }
-
-                // Exit. We don't need to process any further depths.
                 return;
             }
 
@@ -477,15 +267,13 @@ namespace Portals {
             // Calculate where in screen space the portal lies.
             // We use this to only render as much of the screen as necessary, avoiding overdraw.
             Rect viewportRect = CalculatePortalViewportRect(Camera.current);
-            //if (viewportRect.width == 0 || viewportRect.height == 0) {
-            //    return;
-            //}
-            
+            if (viewportRect.width == 0 || viewportRect.height == 0) {
+                return;
+            }
+
             Shader.SetGlobalVector("_ClippingPlane", _portal.ExitPortal.VectorPlane);
 
             _staticRenderDepth++;
-            //RenderTexture tex = portalCamera.RenderToTexture2();
-            //block.SetTexture("_PortalTexture", tex);
             if (Camera.current.stereoEnabled) {
                 // Stereo rendering. Render both eyes.
                 if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Left) {
@@ -500,27 +288,67 @@ namespace Portals {
                 // Mono rendering. Render only one eye, but set which texture to use based on the camera's target eye.
                 RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Mono, viewportRect, renderBackface);
                 block.SetTexture("_LeftEyeTexture", tex);
-                //switch (Camera.current.stereoTargetEye) {
-                //    case StereoTargetEyeMask.Right:
-                //        block.SetTexture("_RightEyeTexture", tex);
-                //        break;
-                //    case StereoTargetEyeMask.None:
-                //    case StereoTargetEyeMask.Left:
-                //    case StereoTargetEyeMask.Both:
-                //    default:
-                //        block.SetTexture("_LeftEyeTexture", tex);
-                //        break;
-                //}
             }
             _staticRenderDepth--;
             _renderer.SetPropertyBlock(block);
             _propertyBlockObjectPool.Give(block);
         }
 
-        protected void PostRenderOld() {
+        protected override void PostRender() {
             _renderer.enabled = true;
             Shader.DisableKeyword("PLANAR_CLIPPING_ENABLED");
             RestoreMaterialProperties();
+        }
+
+
+        private void RenderPreviousFrame(Camera currentCam) {
+            PortalCamera portalCam = PortalCamera.current;
+
+            // Use the previous frame's RenderTexture from the parent camera to render the bottom layer.
+            // This creates an illusion of infinite recursion, but only works with at least two real recursions
+            // because the effect is unconvincing using the Main Camera's previous frame.
+            Camera parentCam = portalCam.parent;
+            PortalCamera parentPortalCam = parentCam.GetComponent<PortalCamera>();
+
+            // Check if the currently rendering portal is viewing itself.
+            // If it is, render the bottom of the stack with the parent camera's view/projection.
+            if (portalCam.portal == _portal && parentPortalCam.portal == _portal) {
+                PortalCamera.FrameData frameData = parentPortalCam.PreviousFrameData;
+                Matrix4x4 projectionMatrix;
+                Matrix4x4 worldToCameraMatrix;
+                Texture texture;
+                string sampler;
+                switch (parentCam.stereoTargetEye) {
+                    case StereoTargetEyeMask.Right:
+                        projectionMatrix = frameData.rightEyeProjectionMatrix;
+                        worldToCameraMatrix = frameData.rightEyeWorldToCameraMatrix;
+                        texture = frameData.rightEyeTexture;
+                        sampler = "_RightEyeTexture";
+                        break;
+                    case StereoTargetEyeMask.Left:
+                    case StereoTargetEyeMask.Both:
+                    case StereoTargetEyeMask.None:
+                    default:
+                        projectionMatrix = frameData.leftEyeProjectionMatrix;
+                        worldToCameraMatrix = frameData.leftEyeWorldToCameraMatrix;
+                        texture = frameData.leftEyeTexture;
+                        sampler = "_LeftEyeTexture";
+                        break;
+                }
+
+                _portalMaterial.EnableKeyword("SAMPLE_PREVIOUS_FRAME");
+                _portalMaterial.SetMatrix("PORTAL_MATRIX_VP", projectionMatrix * worldToCameraMatrix);
+                _portalMaterial.SetTexture(sampler, texture);
+            } else {
+                // We are viewing another portal.
+                // Render the bottom of the stack with a base texture
+                _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
+            }
+        }
+
+        private void RenderDefaultTexture() {
+            _portalMaterial.DisableKeyword("SAMPLE_PREVIOUS_FRAME");
+            _portalMaterial.EnableKeyword("SAMPLE_DEFAULT_TEXTURE");
         }
         #endregion
 

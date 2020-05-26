@@ -26,7 +26,6 @@ namespace Portals {
             depthBufferQuality = PortalDepthBufferQuality._32
         };
         [SerializeField] private PortalAdvancedSettings _advancedSettings = new PortalAdvancedSettings() {
-            useDepthMask = true,
             useCullingMatrix = true,
             useObliqueProjectionMatrix = true,
             useScissorRect = true,
@@ -104,11 +103,6 @@ namespace Portals {
         public bool FakeInfiniteRecursion {
             get { return _fakeInfiniteRecursion; }
             set { _fakeInfiniteRecursion = value; }
-        }
-
-        public bool UseDepthMask {
-            get { return _advancedSettings.useDepthMask; }
-            set { _advancedSettings.useDepthMask = value; }
         }
 
         public bool UseCullingMatrix {
@@ -329,7 +323,6 @@ namespace Portals {
 
         [System.Serializable]
         private struct PortalAdvancedSettings {
-            public bool useDepthMask;
             [Tooltip("If enabled, uses a custom culling matrix to reduce number of objects drawn through a portal.")]
             public bool useCullingMatrix;
             [Tooltip("If enabled, uses a custom projection matrix to prevent objects behind the portal from being drawn.")]

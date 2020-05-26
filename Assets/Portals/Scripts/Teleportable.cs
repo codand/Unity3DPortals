@@ -157,7 +157,7 @@ namespace Portals {
             m_PortalFrameCounter[portal] = 2;
             if (portal.IsOpen && !_contextByPortal.ContainsKey(portal)) {
 
-                Debug.Log("Trigger");
+                //Debug.Log("Trigger");
                 EnterPortal(portal);
             }
         }
@@ -176,7 +176,7 @@ namespace Portals {
 
                     m_PortalFrameCounter[portal] = 2;
                     if (portal.IsOpen && !_contextByPortal.ContainsKey(portal)) {
-                        Debug.Log("Enter " + portal);
+                        //Debug.Log("Enter " + portal);
                         EnterPortal(portal);
                     }
                 }
@@ -188,12 +188,12 @@ namespace Portals {
                 m_PortalFrameCounter[kvp.Key] = count;
                 if (count == -1) {
                     toRemove.Add(kvp.Key);
-                    Debug.Log("Adding " + kvp.Key);
+                    //Debug.Log("Adding " + kvp.Key);
                 }
             }
             
             foreach (var portal in toRemove) {
-                Debug.Log("Exit " + portal);
+                //Debug.Log("Exit " + portal);
                 if (_contextByPortal.ContainsKey(portal)) {
                     ExitPortal(portal);
                 }

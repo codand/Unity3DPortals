@@ -15,32 +15,32 @@ Shader "Portal/PortalBackface"
 
 		//Pass
 		//{
-		//	Name "PORTAL DEFERRED"
-		//	Tags { "LightMode" = "Deferred" }
+		//	// Stencil prevents the backface from rendering if we've already seen the frontface
+		//	// Don't render unless Stencil == 0. The value is decremented when we fail (saw a frontface)
+		//	// so that a recursive layer above us won't be prevented from rendering.
+		//	Stencil{
+		//		Ref 0
+		//		Comp Equal
+		//		Fail DecrSat
+		//		Pass IncrSat
+		//	}	
 
-		//	Blend SrcAlpha OneMinusSrcAlpha
+		//	Blend One Zero
 		//	ZWrite Off
-		//	ZTest Always
-		//	Lighting Off
-		//	Cull Off
+		//	ZTest LEqual
+		//	Cull Front
+		//	ColorMask 0
 
 		//	CGPROGRAM
-		//	#pragma target 3.0
-		//	#pragma exclude_renderers nomrt
+		//	#define IS_BACKFACE
 
-		//	#include "UnityCG.cginc"
 		//	#include "PortalVRHelpers.cginc"
 
 		//	#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
 
 		//	#pragma vertex vertPortal
-		//	#pragma fragment fragDeferred
+		//	#pragma fragment fragPortal
 		//	ENDCG
-		//}
-
-		//Pass {
-		//	ColorMask 0
-		//	ZWrite Off
 		//}
 
 		Pass
@@ -48,17 +48,16 @@ Shader "Portal/PortalBackface"
 			// Stencil prevents the backface from rendering if we've already seen the frontface
 			// Don't render unless Stencil == 0. The value is decremented when we fail (saw a frontface)
 			// so that a recursive layer above us won't be prevented from rendering.
-			Stencil{
-				Ref 0
-				Comp Equal
-				Fail DecrSat
-				Pass IncrSat
-			}	
+			//Stencil{
+			//	Ref 0
+			//	Comp Equal
+			//	Fail DecrSat
+			//	Pass IncrSat
+			//}
 
-			Blend SrcAlpha OneMinusSrcAlpha
+			Blend One Zero
 			ZWrite On
 			ZTest LEqual
-			Lighting Off
 			Cull Back
 
 			CGPROGRAM
@@ -66,7 +65,7 @@ Shader "Portal/PortalBackface"
 
 			#include "PortalVRHelpers.cginc"
 
-			#pragma multi_compile __ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
+			#pragma multi_compile _ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
 
 			#pragma vertex vertPortal
 			#pragma fragment fragPortal
