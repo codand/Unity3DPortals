@@ -26,7 +26,7 @@ namespace Portals {
         private Dictionary<Camera, PortalCamera> _portalByPortalCam = new Dictionary<Camera, PortalCamera>();
 
         // Used to track current recursion depth
-        private static int _staticRenderDepth;
+        private static int _currentRenderDepth;
 
         // Instanced materials
         private Material _portalMaterial;
@@ -126,13 +126,10 @@ namespace Portals {
             Vector3 fbl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
            // Debug.Log($"FTL: {ftl}, FTR: {ftr}, FBR: {fbr}, FBL: {fbl}");
 
-            var min = Min(tl, tr, br, bl, ftl, ftr, fbr, fbl);
-            var max = Max(tl, tr, br, bl, ftl, ftr, fbr, fbl);
-            //var min = Min(tl, tr, br, bl);
-            //var max = Max(tl, tr, br, bl);
-
-            min -= Vector3.one * buffer;
-            max += Vector3.one * buffer;
+            //var min = Min(tl, tr, br, bl, ftl, ftr, fbr, fbl);
+            //var max = Max(tl, tr, br, bl, ftl, ftr, fbr, fbl);
+            var min = Min(tl, tr, br, bl);
+            var max = Max(tl, tr, br, bl);
 
             min = Vector3.Max(Vector3.zero, min);
             max = Vector3.Min(Vector3.one, max);
@@ -142,7 +139,7 @@ namespace Portals {
             Rect viewportRect = new Rect(min.x, min.y, max.x - min.x, max.y - min.y);
             return viewportRect;
         }
-        public float buffer = 0f;
+
         private bool IsCameraUsingDeferredShading(Camera cam) {
             return Camera.current.actualRenderingPath == RenderingPath.DeferredLighting || Camera.current.actualRenderingPath == RenderingPath.DeferredShading;
         }
@@ -181,7 +178,7 @@ namespace Portals {
         //private Dictionary<Camera, RenderTexture> _renderTexturesByCamera = new Dictionary<Camera, RenderTexture>();
 
         private bool IsToplevelCamera() {
-            return _staticRenderDepth == 0;
+            return _currentRenderDepth == 0;
         }
 
         public void OnDestroy() {
@@ -191,9 +188,6 @@ namespace Portals {
                 }
             }
         }
-
-        private static RenderTexture _renderTexture;
-        public FilterMode filterMode = FilterMode.Point;
 
         private void Initialize() {
 #if UNITY_EDITOR
@@ -217,17 +211,17 @@ namespace Portals {
 
             // Don't ever render an exit portal
             // TODO: Disable portal until end of frame
-            bool isRenderingExitPortal = _staticRenderDepth > 0 && _currentlyRenderingPortal == _portal.ExitPortal;
+            bool isRenderingExitPortal = _currentRenderDepth > 0 && _currentlyRenderingPortal == _portal.ExitPortal;
 
             // Don't render too deep
-            bool isAtMaxDepth = _staticRenderDepth >= _portal.MaxRecursion;
+            bool isAtMaxDepth = _currentRenderDepth >= _portal.MaxRecursion;
 
             return isRendererEnabled && isCameraSupported && isExitPortalSet && !isRenderingExitPortal && !isAtMaxDepth;
         }
 
         private bool ShouldRenderPreviousFrame(Camera camera) {
             // Stop recursion when we reach maximum depth
-            return _portal.FakeInfiniteRecursion && _portal.MaxRecursion >= 2 && _staticRenderDepth >= _portal.MaxRecursion;
+            return _portal.FakeInfiniteRecursion && _portal.MaxRecursion >= 2 && _currentRenderDepth >= _portal.MaxRecursion;
         }
 
         private void InitializeIfNeeded() {
@@ -245,15 +239,21 @@ namespace Portals {
             SaveMaterialProperties();
 
             Camera currentCam = Camera.current;
-            if (!ShouldRenderPortal(currentCam)) {
-                if (ShouldRenderPreviousFrame(currentCam)) {
-                    RenderPreviousFrame(currentCam);
-                } else {
-                    RenderDefaultTexture();
-                }
-                return;
+            if (ShouldRenderPortal(currentCam)) {
+                RenderPortal(currentCam);
+            } else if (ShouldRenderPreviousFrame(currentCam)) { 
+                RenderPreviousFrame(currentCam);
+            } else {
+                RenderDefaultTexture();
             }
+        }
 
+        protected override void PostRender() {
+            _renderer.enabled = true;
+            RestoreMaterialProperties();
+        }
+
+        private void RenderPortal(Camera currentCam) {
             MaterialPropertyBlock block = _propertyBlockObjectPool.Take();
             _renderer.GetPropertyBlock(block);
 
@@ -267,11 +267,18 @@ namespace Portals {
             // Calculate where in screen space the portal lies.
             // We use this to only render as much of the screen as necessary, avoiding overdraw.
             Rect viewportRect = CalculatePortalViewportRect(Camera.current);
-            if (viewportRect.width == 0 || viewportRect.height == 0) {
+
+            // Viewport must be at least one pixel wide
+            float pixelWidth = viewportRect.width * currentCam.pixelWidth;
+            float pixelHeight = viewportRect.height * currentCam.pixelHeight;
+            if (pixelWidth < 1 || pixelHeight < 1) {
                 return;
             }
 
-            _staticRenderDepth++;
+            // Save which portal is rendering 
+            var parentPortal = _currentlyRenderingPortal;
+            _currentlyRenderingPortal = _portal;
+            _currentRenderDepth++;
             if (Camera.current.stereoEnabled) {
                 // Stereo rendering. Render both eyes.
                 if (Camera.current.stereoTargetEye == StereoTargetEyeMask.Both || Camera.current.stereoTargetEye == StereoTargetEyeMask.Left) {
@@ -287,15 +294,11 @@ namespace Portals {
                 RenderTexture tex = portalCamera.RenderToTexture(Camera.MonoOrStereoscopicEye.Mono, viewportRect, renderBackface);
                 block.SetTexture("_LeftEyeTexture", tex);
             }
-            _staticRenderDepth--;
-            
+            _currentRenderDepth--;
+            _currentlyRenderingPortal = parentPortal;
+
             _renderer.SetPropertyBlock(block);
             _propertyBlockObjectPool.Give(block);
-        }
-
-        protected override void PostRender() {
-            _renderer.enabled = true;
-            RestoreMaterialProperties();
         }
 
 
@@ -491,7 +494,7 @@ namespace Portals {
             // Decrease the size of the box in which we will render the backface when rendering stereo.
             // This will prevent the backface from appearing in one eye when near the edge of the portal.
             float scaleMultiplier = camera.stereoEnabled ? 0.9f : 1.0f;
-            if (_staticRenderDepth == 0 && LocalXYPlaneContainsPoint(Camera.current.transform.position, scaleMultiplier)) {
+            if (_currentRenderDepth == 0 && LocalXYPlaneContainsPoint(Camera.current.transform.position, scaleMultiplier)) {
                 // Camera is within the border of the camera
                 if (!_portal.Plane.GetSide(Camera.current.transform.position)) {
                     return true;
@@ -550,8 +553,6 @@ namespace Portals {
                 // TODO: Awake doesn't get called when using ExecuteInEditMode
                 portalCamera = go.AddComponent<PortalCamera>();
                 portalCamera.Awake();
-                portalCamera.enterScene = this.gameObject.scene;
-                portalCamera.exitScene = _portal.ExitPortal ? _portal.ExitPortal.gameObject.scene : this.gameObject.scene;
                 portalCamera.parent = currentCamera;
                 portalCamera.portal = _portal;
 
