@@ -59,6 +59,7 @@ Shader "Portal/PortalBackface"
 			ZWrite On
 			ZTest LEqual
 			Cull Back
+			Offset -.01,0
 
 			CGPROGRAM
 			#define IS_BACKFACE
@@ -72,5 +73,5 @@ Shader "Portal/PortalBackface"
 			ENDCG
 		}
 	}
-	FallBack "VertexLit"
+	//FallBack "VertexLit"
 }

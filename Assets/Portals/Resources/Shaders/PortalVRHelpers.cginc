@@ -89,9 +89,25 @@ fixed4 fragPortal(v2f i, fixed face : VFACE) : SV_Target
 
 #ifndef IS_BACKFACE
 	col.a = tex2D(_TransparencyMask, i.objUV).r;
+    //clip(col.a);
 #endif
 
 	return col;
+}
+
+v2f vertPortalShadowCaster(appdata v) {
+	v2f o;
+	o.pos = UnityObjectToClipPos(v.vertex);
+	o.objUV = v.uv;
+	return o;
+}
+
+fixed fragPortalShadowCaster(v2f i) : SV_Target
+{
+	fixed alpha = tex2D(_TransparencyMask, i.objUV).x;
+	clip(alpha - 0.5);
+    
+	return 0;
 }
 
 #endif // PORTAL_VR_HELPERS_INCLUDED

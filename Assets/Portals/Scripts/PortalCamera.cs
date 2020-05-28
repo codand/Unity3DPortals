@@ -215,6 +215,18 @@ namespace Portals {
 
             if (_portal.UseObliqueProjectionMatrix) {
                 _camera.projectionMatrix = CalculateObliqueProjectionMatrix(projectionMatrix);
+            } else {
+                CommandBuffer enableClippingCmdBuffer = new CommandBuffer();
+                enableClippingCmdBuffer.EnableShaderKeyword("PLANAR_CLIPPING_ENABLED");
+                enableClippingCmdBuffer.SetGlobalVector("_ClippingPlane", _portal.ExitPortal.VectorPlane);
+                CommandBuffer disableClippingCmdBuffer = new CommandBuffer();
+                disableClippingCmdBuffer.DisableShaderKeyword("PLANAR_CLIPPING_ENABLED");
+
+                _camera.RemoveAllCommandBuffers();
+                _camera.AddCommandBuffer(CameraEvent.BeforeForwardOpaque, enableClippingCmdBuffer);
+                _camera.AddCommandBuffer(CameraEvent.BeforeDepthTexture, enableClippingCmdBuffer);
+                _camera.AddCommandBuffer(CameraEvent.AfterDepthTexture, disableClippingCmdBuffer);
+                _camera.AddCommandBuffer(CameraEvent.AfterForwardOpaque, disableClippingCmdBuffer);
             }
 
             if (_portal.UseCullingMatrix) {
@@ -313,6 +325,33 @@ namespace Portals {
             }
         }
 
+        //Matrix4x4 CalculateObliqueProjectionMatrix(Matrix4x4 projectionMatrix) {
+        //    // Calculate plane made from the exit portal's transform
+        //    Plane exitPortalPlane = _portal.ExitPortal.Plane;
+
+        //    // Determine whether or not we've crossed the plane already. If we have, we don't need to apply
+        //    // oblique frustum clipping. Offset the value by our portal's ClippingOffset to reduce the effects
+        //    // so that it swaps over slightly early. This helps reduce artifacts caused by loss of depth accuracy.
+        //    bool onCloseSide = new Plane(exitPortalPlane.normal, exitPortalPlane.distance - _portal.ClippingOffset).GetSide(transform.position);
+        //    if (onCloseSide) {
+        //        // Offset the clipping plane itself so that a character walking through a portal has no seams
+        //        exitPortalPlane.distance -= _portal.ClippingOffset / 2;
+
+        //        // Project our world space clipping plane to the camera's local coordinates
+        //        // e.g. normal (0, 0, 1) becomes (1, 0, 0) if we're looking left parallel to the plane
+        //        Vector4 cameraSpaceNormal = _camera.transform.InverseTransformDirection(exitPortalPlane.normal);
+        //        Vector4 cameraSpacePoint = _camera.transform.InverseTransformPoint(exitPortalPlane.normal * -exitPortalPlane.distance);
+
+        //        // Calculate the d value for our plane by projecting our transformed point
+        //        // onto our transformed normal vector.
+        //        float distanceFromPlane = Vector4.Dot(cameraSpaceNormal, cameraSpacePoint);
+        //        Vector4 cameraSpacePlane = new Vector4(-cameraSpaceNormal.x, -cameraSpaceNormal.y, cameraSpaceNormal.z, distanceFromPlane);
+
+        //        MathUtil.MakeProjectionMatrixOblique(ref projectionMatrix, cameraSpacePlane);
+        //    }
+        //    return projectionMatrix;
+        //}
+
         Matrix4x4 CalculateObliqueProjectionMatrix(Matrix4x4 projectionMatrix) {
             // Calculate plane made from the exit portal's transform
             Plane exitPortalPlane = _portal.ExitPortal.Plane;
@@ -320,23 +359,15 @@ namespace Portals {
             // Determine whether or not we've crossed the plane already. If we have, we don't need to apply
             // oblique frustum clipping. Offset the value by our portal's ClippingOffset to reduce the effects
             // so that it swaps over slightly early. This helps reduce artifacts caused by loss of depth accuracy.
-            bool onCloseSide = new Plane(exitPortalPlane.normal, exitPortalPlane.distance - _portal.ClippingOffset).GetSide(transform.position);
-            if (onCloseSide) {
+            //bool onCloseSide = new Plane(exitPortalPlane.normal, exitPortalPlane.distance - _portal.ClippingOffset).GetSide(transform.position);
+            //if (onCloseSide) {
+                Vector4 exitPlaneWorldSpace = _portal.ExitPortal.VectorPlane;
+                Vector4 exitPlaneCameraSpace = _camera.worldToCameraMatrix.inverse.transpose * exitPlaneWorldSpace;
                 // Offset the clipping plane itself so that a character walking through a portal has no seams
-                exitPortalPlane.distance -= _portal.ClippingOffset / 2;
-
-                // Project our world space clipping plane to the camera's local coordinates
-                // e.g. normal (0, 0, 1) becomes (1, 0, 0) if we're looking left parallel to the plane
-                Vector4 cameraSpaceNormal = _camera.transform.InverseTransformDirection(exitPortalPlane.normal);
-                Vector4 cameraSpacePoint = _camera.transform.InverseTransformPoint(exitPortalPlane.normal * -exitPortalPlane.distance);
-
-                // Calculate the d value for our plane by projecting our transformed point
-                // onto our transformed normal vector.
-                float distanceFromPlane = Vector4.Dot(cameraSpaceNormal, cameraSpacePoint);
-                Vector4 cameraSpacePlane = new Vector4(-cameraSpaceNormal.x, -cameraSpaceNormal.y, cameraSpaceNormal.z, distanceFromPlane);
-
-                MathUtil.MakeProjectionMatrixOblique(ref projectionMatrix, cameraSpacePlane);
-            }
+                exitPlaneCameraSpace.w += _portal.ClippingOffset;
+                exitPlaneCameraSpace *= -1;
+                MathUtil.MakeProjectionMatrixOblique(ref projectionMatrix, exitPlaneCameraSpace);
+            //}
             return projectionMatrix;
         }
 

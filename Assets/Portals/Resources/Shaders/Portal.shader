@@ -206,6 +206,27 @@ Shader "Portal/Portal"
 			#pragma fragment fragPortal
 			ENDCG
 		}
+
+
+		Pass
+		{
+			Name "Portal ShadowCaster"
+			Tags { "LightMode" = "ShadowCaster" }
+
+			ZWrite On
+			ZTest LEqual
+			Cull Back
+
+			CGPROGRAM
+			#include "UnityCG.cginc"
+			#include "PortalVRHelpers.cginc"
+
+			#pragma vertex vertPortalShadowCaster
+			#pragma fragment fragPortalShadowCaster
+			ENDCG
+		}
+
+		//UsePass "Standard/SHADOWCASTER"
 	}
-	FallBack "VertexLit"
+	//FallBack "VertexLit"
 }

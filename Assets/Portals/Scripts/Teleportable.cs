@@ -571,6 +571,7 @@ namespace Portals {
                 clippingPlane.w -= VisualClippingOffset;
                 renderer.material.shader = _replacementShader;
                 renderer.material.SetVector(_clippingPlaneShaderHash, clippingPlane);
+                renderer.material.EnableKeyword("PLANAR_CLIPPING_ENABLED");
             }
 
             foreach (Transform child in obj.transform) {

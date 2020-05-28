@@ -271,8 +271,6 @@ namespace Portals {
                 return;
             }
 
-            Shader.SetGlobalVector("_ClippingPlane", _portal.ExitPortal.VectorPlane);
-
             _staticRenderDepth++;
             if (Camera.current.stereoEnabled) {
                 // Stereo rendering. Render both eyes.
@@ -290,13 +288,13 @@ namespace Portals {
                 block.SetTexture("_LeftEyeTexture", tex);
             }
             _staticRenderDepth--;
+            
             _renderer.SetPropertyBlock(block);
             _propertyBlockObjectPool.Give(block);
         }
 
         protected override void PostRender() {
             _renderer.enabled = true;
-            Shader.DisableKeyword("PLANAR_CLIPPING_ENABLED");
             RestoreMaterialProperties();
         }
 
@@ -466,6 +464,7 @@ namespace Portals {
             if (_portalMaterial.IsKeywordEnabled("SAMPLE_DEFAULT_TEXTURE")) {
                 keywords |= ShaderKeyword.SampleDefaultTexture;
             }
+
             _shaderKeywordStack.Push(keywords);
         }
 
@@ -486,18 +485,6 @@ namespace Portals {
             } else {
                 _portalMaterial.DisableKeyword("SAMPLE_DEFAULT_TEXTURE");
             }
-        }
-
-        private void SaveMaterialProperties2() {
-            MaterialPropertyBlock block = _propertyBlockObjectPool.Take();
-            _renderer.GetPropertyBlock(block);
-            _propertyBlockStack.Push(block);
-        }
-
-        private void RestoreMaterialProperties2() {
-            MaterialPropertyBlock block = _propertyBlockStack.Pop();
-            _renderer.SetPropertyBlock(block);
-            _propertyBlockObjectPool.Give(block);
         }
 
         private bool ShouldRenderBackface(Camera camera) {

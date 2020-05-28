@@ -38,14 +38,19 @@ namespace Portals {
         private PortalRenderer _portalRenderer;
 
         public delegate void PortalIgnoredCollidersChangedEvent(Portal portal, Collider[] oldColliders, Collider[] newColliders);
-        public event PortalIgnoredCollidersChangedEvent OnIgnoredCollidersChanged;
-
         public delegate void PortalExitChangeEvent(Portal portal, Portal oldExitPortal, Portal newExitPortal);
-        public event PortalExitChangeEvent OnExitPortalChanged;
-
         public delegate void PortalTextureChangeEvent(Portal portal, Texture oldTexture, Texture newTexture);
+        public delegate void PortalSpawnEvent(Portal portal);
+
+        public event PortalExitChangeEvent OnExitPortalChanged;
+        public event PortalIgnoredCollidersChangedEvent OnIgnoredCollidersChanged;
         public event PortalTextureChangeEvent OnDefaultTextureChanged;
         public event PortalTextureChangeEvent OnTransparencyMaskChanged;
+
+        public static event PortalSpawnEvent OnPortalSpawn;
+        public static event PortalSpawnEvent OnPortalDespawn;
+
+        public static List<Portal> AllPortals { get; private set; } = new List<Portal>();
 
         public PortalRenderer PortalRenderer {
             get {
@@ -301,6 +306,16 @@ namespace Portals {
             ExitPortal = _exitPortal;
             DefaultTexture = _defaultTexture;
             TransparencyMask = _transparencyMask;
+        }
+
+        private void OnEnable() {
+            AllPortals.Add(this);
+            OnPortalSpawn?.Invoke(this);
+        }
+
+        private void OnDisable() {
+            AllPortals.Remove(this);
+            OnPortalDespawn?.Invoke(this);
         }
 
         public enum PortalDepthBufferQuality {
