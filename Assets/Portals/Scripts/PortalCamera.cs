@@ -225,9 +225,6 @@ namespace Portals {
             }
 
             RenderTexture texture = GetTemporaryRT();
-            RenderTexture.active = texture;
-            GL.Clear(true, true, Color.clear);
-
             _camera.targetTexture = texture;
             _camera.Render();
 
