@@ -161,7 +161,8 @@ namespace Portals {
             // TODO: figure out correct settings for VRUsage, memoryless, and dynamic scale
             RenderTexture rt = RenderTexture.GetTemporary(w, h, depth, format, writeMode, msaaSamples, memoryless, vrUsage, useDynamicScale);
             rt.name = this.gameObject.name;
-            rt.filterMode = FilterMode.Point;
+            //rt.filterMode = FilterMode.Point;
+            rt.filterMode = FilterMode.Bilinear;
 
             return rt;
         }
@@ -198,15 +199,16 @@ namespace Portals {
                 CommandBuffer enableClippingCmdBuffer = new CommandBuffer();
                 enableClippingCmdBuffer.EnableShaderKeyword("PLANAR_CLIPPING_ENABLED");
                 enableClippingCmdBuffer.SetGlobalVector("_ClippingPlane", _portal.ExitPortal.VectorPlane);
-                enableClippingCmdBuffer.ClearRenderTarget(false, true, Color.red);
+                //enableClippingCmdBuffer.ClearRenderTarget(true, true, Color.red, 0);
+
                 CommandBuffer disableClippingCmdBuffer = new CommandBuffer();
                 disableClippingCmdBuffer.DisableShaderKeyword("PLANAR_CLIPPING_ENABLED");
 
                 _camera.RemoveAllCommandBuffers();
                 _camera.AddCommandBuffer(CameraEvent.BeforeForwardOpaque, enableClippingCmdBuffer);
+                _camera.AddCommandBuffer(CameraEvent.AfterForwardOpaque, disableClippingCmdBuffer);
                 _camera.AddCommandBuffer(CameraEvent.BeforeDepthTexture, enableClippingCmdBuffer);
                 _camera.AddCommandBuffer(CameraEvent.AfterDepthTexture, disableClippingCmdBuffer);
-                _camera.AddCommandBuffer(CameraEvent.AfterForwardOpaque, disableClippingCmdBuffer);
             }
 
             if (_portal.UseCullingMatrix) {
@@ -223,6 +225,9 @@ namespace Portals {
             }
 
             RenderTexture texture = GetTemporaryRT();
+            RenderTexture.active = texture;
+            GL.Clear(true, true, Color.clear);
+
             _camera.targetTexture = texture;
             _camera.Render();
 

@@ -71,7 +71,6 @@ namespace Portals {
 
         }
 
-
         private Vector4 ClampedWorldToViewportPoint(Camera cam, Vector3 worldPoint) {
             //Vector3 viewportPoint = cam.WorldToViewportPoint(worldPoint);
             Matrix4x4 p = cam.projectionMatrix;
@@ -81,12 +80,16 @@ namespace Portals {
             Vector4 hPoint = vp * point;
             Vector3 ndcPoint;
             if (hPoint.w > 0) {
+                // In front of the camera
                 ndcPoint = ((Vector3)hPoint) / hPoint.w;
             } else {
+                // Behind the camera
                 ndcPoint = new Vector3(Mathf.Sign(hPoint.x), Mathf.Sign(hPoint.y), 0);
             }
-            
+
             Vector3 viewPoint = new Vector3(ndcPoint.x / 2 + 0.5f, ndcPoint.y / 2 + 0.5f, hPoint.w);
+
+            //Debug.Log(hPoint.ToString("F2") + " " + ndcPoint.ToString("F2") + " " + viewPoint.ToString("F2"));
             return viewPoint;
         }
 
@@ -110,31 +113,32 @@ namespace Portals {
             // TODO: using the exit portal corners might cause issues with the backface
 
             // TODO: do this shit better. cache worldspacecorners maybe
-
             Vector4 tl, tr, br, bl;
-            
             var corners = _portal.WorldSpaceCorners();
             tl = ClampedWorldToViewportPoint(Camera.current, corners[0]);
             tr = ClampedWorldToViewportPoint(Camera.current, corners[1]);
             br = ClampedWorldToViewportPoint(Camera.current, corners[2]);
             bl = ClampedWorldToViewportPoint(Camera.current, corners[3]);
             //Debug.Log($"TL: {tl}, TR: {tr}, BR: {br}, BL: {bl}");
+            
+            Vector3 min = Min(tl, tr, br, bl);
+            Vector3 max = Max(tl, tr, br, bl);
 
-            Vector3 ftl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, 0.5f, 1.0f)));
-            Vector3 ftr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 1.0f)));
-            Vector3 fbr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
-            Vector3 fbl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
-           // Debug.Log($"FTL: {ftl}, FTR: {ftr}, FBR: {fbr}, FBL: {fbl}");
+            if (tl.z <= 0 || tr.z <= 0 || br.z <= 0 || bl.z <= 0) {
+                Vector3 ftl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, 0.5f, 1.0f)));
+                Vector3 ftr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 1.0f)));
+                Vector3 fbr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
+                Vector3 fbl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
 
-            //var min = Min(tl, tr, br, bl, ftl, ftr, fbr, fbl);
-            //var max = Max(tl, tr, br, bl, ftl, ftr, fbr, fbl);
-            var min = Min(tl, tr, br, bl);
-            var max = Max(tl, tr, br, bl);
+                min = Min(min, ftl, ftr, fbr, fbl);
+                max = Max(max, ftl, ftr, fbr, fbl);
+            }
+
+            //Debug.Log("Min: " + min + " Max: " + max);
 
             min = Vector3.Max(Vector3.zero, min);
             max = Vector3.Min(Vector3.one, max);
 
-            //Debug.Log("Min: " + min + " Max: " + max);
 
             Rect viewportRect = new Rect(min.x, min.y, max.x - min.x, max.y - min.y);
             return viewportRect;
