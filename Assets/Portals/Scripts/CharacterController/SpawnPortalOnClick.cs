@@ -12,6 +12,9 @@ static internal class AnimationCurves {
 }
 
 public class SpawnPortalOnClick : MonoBehaviour {
+    private static Color RightPortalColor = new Color(255, 0, 0);
+    private static Color LeftPortalColor = new Color(0, 240, 255);
+
     [SerializeField] Camera _camera;
     [SerializeField] GameObject _bulletPrefab;
     [SerializeField] float _bulletSpawnOffset = 3.0f;
@@ -41,8 +44,8 @@ public class SpawnPortalOnClick : MonoBehaviour {
             return;
         }
 
-        _leftPortal = SpawnPortal(Vector3.zero, Quaternion.identity, Color.blue);
-        _rightPortal = SpawnPortal(Vector3.zero, Quaternion.identity, Color.red);
+        _leftPortal = SpawnPortal(Vector3.zero, Quaternion.identity, LeftPortalColor);
+        _rightPortal = SpawnPortal(Vector3.zero, Quaternion.identity, RightPortalColor);
 
         _leftPortal.ExitPortal = _rightPortal;
         _rightPortal.ExitPortal = _leftPortal;
@@ -91,7 +94,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
         }
         
         // Spawn a bullet that will auto-destroy itself after it travels a certain distance
-        Color color = polarity == Polarity.Left ? Color.blue : Color.red;
+        Color color = polarity == Polarity.Left ? LeftPortalColor : RightPortalColor;
         SpawnBullet(_bulletPrefab, _camera.transform.position + _camera.transform.forward * _bulletSpawnOffset, _camera.transform.forward, hit.distance, color);
     }
 

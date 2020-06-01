@@ -9,9 +9,11 @@ Properties {
 
 Category {
 	Tags { "Queue"="Transparent" "IgnoreProjector"="True" "RenderType"="Transparent" "PreviewType"="Plane" }
-	Blend SrcAlpha One
+	//Blend SrcAlpha One
+	Blend SrcAlpha OneMinusSrcAlpha
 	ColorMask RGB
 	Cull Back Lighting Off ZWrite Off
+	Offset -2, -2
 	
 	SubShader {
 		Pass {
