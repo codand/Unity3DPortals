@@ -24,6 +24,9 @@ public class SpawnPortalOnClick : MonoBehaviour {
     [SerializeField] bool _shootThroughPortals = false;
     [SerializeField] int _meshColliderIterationCount = 10;
 
+    [SerializeField] float _portalWaveAmplitude = 0.2f;
+    [SerializeField] float _portalWaveDuration = 0.5f;
+
     Portal _leftPortal;
     Portal _rightPortal;
 
@@ -57,50 +60,69 @@ public class SpawnPortalOnClick : MonoBehaviour {
         bool rightClick = Input.GetMouseButtonDown(1);
 
         if (leftClick || rightClick) {
-            Ray ray = new Ray(_camera.transform.position, _camera.transform.forward);
-            RaycastHit hit;
-            bool hitSomething;
-
-            if (_shootThroughPortals) {
-                hitSomething = PortalPhysics.Raycast(ray, out hit, Mathf.Infinity, _canHit, QueryTriggerInteraction.Ignore);
-            } else {
-                hitSomething = Physics.Raycast(ray, out hit, Mathf.Infinity, _canHit, QueryTriggerInteraction.Ignore);
-            }
-
-            if (hitSomething) {
-                // Spawn a bullet that will auto-destroy itself after it travels a certain distance
-                Color color = leftClick ? Color.blue : Color.red;
-                SpawnBullet(_bulletPrefab, _camera.transform.position + _camera.transform.forward * _bulletSpawnOffset, _camera.transform.forward, hit.distance, color);
-
-                Portal portal = leftClick ? _leftPortal : _rightPortal;
-
-                // Calculate the portal's rotation based off the hit object's normal.
-                // Portals on walls should be upright, portals on the ground can be rotated in any way.
-                Quaternion rotation = CalculateRotation(_camera.transform.forward, hit.normal);
-
-                // Set portal position and rotation. Need to do this before calling FindFit so we can get
-                // the portal's corners in world space
-                portal.transform.position = hit.point;
-                portal.transform.rotation = rotation;
-
-                // Make sure the portal can fit flushly on the object we've hit.
-                // If it can fit, but it's hanging off the edge, push it in.
-                // Otherwise, disable the portal.
-                Vector3 newPosition;
-                if (FindFit(portal, hit.collider, out newPosition)) {
-                    portal.transform.position = newPosition + hit.normal * _normalOffset;
-                    portal.IgnoredColliders = new Collider[] { hit.collider };
-                    portal.gameObject.SetActive(true);
-
-                    // Scale the portal's renderer up from 0 to 1 for a nice visual pop-in
-                    Renderer portalRenderer = portal.GetComponentInChildren<MeshRenderer>();
-                    SetScaleOverTime(portalRenderer.transform, Vector3.zero, Vector3.one, _portalSpawnCurve, _portalSpawnTime);
-                } else {
-                    portal.gameObject.SetActive(false);
-                }
-            }
+            Polarity polarity = leftClick ? Polarity.Left : Polarity.Right;
+            Fire(polarity);
         }
 	}
+
+    private enum Polarity {
+        Left,
+        Right
+    }
+
+    private void Fire(Polarity polarity) {
+        Ray ray = new Ray(_camera.transform.position, _camera.transform.forward);
+        RaycastHit hit;
+        bool hitWall;
+
+        if (_shootThroughPortals) {
+            hitWall = PortalPhysics.Raycast(ray, out hit, Mathf.Infinity, _canHit, QueryTriggerInteraction.Ignore);
+        } else {
+            hitWall = Physics.Raycast(ray, out hit, Mathf.Infinity, _canHit, QueryTriggerInteraction.Ignore);
+        }
+
+        // Test if we hit a portal first to make them wobble
+        bool hitPortal = Physics.Raycast(ray, out RaycastHit portalHit, Mathf.Infinity, PortalPhysics.PortalLayerMask, QueryTriggerInteraction.Collide);
+        if (hitPortal) {
+            Portal portal = portalHit.collider.GetComponentInParent<Portal>();
+            WavePortalOverTime(portal, hit.point, _portalWaveAmplitude, _portalWaveDuration);
+        } else if (hitWall) {
+            TrySpawnPortal(polarity, hit);
+        }
+        
+        // Spawn a bullet that will auto-destroy itself after it travels a certain distance
+        Color color = polarity == Polarity.Left ? Color.blue : Color.red;
+        SpawnBullet(_bulletPrefab, _camera.transform.position + _camera.transform.forward * _bulletSpawnOffset, _camera.transform.forward, hit.distance, color);
+    }
+
+    private void TrySpawnPortal(Polarity polarity, RaycastHit hit) {
+        Portal portal = polarity == Polarity.Left ? _leftPortal : _rightPortal;
+
+        // Calculate the portal's rotation based off the hit object's normal.
+        // Portals on walls should be upright, portals on the ground can be rotated in any way.
+        Quaternion rotation = CalculateRotation(_camera.transform.forward, hit.normal);
+
+        // Set portal position and rotation. Need to do this before calling FindFit so we can get
+        // the portal's corners in world space
+        portal.transform.position = hit.point;
+        portal.transform.rotation = rotation;
+
+        // Make sure the portal can fit flushly on the object we've hit.
+        // If it can fit, but it's hanging off the edge, push it in.
+        // Otherwise, disable the portal.
+        Vector3 newPosition;
+        if (FindFit(portal, hit.collider, out newPosition)) {
+            portal.transform.position = newPosition + hit.normal * _normalOffset;
+            portal.IgnoredColliders = new Collider[] { hit.collider };
+            portal.gameObject.SetActive(true);
+
+            // Scale the portal's renderer up from 0 to 1 for a nice visual pop-in
+            Renderer portalRenderer = portal.GetComponentInChildren<MeshRenderer>();
+            SetScaleOverTime(portalRenderer.transform, Vector3.zero, Vector3.one, _portalSpawnCurve, _portalSpawnTime);
+        } else {
+            portal.gameObject.SetActive(false);
+        }
+    }
 
     Portal SpawnPortal(Vector3 location, Quaternion rotation, Color color) {
         GameObject obj = Instantiate(_portalPrefab, location, rotation);
@@ -263,18 +285,45 @@ public class SpawnPortalOnClick : MonoBehaviour {
         return true;
     }
 
-    void SetScaleOverTime(Transform t, Vector3 startSize, Vector3 endSize, AnimationCurve curve, float time) {
-        StartCoroutine(ScaleOverTimeRoutine(t, startSize, endSize, curve, time));
+    void SetScaleOverTime(Transform t, Vector3 startSize, Vector3 endSize, AnimationCurve curve, float duratio) {
+        StartCoroutine(ScaleOverTimeRoutine(t, startSize, endSize, curve, duratio));
     }
 
-    IEnumerator ScaleOverTimeRoutine(Transform t, Vector3 startSize, Vector3 endSize, AnimationCurve curve, float time) {
+    IEnumerator ScaleOverTimeRoutine(Transform t, Vector3 startSize, Vector3 endSize, AnimationCurve curve, float duration) {
         float elapsed = 0;
-        while (elapsed < time) {
-            t.localScale = Vector3.LerpUnclamped(startSize, endSize, curve.Evaluate(elapsed / time));
+        while (elapsed < duration) {
+            t.localScale = Vector3.LerpUnclamped(startSize, endSize, curve.Evaluate(elapsed / duration));
             yield return null;
             elapsed += Time.deltaTime;
         }
         t.localScale = endSize;
+    }
+
+    private Vector2 CalculatePortalUVSpacePoint(Portal portal, Vector3 pointWorldSpace) {
+        // This calculation is specific to the portal mesh used at the time of writing
+        return portal.transform.InverseTransformPoint(pointWorldSpace) + Vector3.one * 0.5f;
+    }
+
+    private void WavePortalOverTime(Portal portal, Vector3 originWorldSpace, float amplitude, float duration) {
+        StartCoroutine(WavePortalOverTimeRoutine(portal, originWorldSpace, amplitude, duration));
+    }
+
+    IEnumerator WavePortalOverTimeRoutine(Portal portal, Vector3 originWorldSpace, float amplitude, float duration) {
+        Vector2 originUVSpace = CalculatePortalUVSpacePoint(portal, originWorldSpace);
+        portal.PortalRenderer.FrontFaceMaterial.SetVector("_WaveOrigin", originUVSpace);
+        portal.PortalRenderer.BackFaceMaterial.SetVector("_WaveOrigin", originUVSpace);
+
+        float elapsed = 0;
+        while (elapsed < duration) {
+            float ratio = elapsed / duration;
+            float amp = (1 - ratio) * amplitude; // Fade to zero over time
+            portal.PortalRenderer.FrontFaceMaterial.SetFloat("_WaveAmplitude", amp);
+            portal.PortalRenderer.BackFaceMaterial.SetFloat("_WaveAmplitude", amp);
+            yield return null;
+            elapsed += Time.deltaTime;
+        }
+        portal.PortalRenderer.FrontFaceMaterial.SetFloat("_WaveAmplitude", 0);
+        portal.PortalRenderer.BackFaceMaterial.SetFloat("_WaveAmplitude", 0);
     }
 
     GameObject SpawnBullet(GameObject prefab, Vector3 position, Vector3 direction, float distance, Color color) {

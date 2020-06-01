@@ -211,12 +211,6 @@ namespace Portals {
                 _camera.AddCommandBuffer(CameraEvent.AfterDepthTexture, disableClippingCmdBuffer);
             }
 
-            if (_portal.UseCullingMatrix) {
-                _camera.cullingMatrix = CalculateCullingMatrix();
-            } else {
-                _camera.ResetCullingMatrix();
-            }
-
             if (_portal.UseScissorRect) {
                 _camera.rect = viewportRect;
                 _camera.projectionMatrix = MathUtil.ScissorsMatrix(_camera.projectionMatrix, viewportRect);
@@ -278,35 +272,6 @@ namespace Portals {
                 MathUtil.MakeProjectionMatrixOblique(ref projectionMatrix, exitPlaneCameraSpace);
             //}
             return projectionMatrix;
-        }
-
-        private Matrix4x4 CalculateCullingMatrix() {
-            _camera.ResetCullingMatrix();
-
-            // Lower left of the backside of our plane in world coordinates
-            Vector3 pa = _portal.ExitPortal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 0));
-
-            // Lower right
-            Vector3 pb = _portal.ExitPortal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 0));
-
-            // Upper left
-            Vector3 pc = _portal.ExitPortal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 0));
-
-            Vector3 pe = _camera.transform.position;
-
-            // Calculate what our horizontal field of view would be with off-axis projection.
-            // If this fov is greater than our camera's fov, we should just use the camera's default projection
-            // matrix instead. Otherwise, the frustum's fov will approach 180 degrees (way too large).
-            Vector3 camToLowerLeft = pa - _camera.transform.position;
-            camToLowerLeft.y = 0;
-            Vector3 camToLowerRight = pb - _camera.transform.position;
-            camToLowerRight.y = 0;
-            float fieldOfView = Vector3.Angle(camToLowerLeft, camToLowerRight);
-            if (fieldOfView > _camera.fieldOfView) {
-                return _camera.cullingMatrix;
-            } else {
-                return MathUtil.OffAxisProjectionMatrix(_camera.nearClipPlane, _camera.farClipPlane, pa, pb, pc, pe);
-            }
         }
 
         [System.Serializable] // TODO: shouldn't be serializable in the future

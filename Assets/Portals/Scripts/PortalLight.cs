@@ -112,10 +112,6 @@ namespace Portals {
                     }
                 }
             }
-
-            // If we don't set this here, it is possible to leave this value non-zero in the main scene
-            // which will cause normal lights to use the portal shadows when they shouldn't.
-            Shader.SetGlobalFloat("_UseShadowPlanes", 0);
         }
 
         private void UpdateCommandBuffers() {

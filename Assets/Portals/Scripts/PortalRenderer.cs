@@ -54,6 +54,9 @@ namespace Portals {
                 return _mesh;
             }
         }
+
+        public Material FrontFaceMaterial => _portalMaterial;
+        public Material BackFaceMaterial => _backfaceMaterial;
         #endregion
 
         #region Enums
@@ -382,6 +385,9 @@ namespace Portals {
                 _portalMaterial.SetTexture("_TransparencyMask", _portal.TransparencyMask);
                 _portalMaterial.SetTexture("_DefaultTexture", _portal.DefaultTexture);
 
+                _backfaceMaterial.SetTexture("_TransparencyMask", _portal.TransparencyMask);
+                _backfaceMaterial.SetTexture("_DefaultTexture", _portal.DefaultTexture);
+
                 _renderer.sharedMaterials = new Material[] {
                     _portalMaterial,
                     _backfaceMaterial,
@@ -436,10 +442,12 @@ namespace Portals {
         #region Callbacks
         private void OnDefaultTextureChanged(Portal portal, Texture oldTexture, Texture newTexture) {
             _portalMaterial.SetTexture("_DefaultTexture", newTexture);
+            _backfaceMaterial.SetTexture("_DefaultTexture", newTexture);
         }
 
         private void OnTransparencyMaskChanged(Portal portal, Texture oldTexture, Texture newTexture) {
             _portalMaterial.SetTexture("_TransparencyMask", newTexture);
+            _backfaceMaterial.SetTexture("_TransparencyMask", newTexture);
         }
 
 

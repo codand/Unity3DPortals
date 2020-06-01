@@ -26,10 +26,8 @@ namespace Portals {
             depthBufferQuality = PortalDepthBufferQuality._32
         };
         [SerializeField] private PortalAdvancedSettings _advancedSettings = new PortalAdvancedSettings() {
-            useCullingMatrix = true,
             useObliqueProjectionMatrix = true,
             useScissorRect = true,
-            copyGBuffer = true,
             clippingOffset = 0.01f,
             copyGlobalIllumination = false,
             supportedCameraTypes = CameraType.Game | CameraType.SceneView,
@@ -110,11 +108,6 @@ namespace Portals {
             set { _fakeInfiniteRecursion = value; }
         }
 
-        public bool UseCullingMatrix {
-            get { return _advancedSettings.useCullingMatrix; }
-            set { _advancedSettings.useCullingMatrix = value; }
-        }
-
         public bool UseObliqueProjectionMatrix {
             get { return _advancedSettings.useObliqueProjectionMatrix; }
             set { _advancedSettings.useObliqueProjectionMatrix = value; }
@@ -128,16 +121,6 @@ namespace Portals {
         public float ClippingOffset {
             get { return _advancedSettings.clippingOffset; }
             set { _advancedSettings.clippingOffset = value; }
-        }
-
-        public bool CopyGlobalIllumination {
-            get { return _advancedSettings.copyGlobalIllumination; }
-            set { _advancedSettings.copyGlobalIllumination = value; }
-        }
-
-        public bool CopyGBuffer {
-            get { return _advancedSettings.copyGBuffer; }
-            set { _advancedSettings.copyGBuffer = value; }
         }
 
         // TODO: match style
@@ -338,13 +321,10 @@ namespace Portals {
 
         [System.Serializable]
         private struct PortalAdvancedSettings {
-            [Tooltip("If enabled, uses a custom culling matrix to reduce number of objects drawn through a portal.")]
-            public bool useCullingMatrix;
             [Tooltip("If enabled, uses a custom projection matrix to prevent objects behind the portal from being drawn.")]
             public bool useObliqueProjectionMatrix;
             [Tooltip("Enabling reduces overdraw by not rendering any pixels outside of a portal frame.")]
             public bool useScissorRect;
-            public bool copyGBuffer;
             [Tooltip("Offset at which the custom projection matrix will be disabled.Increase this value if you experience Z-Fighting issues. Decrease this if you can see objects behind the portal.")]
             public float clippingOffset;
             [Tooltip("If enabled, global illumination settings will be copied if the exit portal is in a different scene.")]

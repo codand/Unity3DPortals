@@ -20,6 +20,8 @@ float _PortalMultiPassCurrentEye;
 float4x4 PORTAL_MATRIX_VP;
 #endif
 
+static const float _AlphaCutoff = 0.5;
+
 sampler2D _DefaultTexture;
 sampler2D _LeftEyeTexture;
 sampler2D _RightEyeTexture;
@@ -33,6 +35,10 @@ float4x4 _PortalProjectionMatrix2;
 float _BackfaceAlpha;
 #endif
 
+
+float _WaveAmplitude;
+float2 _WaveOrigin; // UV space
+
 struct appdata
 {
 	float4 vertex : POSITION;
@@ -43,14 +49,16 @@ struct v2f {
 	float4 pos : SV_POSITION;
 	float4 screenUV : TEXCOORD0;
 	float4 objUV : TEXCOORD1;
+    float4 objPos : TEXCOORD2; // TODO: Can be combined with objUV for performance gains
 };
 
 v2f vertPortal(appdata v)
 {
 	v2f o;
 	o.pos = UnityObjectToClipPos(v.vertex);
-
+    o.objPos = v.vertex;
 	o.objUV = v.uv;
+
 #ifdef SAMPLE_PREVIOUS_FRAME
 	// Instead of getting the clip position of our portal from the currently rendering camera,
 	// calculate the clip position of the portal from a higher level portal. PORTAL_MATRIX_VP == camera.projectionMatrix.
@@ -75,22 +83,58 @@ float4 sampleCurrentTextureProj(float4 uv)
 	//return tex2Dproj(_PortalTexture, uv);
 }
 
+float wave(float2 position, float2 origin, float time) {
+    float d = length(position - origin);
+    float t = time - d * 20;
+    return sin(t);
+}
+
+float2 waveSlope(float2 position, float2 origin, float amplitude) {
+    const float2 dx = float2(0.01f, 0);
+    const float2 dy = float2(0, 0.01f);
+
+    float2 time = _Time.y * 50;
+    float w = wave(position, origin, time);
+    float2 dw = float2(wave(position + dx, origin, time) - w, wave(position + dy, origin, time) - w);
+    return dw * amplitude;
+}
+
+// Given a vertex position that is NOT coplanar with the portal front face,
+// reconstruct what this pixel's UV coordinate would be if it WERE on the front face.
+// This is needed because the back-geometry of the portal still needs to sample 
+// textures as though it were the front face.
+// TODO: Do I need to handle reversed Z here?
+float4 reconstructFrontFaceUV(float4 objPos) {
+    float3 objSpaceCameraPos = mul(unity_WorldToObject, float4(_WorldSpaceCameraPos.xyz, 1)).xyz;
+    float3 camToVertex = objSpaceCameraPos - objPos.xyz;
+    // Solve for z = 0
+    // camPos.z + toVertex.z * t = 0
+    // t = -camPos.z / toVertex.z
+    float t = -objSpaceCameraPos.z / camToVertex.z;
+    float2 uv = objSpaceCameraPos.xy + t * camToVertex.xy + 0.5;
+    return float4(uv, 0, 1);
+}
+
 fixed4 fragPortal(v2f i, fixed face : VFACE) : SV_Target
 {
 #ifdef IS_BACKFACE
-    clip(_BackfaceAlpha - 0.1);
+    clip(_BackfaceAlpha - _AlphaCutoff);
+    i.objUV = reconstructFrontFaceUV(i.objPos);
+#else
+    i.screenUV /= i.screenUV.w;
 #endif
 
+    float2 waveUVOffset = waveSlope(i.objUV.xy, _WaveOrigin, _WaveAmplitude);
+    i.screenUV.xy += waveUVOffset;
+
 #ifdef SAMPLE_DEFAULT_TEXTURE
-	float4 col = tex2Dproj(_DefaultTexture, i.objUV);
+	float4 col = tex2D(_DefaultTexture, i.objUV);
 #else 
 	float4 col = sampleCurrentTextureProj(i.screenUV);
 #endif
 
-#ifndef IS_BACKFACE
 	col.a = tex2D(_TransparencyMask, i.objUV).r;
-    //clip(col.a);
-#endif
+    clip(col.a - _AlphaCutoff);
 
 	return col;
 }
