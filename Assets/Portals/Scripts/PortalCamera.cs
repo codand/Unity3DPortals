@@ -151,9 +151,9 @@ namespace Portals {
             int w = Camera.current.pixelWidth / _portal.Downscaling;
             int h = Camera.current.pixelHeight / _portal.Downscaling;
             int depth = (int)_portal.DepthBufferQuality;
-            var format = RenderTextureFormat.Default;
+            var format = _camera.allowHDR ? RenderTextureFormat.DefaultHDR : RenderTextureFormat.Default;
             var writeMode = RenderTextureReadWrite.Default;
-            int msaaSamples = 1;
+            int msaaSamples = QualitySettings.antiAliasing > 0 ? QualitySettings.antiAliasing : 1;
             var memoryless = RenderTextureMemoryless.None;
             var vrUsage = VRTextureUsage.None;
             bool useDynamicScale = false;
@@ -161,8 +161,8 @@ namespace Portals {
             // TODO: figure out correct settings for VRUsage, memoryless, and dynamic scale
             RenderTexture rt = RenderTexture.GetTemporary(w, h, depth, format, writeMode, msaaSamples, memoryless, vrUsage, useDynamicScale);
             rt.name = this.gameObject.name;
-            //rt.filterMode = FilterMode.Point;
-            rt.filterMode = FilterMode.Bilinear;
+            rt.filterMode = FilterMode.Point;
+            //rt.filterMode = FilterMode.Bilinear;
 
             return rt;
         }
@@ -243,8 +243,8 @@ namespace Portals {
             //dst.transparencySortAxis = src.transparencySortAxis;
             //dst.transparencySortMode = src.transparencySortMode;
             // TODO: Fix occlusion culling
-            //dst.useOcclusionCulling = src.useOcclusionCulling;
-            dst.useOcclusionCulling = false;
+            dst.useOcclusionCulling = src.useOcclusionCulling;
+            //dst.useOcclusionCulling = false;
 
             dst.eventMask = 0; // Ignore OnMouseXXX events
             dst.cameraType = src.cameraType;

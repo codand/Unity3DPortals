@@ -83,7 +83,7 @@ Shader "Portals/StandardClipped"
 			#pragma shader_feature _ _SPECULARHIGHLIGHTS_OFF
 			#pragma shader_feature _ _GLOSSYREFLECTIONS_OFF
 			#pragma shader_feature _PARALLAXMAP
-			#pragma shader_feature _ PLANAR_CLIPPING_ENABLED
+			#pragma multi_compile _ PLANAR_CLIPPING_ENABLED
 
 			#pragma multi_compile_fwdbase
 			#pragma multi_compile_fog
@@ -119,7 +119,7 @@ Shader "Portals/StandardClipped"
 			#pragma shader_feature _ _SPECULARHIGHLIGHTS_OFF
 			#pragma shader_feature ___ _DETAIL_MULX2
 			#pragma shader_feature _PARALLAXMAP
-			#pragma shader_feature _ PLANAR_CLIPPING_ENABLED
+			#pragma multi_compile _ PLANAR_CLIPPING_ENABLED
 
 			#pragma multi_compile_fwdadd_fullshadows
 			#pragma multi_compile_fog
@@ -147,9 +147,10 @@ Shader "Portals/StandardClipped"
 			#pragma shader_feature _ _ALPHATEST_ON _ALPHABLEND_ON _ALPHAPREMULTIPLY_ON
 			#pragma shader_feature _METALLICGLOSSMAP
 			#pragma shader_feature _PARALLAXMAP
-			#pragma shader_feature _ PLANAR_CLIPPING_ENABLED
 			#pragma multi_compile_shadowcaster
 			#pragma multi_compile_instancing
+
+			#pragma multi_compile _ PLANAR_CLIPPING_ENABLED
 
 			#pragma vertex vertShadowCaster
 			#pragma fragment fragShadowCaster
@@ -180,7 +181,7 @@ Shader "Portals/StandardClipped"
 			#pragma shader_feature _ _SPECULARHIGHLIGHTS_OFF
 			#pragma shader_feature ___ _DETAIL_MULX2
 			#pragma shader_feature _PARALLAXMAP
-			#pragma shader_feature _ PLANAR_CLIPPING_ENABLED
+			#pragma multi_compile _ PLANAR_CLIPPING_ENABLED
 
 			#pragma multi_compile_prepassfinal
 			#pragma multi_compile_instancing
@@ -245,7 +246,7 @@ Shader "Portals/StandardClipped"
 			#pragma shader_feature _ _GLOSSYREFLECTIONS_OFF
 			// SM2.0: NOT SUPPORTED shader_feature ___ _DETAIL_MULX2
 			// SM2.0: NOT SUPPORTED shader_feature _PARALLAXMAP
-			#pragma shader_feature _ PLANAR_CLIPPING_ENABLED
+			#pragma multi_compile _ PLANAR_CLIPPING_ENABLED
 
 			#pragma skip_variants SHADOWS_SOFT DIRLIGHTMAP_COMBINED
 
@@ -280,7 +281,7 @@ Shader "Portals/StandardClipped"
 			#pragma shader_feature ___ _DETAIL_MULX2
 			// SM2.0: NOT SUPPORTED shader_feature _PARALLAXMAP
 			#pragma skip_variants SHADOWS_SOFT
-			#pragma shader_feature _ PLANAR_CLIPPING_ENABLED
+			#pragma multi_compile _ PLANAR_CLIPPING_ENABLED
 			
 			#pragma multi_compile_fwdadd_fullshadows
 			#pragma multi_compile_fog
@@ -304,9 +305,9 @@ Shader "Portals/StandardClipped"
 
 			#pragma shader_feature _ _ALPHATEST_ON _ALPHABLEND_ON _ALPHAPREMULTIPLY_ON
 			#pragma shader_feature _METALLICGLOSSMAP
-			#pragma shader_feature _ PLANAR_CLIPPING_ENABLED
 			#pragma skip_variants SHADOWS_SOFT
 			#pragma multi_compile_shadowcaster
+			#pragma multi_compile _ PLANAR_CLIPPING_ENABLED
 
 			#pragma vertex vertShadowCaster
 			#pragma fragment fragShadowCaster
@@ -343,5 +344,5 @@ Shader "Portals/StandardClipped"
 
 
 	//FallBack "VertexLit"
-	//CustomEditor "StandardShaderGUI"
+	CustomEditor "StandardShaderGUI"
 }

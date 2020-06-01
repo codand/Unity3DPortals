@@ -394,12 +394,12 @@ namespace Portals {
                 };
             }
 
-            if (!_stencilMaskMaterial) {
-                _stencilMaskMaterial = new Material(Shader.Find("Portals/StencilMask"));
-            }
-            if (!_depthMaskMaterial) {
-                _depthMaskMaterial = new Material(Shader.Find("Portals/DepthMask"));
-            }
+            //if (!_stencilMaskMaterial) {
+            //    _stencilMaskMaterial = new Material(Shader.Find("Portals/StencilMask"));
+            //}
+            //if (!_depthMaskMaterial) {
+            //    _depthMaskMaterial = new Material(Shader.Find("Portals/DepthMask"));
+            //}
         }
 
         private void OnEnable() {
