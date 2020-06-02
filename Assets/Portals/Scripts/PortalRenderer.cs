@@ -112,6 +112,24 @@ namespace Portals {
             return max;
         }
 
+        private Rect MakePixelPerfect(Rect r, Camera cam) {
+            float wCam = cam.pixelWidth;
+            float hCam = cam.pixelHeight;
+
+            Rect pr = new Rect(r.x * wCam, r.y * hCam, r.width * wCam, r.height * hCam);
+            float xFloor = Mathf.Floor(pr.x);
+            float yFloor = Mathf.Floor(pr.y);
+            float dx = pr.x - xFloor;
+            float dy = pr.y - yFloor;
+
+            float x = xFloor / wCam;
+            float y = yFloor / hCam;
+            float w = Mathf.Ceil(pr.width + dx) / wCam;
+            float h = Mathf.Ceil(pr.height + dy) / hCam;
+
+            return new Rect(x, y, w, h);
+        }
+
         private Rect CalculatePortalViewportRect(Camera cam) {
             // TODO: using the exit portal corners might cause issues with the backface
 
@@ -144,7 +162,7 @@ namespace Portals {
 
 
             Rect viewportRect = new Rect(min.x, min.y, max.x - min.x, max.y - min.y);
-            return viewportRect;
+            return MakePixelPerfect(viewportRect, cam);
         }
 
         private bool IsCameraUsingDeferredShading(Camera cam) {

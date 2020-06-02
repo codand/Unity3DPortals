@@ -146,7 +146,7 @@ namespace Portals {
                     break;
             }
         }
-
+        
         private RenderTexture GetTemporaryRT() {
             int w = Camera.current.pixelWidth / _portal.Downscaling;
             int h = Camera.current.pixelHeight / _portal.Downscaling;
@@ -219,6 +219,12 @@ namespace Portals {
             }
 
             RenderTexture texture = GetTemporaryRT();
+            //RenderTexture.active = texture;
+            //GL.Clear(true, true, Color.red);
+            //GL.Viewport(new Rect(viewportRect.x * Screen.width, viewportRect.y * Screen.height, viewportRect.width *Screen.width, viewportRect.height * Screen.height));
+            ////GL.LoadProjectionMatrix(_camera.projectionMatrix);
+            //GL.Clear(true, true, Color.green);
+
             _camera.targetTexture = texture;
             _camera.Render();
 
