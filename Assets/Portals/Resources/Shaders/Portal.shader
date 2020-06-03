@@ -194,7 +194,7 @@ Shader "Portal/Portal"
 			ZTest LEqual
 			Lighting Off
 			Cull Back
-			Offset -1,-1
+			Offset -1,-5
 
 			CGPROGRAM
 			#include "UnityCG.cginc"
