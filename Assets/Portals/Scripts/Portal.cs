@@ -50,6 +50,9 @@ namespace Portals {
 
         public static List<Portal> AllPortals { get; private set; } = new List<Portal>();
 
+        /// <summary>
+        /// Returns the PortalRenderer component responbile for doing the actual rendering
+        /// </summary>
         public PortalRenderer PortalRenderer {
             get {
                 if (!_portalRenderer) {
@@ -59,12 +62,18 @@ namespace Portals {
             }
         }
 
+        /// <summary>
+        /// Returns true if this portal has an exit portal and both are enabled
+        /// </summary>
         public bool IsOpen {
             get {
                 return this.isActiveAndEnabled && ExitPortal && ExitPortal.isActiveAndEnabled; 
             }
         }
 
+        /// <summary>
+        /// Get or set the exit portal. Setting the exit portal will invoke OnExitPortalChanged.
+        /// </summary>
         public Portal ExitPortal {
             get {
                 return _exitPortal;
@@ -76,6 +85,9 @@ namespace Portals {
             }
         }
 
+        /// <summary>
+        /// Get or set the default texture. Setting the default texture will invoke OnDefaultTextureChanged.
+        /// </summary>
         public Texture DefaultTexture {
             get {
                 return _defaultTexture;
@@ -87,6 +99,9 @@ namespace Portals {
             }
         }
 
+        /// <summary>
+        /// Get or set the transparency mask. Setting the transparency mask invoke OnTransparencyMaskChanged.
+        /// </summary>
         public Texture TransparencyMask {
             get {
                 return _transparencyMask;
@@ -98,47 +113,77 @@ namespace Portals {
             }
         }
 
+        /// <summary>
+        /// Get or set the maximum number of times a portal can render another portal.
+        /// </summary>
         public int MaxRecursion {
             get { return _maxRecursion; }
             set { _maxRecursion = value; }
         }
 
+        /// <summary>
+        /// Enable or disable infinite recursion faking. <see cref="MaxRecursion"/> must be greater than 1 for this to work.
+        /// </summary>
         public bool FakeInfiniteRecursion {
             get { return _fakeInfiniteRecursion; }
             set { _fakeInfiniteRecursion = value; }
         }
 
+        /// <summary>
+        /// Enable or disable oblique projection. Enabling this will prevent portals from rendering things behind them,
+        /// but will lose some depth buffer accuracy. This should be enabled unless you are using materials that support
+        /// planar clipping.
+        /// </summary>
         public bool UseObliqueProjectionMatrix {
             get { return _advancedSettings.useObliqueProjectionMatrix; }
             set { _advancedSettings.useObliqueProjectionMatrix = value; }
         }
 
+        /// <summary>
+        /// Enable or disable rectangular portal clipping. This will make portals render only the rectangular area in
+        /// which they can be seen on screen, reducing the total number of objects rendering and total number of pixels
+        /// drawn. This should be enabled unless it is causing rendering issues.
+        /// </summary>
         public bool UseScissorRect {
             get { return _advancedSettings.useScissorRect; }
             set { _advancedSettings.useScissorRect = value; }
         }
 
+        /// <summary>
+        /// Get or set the clipping offset when using oblique projection.
+        /// </summary>
         public float ClippingOffset {
             get { return _advancedSettings.clippingOffset; }
             set { _advancedSettings.clippingOffset = value; }
         }
 
-        // TODO: match style
+        /// <summary>
+        /// Get or set portal texture downscaling. Increase value to improve performance.
+        /// </summary>
         public int Downscaling {
-            get => _qualitySettings.downscaling;
-            set => _qualitySettings.downscaling = value;
+            get { return _qualitySettings.downscaling; }
+            set { _qualitySettings.downscaling = value; }
         }
 
+        /// <summary>
+        /// Get or set portal texture depth buffer quality.
+        /// </summary>
         public PortalDepthBufferQuality DepthBufferQuality {
             get => _qualitySettings.depthBufferQuality;
             set => _qualitySettings.depthBufferQuality = value;
         }
 
+        /// <summary>
+        /// Get or set camera types that can render portals.
+        /// </summary>
         public CameraType SupportedCameraTypes {
             get { return _advancedSettings.supportedCameraTypes; }
             set { _advancedSettings.supportedCameraTypes = value; }
         }
 
+        /// <summary>
+        /// Get or set list of colliders that will be disabled when entering this portal.
+        /// </summary>
         public Collider[] IgnoredColliders {
             get {
                 return _ignoredColliders.ToArray();
@@ -150,18 +195,27 @@ namespace Portals {
             }
         }
 
+        /// <summary>
+        /// Returns the portal's facing plane.
+        /// </summary>
         public Plane Plane {
             get {
                 return new Plane(transform.forward, transform.position);
             }
         }
 
+        /// <summary>
+        /// Returns the inverse of the portal's facing plane.
+        /// </summary>
         public Plane PlaneInverse {
             get {
                 return new Plane(-transform.forward, transform.position);
             }
         }
 
+        /// <summary>
+        /// Returns the portal's facing plane as a Vector4.
+        /// </summary>
         public Vector4 VectorPlane {
             get {
                 Plane plane = this.Plane;
@@ -170,7 +224,13 @@ namespace Portals {
             }
         }
 
-        // TopLeft->TopRight->BottomRight->BottomLeft
+        /// <summary>
+        /// Returns a list of this portals corner's in world space.
+        /// corners[0] = TopLeft
+        /// corners[1] = TopRight
+        /// corners[2] = BottomRight
+        /// corners[3] = BottomLeft
+        /// </summary>
         public Vector3[] WorldSpaceCorners() {
             Vector3 topLeft     = transform.TransformPoint(new Vector3(-0.5f, 0.5f));
             Vector3 topRight    = transform.TransformPoint(new Vector3(0.5f, 0.5f));

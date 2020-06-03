@@ -199,8 +199,6 @@ namespace Portals {
                 CommandBuffer enableClippingCmdBuffer = new CommandBuffer();
                 enableClippingCmdBuffer.EnableShaderKeyword("PLANAR_CLIPPING_ENABLED");
                 enableClippingCmdBuffer.SetGlobalVector("_ClippingPlane", _portal.ExitPortal.VectorPlane);
-                //enableClippingCmdBuffer.ClearRenderTarget(true, true, Color.red, 0);
-
                 CommandBuffer disableClippingCmdBuffer = new CommandBuffer();
                 disableClippingCmdBuffer.DisableShaderKeyword("PLANAR_CLIPPING_ENABLED");
 
@@ -219,12 +217,6 @@ namespace Portals {
             }
 
             RenderTexture texture = GetTemporaryRT();
-            //RenderTexture.active = texture;
-            //GL.Clear(true, true, Color.red);
-            //GL.Viewport(new Rect(viewportRect.x * Screen.width, viewportRect.y * Screen.height, viewportRect.width *Screen.width, viewportRect.height * Screen.height));
-            ////GL.LoadProjectionMatrix(_camera.projectionMatrix);
-            //GL.Clear(true, true, Color.green);
-
             _camera.targetTexture = texture;
             _camera.Render();
 
@@ -265,22 +257,16 @@ namespace Portals {
             // Calculate plane made from the exit portal's transform
             Plane exitPortalPlane = _portal.ExitPortal.Plane;
 
-            // Determine whether or not we've crossed the plane already. If we have, we don't need to apply
-            // oblique frustum clipping. Offset the value by our portal's ClippingOffset to reduce the effects
-            // so that it swaps over slightly early. This helps reduce artifacts caused by loss of depth accuracy.
-            //bool onCloseSide = new Plane(exitPortalPlane.normal, exitPortalPlane.distance - _portal.ClippingOffset).GetSide(transform.position);
-            //if (onCloseSide) {
-                Vector4 exitPlaneWorldSpace = _portal.ExitPortal.VectorPlane;
-                Vector4 exitPlaneCameraSpace = _camera.worldToCameraMatrix.inverse.transpose * exitPlaneWorldSpace;
-                // Offset the clipping plane itself so that a character walking through a portal has no seams
-                exitPlaneCameraSpace.w += _portal.ClippingOffset;
-                exitPlaneCameraSpace *= -1;
-                MathUtil.MakeProjectionMatrixOblique(ref projectionMatrix, exitPlaneCameraSpace);
-            //}
+            Vector4 exitPlaneWorldSpace = _portal.ExitPortal.VectorPlane;
+            Vector4 exitPlaneCameraSpace = _camera.worldToCameraMatrix.inverse.transpose * exitPlaneWorldSpace;
+            // Offset the clipping plane itself so that a character walking through a portal has no seams
+            exitPlaneCameraSpace.w += _portal.ClippingOffset;
+            exitPlaneCameraSpace *= -1;
+            MathUtil.MakeProjectionMatrixOblique(ref projectionMatrix, exitPlaneCameraSpace);
             return projectionMatrix;
         }
 
-        [System.Serializable] // TODO: shouldn't be serializable in the future
+        [System.Serializable]
         public class FrameData {
             public RenderTexture leftEyeTexture;
             public RenderTexture rightEyeTexture;
