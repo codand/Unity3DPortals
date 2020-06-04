@@ -114,6 +114,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
         // If it can fit, but it's hanging off the edge, push it in.
         // Otherwise, disable the portal.
         Vector3 newPosition;
+        portal.gameObject.SetActive(false);
         if (FindFit(portal, hit.collider, out newPosition)) {
             portal.transform.position = newPosition + hit.normal * _normalOffset;
             portal.IgnoredColliders = new Collider[] { hit.collider };
@@ -122,8 +123,6 @@ public class SpawnPortalOnClick : MonoBehaviour {
             // Scale the portal's renderer up from 0 to 1 for a nice visual pop-in
             Renderer portalRenderer = portal.GetComponentInChildren<MeshRenderer>();
             SetScaleOverTime(portalRenderer.transform, Vector3.zero, Vector3.one, _portalSpawnCurve, _portalSpawnTime);
-        } else {
-            portal.gameObject.SetActive(false);
         }
     }
 
@@ -196,7 +195,9 @@ public class SpawnPortalOnClick : MonoBehaviour {
             // Perform raycast from a tiny bit back from the contact point to a little bit through the contact point
             float normalOffset = 0.01f;
             Ray ray = new Ray(corner - direction * normalOffset, direction);
-            outHits[i] = collider.Raycast(ray, out RaycastHit hitInfo, normalOffset * 2);
+            bool hitCollider = collider.Raycast(ray, out RaycastHit hitInfo, normalOffset * 2);
+            bool hitPortal = Physics.Raycast(ray, out hitInfo, normalOffset * 2, PortalPhysics.PortalLayerMask, QueryTriggerInteraction.Collide);
+            outHits[i] = hitCollider && !hitPortal;
             if (outHits[i]) {
                 numHits++;
             }
@@ -276,8 +277,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
         Vector3 center = portal.transform.position;
         Vector3[] corners = portal.WorldSpaceCorners();
         Vector3 forward = portal.transform.forward;
-
-        // TODO: magic number
+        
         int numIterations = _meshColliderIterationCount;
         bool viablePositionExists = FindViableCoplanarRectOnCollider(collider, center, corners, forward, numIterations, out Vector3 offset);
         if (!viablePositionExists) {
