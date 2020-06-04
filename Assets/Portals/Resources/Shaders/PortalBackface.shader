@@ -45,19 +45,10 @@ Shader "Portal/PortalBackface"
 
 		Pass
 		{
-			// Stencil prevents the backface from rendering if we've already seen the frontface
-			// Don't render unless Stencil == 0. The value is decremented when we fail (saw a frontface)
-			// so that a recursive layer above us won't be prevented from rendering.
-			//Stencil{
-			//	Ref 0
-			//	Comp Equal
-			//	Fail DecrSat
-			//	Pass IncrSat
-			//}
-
 			Blend One Zero
 			ZWrite On
-			ZTest LEqual
+			//ZTest LEqual
+			ZTest Always
 			Cull Back
 			Offset -.01,0
 

@@ -8,7 +8,7 @@
 	SubShader
 	{
 		Tags{ "RenderType" = "Opaque" "Queue" = "Geometry" }
-
+		ZTest Always
 		Pass
 		{
 			Stencil{

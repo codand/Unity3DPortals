@@ -43,10 +43,16 @@ namespace Portals {
 
         private Rigidbody _rigidbody;
         private CapsuleCollider _capsuleCollider;
+        private GravityManipulator _gravityManipulator;
+
+        private Vector3 UpVector {
+            get => _gravityManipulator ? _gravityManipulator.upVector : Vector3.up;
+        }
 
         private void Awake() {
             _rigidbody = GetComponent<Rigidbody>();
             _capsuleCollider = GetComponent<CapsuleCollider>();
+            _gravityManipulator = GetComponent<GravityManipulator>();
         }
 
         private void FixedUpdate() {
@@ -54,13 +60,13 @@ namespace Portals {
             _grounded = Physics.SphereCast(
                 transform.position,
                 _capsuleCollider.radius,
-                Vector3.down,
+                -1 * this.UpVector,
                 out hitInfo,
                 ((_capsuleCollider.height / 2f) - _capsuleCollider.radius) + _groundCheckDistance,
                 _collisionMask.value,
                 QueryTriggerInteraction.Ignore);
 
-            Vector3 horizontalVelocity = Vector3.ProjectOnPlane(_rigidbody.velocity, Vector3.up);
+            Vector3 horizontalVelocity = Vector3.ProjectOnPlane(_rigidbody.velocity, this.UpVector);
             Vector3 verticalVelocity = _rigidbody.velocity - horizontalVelocity;
             _rigidbody.AddForce(-1 * horizontalVelocity * (_grounded ? _movementInfo.dragGrounded : _movementInfo.dragAerial), ForceMode.VelocityChange);
 
@@ -88,9 +94,9 @@ namespace Portals {
             if (_noClipEnabled) {
                 transform.position += direction * _flySpeed * scaleFactor * Time.deltaTime;
             } else {
-                Vector3 moveDir = Vector3.ProjectOnPlane(direction, Vector3.up).normalized;
+                Vector3 moveDir = Vector3.ProjectOnPlane(direction, this.UpVector).normalized;
 
-                Vector3 verticalVelocity = Vector3.up * Vector3.Dot(Vector3.up, _rigidbody.velocity);
+                Vector3 verticalVelocity = this.UpVector * Vector3.Dot(this.UpVector, _rigidbody.velocity);
                 Vector3 horizontalVelocity = _rigidbody.velocity - verticalVelocity;
 
                 Vector3 movement = moveDir * scaleFactor * (_grounded ? _movementInfo.accellerationGrounded : _movementInfo.accellerationAerial);
@@ -140,7 +146,7 @@ namespace Portals {
 
         public void Jump() {
             float scaleFactor = this.transform.localScale.x;
-            _rigidbody.AddForce(Vector3.up * _movementInfo.jumpForce * scaleFactor, ForceMode.Acceleration);
+            _rigidbody.AddForce(this.UpVector * _movementInfo.jumpForce * scaleFactor, ForceMode.Acceleration);
         }
 
         Coroutine correctRotation = null;

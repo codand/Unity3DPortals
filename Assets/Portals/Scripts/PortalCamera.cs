@@ -257,12 +257,16 @@ namespace Portals {
             // Calculate plane made from the exit portal's transform
             Plane exitPortalPlane = _portal.ExitPortal.Plane;
 
-            Vector4 exitPlaneWorldSpace = _portal.ExitPortal.VectorPlane;
-            Vector4 exitPlaneCameraSpace = _camera.worldToCameraMatrix.inverse.transpose * exitPlaneWorldSpace;
-            // Offset the clipping plane itself so that a character walking through a portal has no seams
-            exitPlaneCameraSpace.w += _portal.ClippingOffset;
-            exitPlaneCameraSpace *= -1;
-            MathUtil.MakeProjectionMatrixOblique(ref projectionMatrix, exitPlaneCameraSpace);
+            Vector3 position = _camera.cameraToWorldMatrix.MultiplyPoint3x4(Vector3.zero);
+            float distanceToPlane = exitPortalPlane.GetDistanceToPoint(position);
+            if (distanceToPlane > _portal.ClippingOffset) {
+                Vector4 exitPlaneWorldSpace = _portal.ExitPortal.VectorPlane;
+                Vector4 exitPlaneCameraSpace = _camera.worldToCameraMatrix.inverse.transpose * exitPlaneWorldSpace;
+                // Offset the clipping plane itself so that a character walking through a portal has no seams
+                //exitPlaneCameraSpace.w -= _portal.ClippingOffset;
+                exitPlaneCameraSpace *= -1;
+                MathUtil.MakeProjectionMatrixOblique(ref projectionMatrix, exitPlaneCameraSpace);
+            }
             return projectionMatrix;
         }
 

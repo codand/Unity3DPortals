@@ -11,6 +11,8 @@ public enum DebugRenderView {
 [ExecuteInEditMode]
 public class DebugRender : MonoBehaviour {
     public DebugRenderView DebugView;
+    public int StencilMin = 0;
+    public int StencilMax = 4;
 
     private Material _depthDebugMaterial;
     private Material _stencilDebugMaterial;
@@ -29,10 +31,10 @@ public class DebugRender : MonoBehaviour {
         RenderTexture tmp = RenderTexture.GetTemporary(src.width, src.height, 24);
         Graphics.Blit(src, tmp);
 
-        for (int i = 0; i < 256; i++) {
+        for (int i = StencilMin; i <= StencilMax; i++) {
             int bitMask = i;
             _stencilDebugMaterial.SetFloat("_StencilRef", bitMask);
-            float f = i / 256f;
+            float f = (float)i / (StencilMax - StencilMin);
             Color color = new Color(f, f, f, 1);
             _stencilDebugMaterial.SetColor("_Color", color);
             DrawQuad(tmp.colorBuffer, src.depthBuffer, _stencilDebugMaterial);
