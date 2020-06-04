@@ -74,11 +74,8 @@ namespace Portals {
 
         }
 
-        private Vector4 ClampedWorldToViewportPoint(Camera cam, Vector3 worldPoint) {
+        private Vector4 WorldToViewportPoint(Matrix4x4 vp, Vector3 worldPoint) {
             //Vector3 viewportPoint = cam.WorldToViewportPoint(worldPoint);
-            Matrix4x4 p = cam.projectionMatrix;
-            Matrix4x4 v = cam.worldToCameraMatrix;
-            Matrix4x4 vp = p * v;
             Vector4 point = new Vector4(worldPoint.x, worldPoint.y, worldPoint.z, 1);
             Vector4 hPoint = vp * point;
             Vector3 ndcPoint;
@@ -98,16 +95,16 @@ namespace Portals {
 
         private Vector3 Min(params Vector3[] vecs) {
             Vector3 min = new Vector3(Mathf.Infinity, Mathf.Infinity, Mathf.Infinity);
-            foreach (Vector3 vec in vecs) {
-                min = Vector3.Min(min, vec);
+            for (int i = 0; i < vecs.Length; i++) {
+                min = Vector3.Min(min, vecs[i]);
             }
             return min;
         }
 
         private Vector3 Max(params Vector3[] vecs) {
             Vector3 max = new Vector3(Mathf.NegativeInfinity, Mathf.NegativeInfinity, Mathf.NegativeInfinity);
-            foreach (Vector3 vec in vecs) {
-                max = Vector3.Max(max, vec);
+            for (int i = 0; i < vecs.Length; i++) {
+                max = Vector3.Max(max, vecs[i]);
             }
             return max;
         }
@@ -131,37 +128,44 @@ namespace Portals {
         }
 
         private Rect CalculatePortalViewportRect(Camera cam) {
-            // TODO: using the exit portal corners might cause issues with the backface
+            // Precalculate VP matrix for calculating viewport rect
+            Matrix4x4 p = cam.projectionMatrix;
+            Matrix4x4 v = cam.worldToCameraMatrix;
+            Matrix4x4 vp = p * v;
 
-            // TODO: do this shit better. cache worldspacecorners maybe
-            Vector4 tl, tr, br, bl;
+            // Calculate the viewport rect of portal's front face by transforming each world space
+            // corner to screen space.
             var corners = _portal.WorldSpaceCorners();
-            tl = ClampedWorldToViewportPoint(Camera.current, corners[0]);
-            tr = ClampedWorldToViewportPoint(Camera.current, corners[1]);
-            br = ClampedWorldToViewportPoint(Camera.current, corners[2]);
-            bl = ClampedWorldToViewportPoint(Camera.current, corners[3]);
-            //Debug.Log($"TL: {tl}, TR: {tr}, BR: {br}, BL: {bl}");
+            Vector4 tl, tr, br, bl;
+            tl = WorldToViewportPoint(vp, corners[0]);
+            tr = WorldToViewportPoint(vp, corners[1]);
+            br = WorldToViewportPoint(vp, corners[2]);
+            bl = WorldToViewportPoint(vp, corners[3]);
             
             Vector3 min = Min(tl, tr, br, bl);
             Vector3 max = Max(tl, tr, br, bl);
 
+            // If any of the portal's corners are behind the camera, then the viewport rect calculated
+            // using only the portal's front face might not cover everything. In this case,
+            // just run the same calculations using the portal's back plane.
             if (tl.z <= 0 || tr.z <= 0 || br.z <= 0 || bl.z <= 0) {
-                Vector3 ftl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, 0.5f, 1.0f)));
-                Vector3 ftr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 1.0f)));
-                Vector3 fbr = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
-                Vector3 fbl = ClampedWorldToViewportPoint(Camera.current, _portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
+                Vector3 ftl = WorldToViewportPoint(vp, _portal.transform.TransformPoint(new Vector3(-0.5f, 0.5f, 1.0f)));
+                Vector3 ftr = WorldToViewportPoint(vp, _portal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 1.0f)));
+                Vector3 fbr = WorldToViewportPoint(vp, _portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
+                Vector3 fbl = WorldToViewportPoint(vp, _portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
 
                 min = Min(min, ftl, ftr, fbr, fbl);
                 max = Max(max, ftl, ftr, fbr, fbl);
             }
 
-            //Debug.Log("Min: " + min + " Max: " + max);
-
+            // Clamp viewport rect to edges of the screen
             min = Vector3.Max(Vector3.zero, min);
             max = Vector3.Min(Vector3.one, max);
 
-
             Rect viewportRect = new Rect(min.x, min.y, max.x - min.x, max.y - min.y);
+
+            // The viewport rect should be aligned on pixel boundaries to avoid sub-pixel error
+            // when rendering with scissors matrix
             return MakePixelPerfect(viewportRect, cam);
         }
 
@@ -229,7 +233,7 @@ namespace Portals {
             bool isRendererEnabled = enabled && _renderer && _renderer.enabled;
 
             // Don't render non-supported camera types (preview cameras can cause issues)
-            bool isCameraSupported = _portal.SupportedCameraTypes.HasFlag(camera.cameraType);
+            bool isCameraSupported = (_portal.SupportedCameraTypes & camera.cameraType) == camera.cameraType;
 
             // Only render if an exit portal is set
             bool isExitPortalSet = _portal.ExitPortal != null;

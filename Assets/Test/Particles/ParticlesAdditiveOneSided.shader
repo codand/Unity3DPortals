@@ -13,7 +13,7 @@ Category {
 	Blend SrcAlpha OneMinusSrcAlpha
 	ColorMask RGB
 	Cull Back Lighting Off ZWrite Off
-	Offset -2, -2
+	Offset -8, -2
 	
 	SubShader {
 		Pass {

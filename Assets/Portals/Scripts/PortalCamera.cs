@@ -160,7 +160,7 @@ namespace Portals {
 
             // TODO: figure out correct settings for VRUsage, memoryless, and dynamic scale
             RenderTexture rt = RenderTexture.GetTemporary(w, h, depth, format, writeMode, msaaSamples, memoryless, vrUsage, useDynamicScale);
-            rt.name = this.gameObject.name;
+            //rt.name = this.gameObject.name;
             rt.filterMode = FilterMode.Point;
             //rt.filterMode = FilterMode.Bilinear;
 

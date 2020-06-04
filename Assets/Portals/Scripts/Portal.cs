@@ -34,6 +34,7 @@ namespace Portals {
         };
 
         private PortalRenderer _portalRenderer;
+        private Vector3[] _cornerBuffer;
 
         public delegate void PortalIgnoredCollidersChangedEvent(Portal portal, Collider[] oldColliders, Collider[] newColliders);
         public delegate void PortalExitChangeEvent(Portal portal, Portal oldExitPortal, Portal newExitPortal);
@@ -232,16 +233,23 @@ namespace Portals {
         /// corners[3] = BottomLeft
         /// </summary>
         public Vector3[] WorldSpaceCorners() {
-            Vector3 topLeft     = transform.TransformPoint(new Vector3(-0.5f, 0.5f));
-            Vector3 topRight    = transform.TransformPoint(new Vector3(0.5f, 0.5f));
-            Vector3 bottomRight = transform.TransformPoint(new Vector3(0.5f, -0.5f));
-            Vector3 bottomLeft  = transform.TransformPoint(new Vector3(-0.5f, -0.5f));
-            return new Vector3[] {
-                topLeft,
-                topRight,
-                bottomRight,
-                bottomLeft
-            };
+            if (transform.hasChanged) {
+                Vector3 topLeft = transform.TransformPoint(new Vector3(-0.5f, 0.5f));
+                Vector3 topRight = transform.TransformPoint(new Vector3(0.5f, 0.5f));
+                Vector3 bottomRight = transform.TransformPoint(new Vector3(0.5f, -0.5f));
+                Vector3 bottomLeft = transform.TransformPoint(new Vector3(-0.5f, -0.5f));
+                if (_cornerBuffer == null) {
+                    _cornerBuffer = new Vector3[4];
+                }
+                _cornerBuffer[0] = topLeft;
+                _cornerBuffer[1] = topRight;
+                _cornerBuffer[2] = bottomRight;
+                _cornerBuffer[3] = bottomLeft;
+
+                transform.hasChanged = false;
+            }
+
+            return _cornerBuffer;
         }
 
         public Vector3[] GetCorners() {
