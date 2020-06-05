@@ -25,19 +25,13 @@ namespace Portals {
         [SerializeField]
         private MovementInfo _movementInfo;
         [SerializeField]
-        private float _maxLookAngle = 89.5f;
+        private float _maxLookAngle = 89f;
         [SerializeField]
         private float _portalLookSnapAngle = 15.0f;
         [SerializeField]
         private float _groundCheckDistance = 0.01f;
         [SerializeField]
         private LayerMask _collisionMask = -1;
-        [SerializeField]
-        private bool _correctRotationOnTeleport = true;
-        [SerializeField]
-        private float _correctRotationDuration = 0.5f;
-        [SerializeField]
-        private AnimationCurve _correctRotationEasing = AnimationCurve.EaseInOut(0, 0, 1, 1);
         [SerializeField]
         private float _rotationalReallignmentRate = 10.0f;
 
