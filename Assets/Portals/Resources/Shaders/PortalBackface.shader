@@ -47,8 +47,7 @@ Shader "Portal/PortalBackface"
 		{
 			Blend One Zero
 			ZWrite On
-			//ZTest LEqual
-			ZTest Always
+			ZTest LEqual
 			Cull Back
 			Offset -.01,0
 

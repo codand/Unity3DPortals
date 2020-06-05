@@ -384,24 +384,7 @@ namespace Portals {
             }
 
             if (_rigidbody && !_rigidbody.isKinematic) {
-                // Interpolate velocity change through the portal
-                Vector3 frameMovement = _rigidbody.position - _rigidbodyLastTick.position;
-                float distanceFromPortalLastFrame;
-                if (portal.Plane.Raycast(new Ray(_rigidbodyLastTick.position, frameMovement), out distanceFromPortalLastFrame)) {
-                    float ratioLastFrame = distanceFromPortalLastFrame / frameMovement.magnitude;
-                    float ratioThisFrame = 1 - ratioLastFrame;
-
-                    Vector3 acceleration = Physics.gravity * Time.deltaTime; // Unfortunately we can't known about forces other than gravity because they aren't exposed by Rigidbody API
-
-                    Vector3 velocity = _rigidbody.velocity;
-                    velocity -= acceleration; // Rewind acceleration
-                    velocity += acceleration * ratioLastFrame; // Replay acceleration until we hit the portal
-                    velocity = portal.TeleportVector(velocity); // Teleport velocity
-                    velocity += acceleration * ratioThisFrame; // Replay acceleration after we passed the portal
-                    _rigidbody.velocity = velocity;
-                } else {
-                    _rigidbody.velocity = portal.TeleportVector(_rigidbody.velocity);
-                }
+                _rigidbody.velocity = portal.TeleportVector(_rigidbody.velocity);
 
                 //// float scaleDelta = portal.PortalScaleAverage();
                 ////

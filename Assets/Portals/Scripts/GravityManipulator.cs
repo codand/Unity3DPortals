@@ -7,10 +7,10 @@ namespace Portals {
     public class GravityManipulator : MonoBehaviour {
         public Vector3 upVector = Vector3.up;
         public bool useGravity = true;
-
+        public bool invert = false;
         private Rigidbody _rigidbody;
 
-        private void Awake() {
+        private void Start() {
             _rigidbody = GetComponent<Rigidbody>();
             _rigidbody.useGravity = false;
         }
@@ -28,6 +28,9 @@ namespace Portals {
         private void OnPortalTeleport(Portal portal) {
             Vector3 newUp = portal.PortalRotation() * upVector;
             upVector = newUp.normalized;
+            if (invert) {
+                upVector *= -1;
+            }
         }
     }
 }
