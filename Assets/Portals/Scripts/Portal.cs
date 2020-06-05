@@ -30,6 +30,7 @@ namespace Portals {
         [SerializeField] private PortalAdvancedSettings _advancedSettings = new PortalAdvancedSettings() {
             useObliqueProjectionMatrix = true,
             useScissorRect = true,
+            useRaycastOcclusion = true,
             clippingOffset = 0.01f,
             copyGlobalIllumination = false,
             supportedCameraTypes = CameraType.Game | CameraType.SceneView,
@@ -158,6 +159,14 @@ namespace Portals {
         public bool UseScissorRect {
             get { return _advancedSettings.useScissorRect; }
             set { _advancedSettings.useScissorRect = value; }
+        }
+
+        /// <summary>
+        /// Enable or disable using raycasts to check whether or not this portal should be rendered.
+        /// </summary>
+        public bool UseRaycastOcclusion {
+            get { return _advancedSettings.useRaycastOcclusion; }
+            set { _advancedSettings.useRaycastOcclusion = value; }
         }
 
         /// <summary>
@@ -407,6 +416,8 @@ namespace Portals {
             public float clippingOffset;
             [Tooltip("If enabled, global illumination settings will be copied if the exit portal is in a different scene.")]
             public bool copyGlobalIllumination;
+            [Tooltip("If enabled, will use raycasting to determine whether or not to render this portal.")]
+            public bool useRaycastOcclusion;
             [Tooltip("Should portals be rendered in Scene view or in reflections?")]
             public CameraType supportedCameraTypes;
         }

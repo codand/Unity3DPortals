@@ -70,10 +70,6 @@ namespace Portals {
 
         #region Rendering
 
-        private struct CameraData {
-
-        }
-
         private Vector4 WorldToViewportPoint(Matrix4x4 vp, Vector3 worldPoint) {
             //Vector3 viewportPoint = cam.WorldToViewportPoint(worldPoint);
             Vector4 point = new Vector4(worldPoint.x, worldPoint.y, worldPoint.z, 1);
@@ -88,25 +84,7 @@ namespace Portals {
             }
 
             Vector3 viewPoint = new Vector3(ndcPoint.x / 2 + 0.5f, ndcPoint.y / 2 + 0.5f, hPoint.w);
-
-            //Debug.Log(hPoint.ToString("F2") + " " + ndcPoint.ToString("F2") + " " + viewPoint.ToString("F2"));
             return viewPoint;
-        }
-
-        private Vector3 Min(params Vector3[] vecs) {
-            Vector3 min = new Vector3(Mathf.Infinity, Mathf.Infinity, Mathf.Infinity);
-            for (int i = 0; i < vecs.Length; i++) {
-                min = Vector3.Min(min, vecs[i]);
-            }
-            return min;
-        }
-
-        private Vector3 Max(params Vector3[] vecs) {
-            Vector3 max = new Vector3(Mathf.NegativeInfinity, Mathf.NegativeInfinity, Mathf.NegativeInfinity);
-            for (int i = 0; i < vecs.Length; i++) {
-                max = Vector3.Max(max, vecs[i]);
-            }
-            return max;
         }
 
         private Rect MakePixelPerfect(Rect r, Camera cam) {
@@ -132,7 +110,7 @@ namespace Portals {
             Matrix4x4 p = cam.projectionMatrix;
             Matrix4x4 v = cam.worldToCameraMatrix;
             Matrix4x4 vp = p * v;
-
+            
             // Calculate the viewport rect of portal's front face by transforming each world space
             // corner to screen space.
             var corners = _portal.WorldSpaceCorners();
@@ -142,8 +120,8 @@ namespace Portals {
             br = WorldToViewportPoint(vp, corners[2]);
             bl = WorldToViewportPoint(vp, corners[3]);
             
-            Vector3 min = Min(tl, tr, br, bl);
-            Vector3 max = Max(tl, tr, br, bl);
+            Vector3 min = Vector3.Min(tr, Vector3.Min(tl, Vector3.Min(br, bl)));
+            Vector3 max = Vector3.Max(tr, Vector3.Max(tl, Vector3.Max(br, bl)));
 
             // If any of the portal's corners are behind the camera, then the viewport rect calculated
             // using only the portal's front face might not cover everything. In this case,
@@ -154,8 +132,8 @@ namespace Portals {
                 Vector3 fbr = WorldToViewportPoint(vp, _portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
                 Vector3 fbl = WorldToViewportPoint(vp, _portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
 
-                min = Min(min, ftl, ftr, fbr, fbl);
-                max = Max(max, ftl, ftr, fbr, fbl);
+                min = Vector3.Min(ftr, Vector3.Min(ftl, Vector3.Min(fbr, fbl)));
+                max = Vector3.Max(ftr, Vector3.Max(ftl, Vector3.Max(fbr, fbl)));
             }
 
             // Clamp viewport rect to edges of the screen
@@ -228,24 +206,60 @@ namespace Portals {
 #endif
         }
 
+        private bool IsPortalOccluded(Portal portal, Camera camera) {
+            if (!portal.UseRaycastOcclusion) {
+                return false;
+            }
+
+            Vector3 origin = camera.transform.position;
+
+            var corners = portal.WorldSpaceCorners();
+            for (int i = 0; i < corners.Length; i++) {
+                Vector3 corner = corners[i];
+                Vector3 direction = corner - origin;
+                float distance = direction.magnitude;
+
+                if (Physics.Raycast(origin, direction, out RaycastHit hit, distance)) {
+                    // Hit something, check how far
+                    float epsilon = 1f;
+                    if (hit.distance + epsilon >= distance) {
+                        return false;
+                    }
+                } else {
+                    // Didn't hit anything, no occluders
+                    return false;
+                }
+            }
+            return true;
+        }
+
         private bool ShouldRenderPortal(Camera camera) {
             // Don't render if renderer disabled. Not sure if this is possible anyway, but better to be safe.
             bool isRendererEnabled = enabled && _renderer && _renderer.enabled;
+            if (!isRendererEnabled) { return false; }
 
             // Don't render non-supported camera types (preview cameras can cause issues)
             bool isCameraSupported = (_portal.SupportedCameraTypes & camera.cameraType) == camera.cameraType;
+            if (!isCameraSupported) { return false; }
 
             // Only render if an exit portal is set
             bool isExitPortalSet = _portal.ExitPortal != null;
+            if (!isExitPortalSet) { return false; }
 
             // Don't ever render an exit portal
             // TODO: Disable portal until end of frame
             bool isRenderingExitPortal = _currentRenderDepth > 0 && _currentlyRenderingPortal == _portal.ExitPortal;
+            if (isRenderingExitPortal) { return false; }
 
             // Don't render too deep
             bool isAtMaxDepth = _currentRenderDepth >= _portal.MaxRecursion;
+            if (isAtMaxDepth) { return false; }
 
-            return isRendererEnabled && isCameraSupported && isExitPortalSet && !isRenderingExitPortal && !isAtMaxDepth;
+            // Don't render if hidden behind objects
+            bool isOccluded = IsPortalOccluded(_portal, camera);
+            if (isOccluded) { return false; }
+
+            return true;
         }
 
         private bool ShouldRenderPreviousFrame(Camera camera) {
