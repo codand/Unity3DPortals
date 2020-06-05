@@ -38,12 +38,16 @@ namespace Portals {
         private float _correctRotationDuration = 0.5f;
         [SerializeField]
         private AnimationCurve _correctRotationEasing = AnimationCurve.EaseInOut(0, 0, 1, 1);
-
-        private bool _grounded = false;
+        [SerializeField]
+        private float _rotationalReallignmentRate = 10.0f;
 
         private Rigidbody _rigidbody;
         private CapsuleCollider _capsuleCollider;
         private GravityManipulator _gravityManipulator;
+        private bool _isGrounded = false;
+        private Quaternion _previousHeadRotation;
+        private float _xFrameRotation;
+        private float _yFrameRotation;
 
         private Vector3 UpVector {
             get => _gravityManipulator ? _gravityManipulator.upVector : Vector3.up;
@@ -55,20 +59,84 @@ namespace Portals {
             _gravityManipulator = GetComponent<GravityManipulator>();
         }
 
-        private void FixedUpdate() {
-            RaycastHit hitInfo;
-            _grounded = Physics.SphereCast(
-                transform.position,
-                _capsuleCollider.radius,
-                -1 * this.UpVector,
-                out hitInfo,
-                ((_capsuleCollider.height / 2f) - _capsuleCollider.radius) + _groundCheckDistance,
-                _collisionMask.value,
-                QueryTriggerInteraction.Ignore);
+        private void Start() {
+            _previousHeadRotation = _head.rotation;
+        }
 
+        private void FixedUpdate() {
+            DoGroundCheck();
+            FixRotation();
+            ApplyDrag();
+        }
+
+        private void LateUpdate() {
+            DoHeadRotation(_xFrameRotation, _yFrameRotation);
+            _xFrameRotation = 0;
+            _yFrameRotation = 0;
+        }
+
+        private void OnPortalTeleport(Portal portal) {
+            _previousHeadRotation = portal.TeleportRotation(_previousHeadRotation);
+        }
+
+        private void DoHeadRotation(float xRot, float yRot) {
+            // Reset head rotation because the head rotates independent of the body
+            _head.rotation = _previousHeadRotation;
+
+            // Rotate horizontally
+            _head.Rotate(UpVector, xRot, Space.World);
+
+            // Rotate vertically, but clamp to avoid looking higher or lower than 90 degrees
+            yRot = ClampRotation(yRot, _maxLookAngle);
+            _head.Rotate(_head.right, -yRot, Space.World);
+
+            // Fix head rotation in the case that we are upside down
+            Quaternion srcHeadRotation = _head.rotation;
+            Quaternion dstHeadRotation = Quaternion.LookRotation(_head.forward, UpVector);
+            Quaternion headCorrection = Quaternion.Slerp(srcHeadRotation, dstHeadRotation, _rotationalReallignmentRate * Time.deltaTime);
+            _head.rotation = headCorrection;
+
+            // Save head rotation for next frame
+            _previousHeadRotation = _head.rotation;
+        }
+
+        // TODO: This could work a lot better
+        private float ClampRotation(float rotation, float maxRotation) {
+            Vector3 centerForward = Vector3.ProjectOnPlane(_head.forward, UpVector);
+            float currentAngle = Vector3.SignedAngle(_head.forward, centerForward, _head.right);
+            float desiredAngle = currentAngle + rotation;
+
+            if (Mathf.Abs(desiredAngle) > _maxLookAngle) {
+                rotation = Mathf.Sign(desiredAngle) * _maxLookAngle - currentAngle;
+            }
+
+            return rotation;
+        }
+
+        private void DoGroundCheck() {
+            Vector3 origin = transform.position;
+            float radius = _capsuleCollider.radius;
+            Vector3 direction = -1 * UpVector;
+            float distance = ((_capsuleCollider.height / 2f) - _capsuleCollider.radius) + _groundCheckDistance;
+            int layerMask = _collisionMask.value;
+            _isGrounded = Physics.SphereCast(origin, radius, direction, out RaycastHit hit, distance, layerMask, QueryTriggerInteraction.Ignore);
+        }
+
+        private void FixRotation() {
+            Vector3 dstForwardVector = Vector3.ProjectOnPlane(_head.forward, UpVector);
+            Quaternion srcBodyRotation = _rigidbody.rotation;
+            Quaternion dstBodyRotation = Quaternion.LookRotation(dstForwardVector, UpVector);
+
+            Quaternion newBodyRotation = Quaternion.Slerp(srcBodyRotation, dstBodyRotation, _rotationalReallignmentRate * Time.deltaTime);
+            
+            // MoveRotation respects interpolation settings, so this will rotate smoothly
+            _rigidbody.MoveRotation(newBodyRotation);
+        }
+
+        private void ApplyDrag() {
             Vector3 horizontalVelocity = Vector3.ProjectOnPlane(_rigidbody.velocity, this.UpVector);
             Vector3 verticalVelocity = _rigidbody.velocity - horizontalVelocity;
-            _rigidbody.AddForce(-1 * horizontalVelocity * (_grounded ? _movementInfo.dragGrounded : _movementInfo.dragAerial), ForceMode.VelocityChange);
+            _rigidbody.AddForce(-1 * horizontalVelocity * (_isGrounded ? _movementInfo.dragGrounded : _movementInfo.dragAerial), ForceMode.VelocityChange);
 
             //horizontalVelocity = Vector3.ClampMagnitude(horizontalVelocity, _movementInfo.maxSpeedHorizontal);
             verticalVelocity = Vector3.ClampMagnitude(verticalVelocity, _movementInfo.maxSpeedVertical);
@@ -94,161 +162,26 @@ namespace Portals {
             if (_noClipEnabled) {
                 transform.position += direction * _flySpeed * scaleFactor * Time.deltaTime;
             } else {
-                Vector3 moveDir = Vector3.ProjectOnPlane(direction, this.UpVector).normalized;
+                Vector3 forward = Vector3.ProjectOnPlane(direction, UpVector).normalized;
 
-                Vector3 verticalVelocity = this.UpVector * Vector3.Dot(this.UpVector, _rigidbody.velocity);
+                Vector3 verticalVelocity = UpVector * Vector3.Dot(UpVector, _rigidbody.velocity);
                 Vector3 horizontalVelocity = _rigidbody.velocity - verticalVelocity;
 
-                Vector3 movement = moveDir * scaleFactor * (_grounded ? _movementInfo.accellerationGrounded : _movementInfo.accellerationAerial);
+                Vector3 movement = forward * scaleFactor * (_isGrounded ? _movementInfo.accellerationGrounded : _movementInfo.accellerationAerial);
 
                 horizontalVelocity = Vector3.ClampMagnitude(horizontalVelocity + movement, Mathf.Max(horizontalVelocity.magnitude, _movementInfo.maxSpeedHorizontal));
                 _rigidbody.velocity = horizontalVelocity + verticalVelocity;
             }
         }
 
-        public void Rotate(float angle) {
-            if (_disableControls) return;
-
-            Quaternion rotation = Quaternion.AngleAxis(angle, Vector3.up);
-
-            // TODO: This causes jittering
-            this.transform.localRotation = this.transform.localRotation * rotation;
-
-            // And this causes lethargic movement
-            //_rigidbody.MoveRotation(_rigidbody.rotation * rotation);
-        }
-
-        public void RotateHead(float angle) {
-            if (!_head) {
-                return;
-            }
-
-            if (_disableControls) return;
-
-            //float currentAngle = normalizeAngle(_head.localEulerAngles.x, -180, 180);
-            //float newAngle = currentAngle - angle;
-
-            //if (newAngle > _maxLookAngle) {
-            //    newAngle = _maxLookAngle;
-            //} else if (newAngle < -_maxLookAngle) {
-            //    newAngle = -_maxLookAngle;
-            //}
-
-            _head.localRotation = Quaternion.Euler(_head.localRotation.eulerAngles.x - angle, 0, 0);
-            //_head.localRotation *= Quaternion.Euler(-angle, 0, 0);
-            _head.localRotation = ClampRotationAroundXAxis(_head.localRotation, -_maxLookAngle, _maxLookAngle);
-            //Quaternion rotation = Quaternion.AngleAxis(angle, -Vector3.right);
-            //Quaternion desiredRotation = _head.localRotation * rotation;
-
-
-            //_head.localEulerAngles = eulers;
+        public void Rotate(float xAngle, float yAngle) {
+            _xFrameRotation = xAngle;
+            _yFrameRotation = yAngle;
         }
 
         public void Jump() {
             float scaleFactor = this.transform.localScale.x;
             _rigidbody.AddForce(this.UpVector * _movementInfo.jumpForce * scaleFactor, ForceMode.Acceleration);
-        }
-
-        Coroutine correctRotation = null;
-        void OnPortalTeleport(Portal portal) {
-            if (_correctRotationOnTeleport) {
-                if (correctRotation != null) {
-                    StopCoroutine(correctRotation);
-                }
-                correctRotation = StartCoroutine(CorrectionRotationRoutine(_correctRotationDuration));
-            }
-        }
-        
-        bool _disableControls = false;
-        IEnumerator CorrectionRotationRoutine(float duration) {
-            _disableControls = true;
-
-            float elapsed = 0;
-            while (elapsed < duration) {
-                float ratio = elapsed / duration;
-                float easing = _correctRotationEasing.Evaluate(ratio);
-                float angle = CorrectRotation(easing);
-
-                yield return null;
-                elapsed += Time.deltaTime;
-            }
-
-            CorrectRotation(1.0f);
-
-            _disableControls = false;
-        }
-
-        float CorrectRotation(float ratio) {
-            // TODO: Make this independent of input
-            float xRot = Input.GetAxis("Mouse X") * 3;
-            float yRot = Input.GetAxis("Mouse Y") * 3;
-
-            Quaternion frameXRotation = Quaternion.Euler(0, xRot, 0);
-            Quaternion frameYRotation = Quaternion.Euler(-yRot, 0, 0);
-
-            // Calculate head rotation
-            Quaternion srcHeadRotation = _head.rotation;
-            Quaternion dstHeadRotation = Quaternion.LookRotation(_head.forward, Vector3.up);
-            float angle = Quaternion.Angle(srcHeadRotation, dstHeadRotation);
-
-            //// Check if our current up angle overshoots our max angle.
-            //// If it does, and it's within our defined snap angle, then try to look straight up
-            //// instead of flipping the camera.
-            //float angleFromTrueUp = Util.SignedPlanarAngle(_head.up, Vector3.up, _head.right);
-            //if ((-90 - _portalLookSnapAngle < angleFromTrueUp && angleFromTrueUp < -90) ||
-            //    (90 < angleFromTrueUp && angleFromTrueUp < 90 + _portalLookSnapAngle)) {
-            //    dstHeadRotation = srcHeadRotation * Quaternion.Euler(-angleFromTrueUp + 0.5f, 0, 0);
-            //}
-
-            // Calculate desired body rotation by projecting the desired camera rotation onto the upward plane
-            // and using that rotation.
-            Vector3 dstForwardVector = Vector3.ProjectOnPlane(dstHeadRotation * Vector3.forward, Vector3.up);
-            float dstBodyAngle = MathUtil.SignedPlanarAngle(dstForwardVector, Vector3.forward, Vector3.up);
-            Quaternion srcBodyRotation = transform.rotation;
-            Quaternion dstBodyRotation = Quaternion.Euler(0, dstBodyAngle, 0);
-
-            transform.rotation = Quaternion.Slerp(srcBodyRotation, dstBodyRotation, ratio) * frameXRotation;
-            _head.rotation = Quaternion.Slerp(srcHeadRotation, dstHeadRotation, ratio) * frameYRotation * frameXRotation;
-
-            //// TODO: this doesn't account for body
-            //if (Quaternion.Angle(correctedHeadRotation, dstHeadRotation) < 0.1f) {
-            //    break;
-            //}
-            return angle;
-        }
-
-        //Quaternion AlignAxis(Quaternion rotation, Vector3 axis) {
-        //    Quaternion q;
-        //    Vector3 a = Vector3.Cross(3dobject.up, varnormal);
-        //    float d = Vector3.Dot(3dobject.up, varnormal);
-        //    if (d < 0.0 && a.sqrMagnitude == 0.0) /* Replace with a real epsilon test */
-        //    {
-        //        q.x = 3dobject.left.x;
-        //        q.y = 3dobject.left.y;
-        //        q.z = 3dobject.left.z;
-        //        q.w = 0.0;
-        //    } else {
-        //        q.x = a.x;
-        //        q.y = a.y;
-        //        q.z = a.z;
-        //        q.w = Mathf.Sqrt((3dobject.up.sqrMagnitude) * (varnormal.sqrMagnitude)) +d;
-        //    }
-        //    return q;
-        //}
-
-        Quaternion ClampRotationAroundXAxis(Quaternion rotation, float minX, float maxX) {
-            rotation.x /= rotation.w;
-            rotation.y /= rotation.w;
-            rotation.z /= rotation.w;
-            rotation.w = 1.0f;
-
-            float angleX = 2.0f * Mathf.Rad2Deg * Mathf.Atan(rotation.x);
-
-            angleX = Mathf.Clamp(angleX, minX, maxX);
-
-            rotation.x = Mathf.Tan(0.5f * Mathf.Deg2Rad * angleX);
-
-            return rotation;
         }
     }
 }

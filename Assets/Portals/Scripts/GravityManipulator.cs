@@ -26,10 +26,12 @@ namespace Portals {
         }
 
         private void OnPortalTeleport(Portal portal) {
-            Vector3 newUp = portal.PortalRotation() * upVector;
-            upVector = newUp.normalized;
-            if (invert) {
-                upVector *= -1;
+            if (portal.ModifyGravity) {
+                Vector3 newUp = portal.PortalRotation() * upVector;
+                upVector = newUp.normalized;
+                if (invert) {
+                    upVector *= -1;
+                }
             }
         }
     }

@@ -19,6 +19,8 @@ namespace Portals {
         [SerializeField] private int _maxRecursion = 2;
         [Tooltip("If enabled, uses the previous frame to draw the last recursion. Max Recursion must be 2 or greater.")]
         [SerializeField] private bool _fakeInfiniteRecursion = true;
+        [Tooltip("If enabled, gravity will be realligned when travelling through a portal if the GravityManipulator script is attached.")]
+        [SerializeField] private bool _modifyGravity = false;
         [Tooltip("Colliders to ignore when entering this portal. Set this to the objects behind the portal.")]
         [SerializeField] private List<Collider> _ignoredColliders;
         [SerializeField] private PortalQualitySettings _qualitySettings = new PortalQualitySettings() {
@@ -128,6 +130,14 @@ namespace Portals {
         public bool FakeInfiniteRecursion {
             get { return _fakeInfiniteRecursion; }
             set { _fakeInfiniteRecursion = value; }
+        }
+
+        /// <summary>
+        /// Enable or disable gravity modification for teleportable objects with a GravityManipulator script attached.
+        /// </summary>
+        public bool ModifyGravity {
+            get { return _modifyGravity; }
+            set { _modifyGravity = value; }
         }
 
         /// <summary>
