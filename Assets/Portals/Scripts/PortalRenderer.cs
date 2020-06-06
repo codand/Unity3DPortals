@@ -19,6 +19,7 @@ namespace Portals {
 
         // Counts the number of active PortalRenderers in the scene.
         private static int _activePortalRendererCount = 0;
+        private static Portal _currentlyRenderingPortal;
 
         private Portal _portal;
 
@@ -70,6 +71,10 @@ namespace Portals {
 
         #region Rendering
 
+        private struct CameraData {
+
+        }
+
         private Vector4 WorldToViewportPoint(Matrix4x4 vp, Vector3 worldPoint) {
             //Vector3 viewportPoint = cam.WorldToViewportPoint(worldPoint);
             Vector4 point = new Vector4(worldPoint.x, worldPoint.y, worldPoint.z, 1);
@@ -84,7 +89,25 @@ namespace Portals {
             }
 
             Vector3 viewPoint = new Vector3(ndcPoint.x / 2 + 0.5f, ndcPoint.y / 2 + 0.5f, hPoint.w);
+
+            //Debug.Log(hPoint.ToString("F2") + " " + ndcPoint.ToString("F2") + " " + viewPoint.ToString("F2"));
             return viewPoint;
+        }
+
+        private Vector3 Min(params Vector3[] vecs) {
+            Vector3 min = new Vector3(Mathf.Infinity, Mathf.Infinity, Mathf.Infinity);
+            for (int i = 0; i < vecs.Length; i++) {
+                min = Vector3.Min(min, vecs[i]);
+            }
+            return min;
+        }
+
+        private Vector3 Max(params Vector3[] vecs) {
+            Vector3 max = new Vector3(Mathf.NegativeInfinity, Mathf.NegativeInfinity, Mathf.NegativeInfinity);
+            for (int i = 0; i < vecs.Length; i++) {
+                max = Vector3.Max(max, vecs[i]);
+            }
+            return max;
         }
 
         private Rect MakePixelPerfect(Rect r, Camera cam) {
@@ -110,7 +133,7 @@ namespace Portals {
             Matrix4x4 p = cam.projectionMatrix;
             Matrix4x4 v = cam.worldToCameraMatrix;
             Matrix4x4 vp = p * v;
-            
+
             // Calculate the viewport rect of portal's front face by transforming each world space
             // corner to screen space.
             var corners = _portal.WorldSpaceCorners();
@@ -119,9 +142,12 @@ namespace Portals {
             tr = WorldToViewportPoint(vp, corners[1]);
             br = WorldToViewportPoint(vp, corners[2]);
             bl = WorldToViewportPoint(vp, corners[3]);
-            
+
+            //Vector3 min = Min(tl, tr, br, bl);
+            //Vector3 max = Max(tl, tr, br, bl);
             Vector3 min = Vector3.Min(tr, Vector3.Min(tl, Vector3.Min(br, bl)));
             Vector3 max = Vector3.Max(tr, Vector3.Max(tl, Vector3.Max(br, bl)));
+
 
             // If any of the portal's corners are behind the camera, then the viewport rect calculated
             // using only the portal's front face might not cover everything. In this case,
@@ -132,8 +158,10 @@ namespace Portals {
                 Vector3 fbr = WorldToViewportPoint(vp, _portal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 1.0f)));
                 Vector3 fbl = WorldToViewportPoint(vp, _portal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 1.0f)));
 
-                min = Vector3.Min(ftr, Vector3.Min(ftl, Vector3.Min(fbr, fbl)));
-                max = Vector3.Max(ftr, Vector3.Max(ftl, Vector3.Max(fbr, fbl)));
+                //min = Min(tl, tr, br, bl);
+                //max = Max(tl, tr, br, bl);
+                min = Vector3.Min(min, Vector3.Min(ftr, Vector3.Min(ftl, Vector3.Min(fbr, fbl))));
+                max = Vector3.Max(max, Vector3.Max(ftr, Vector3.Max(ftl, Vector3.Max(fbr, fbl))));
             }
 
             // Clamp viewport rect to edges of the screen
@@ -147,42 +175,6 @@ namespace Portals {
             return MakePixelPerfect(viewportRect, cam);
         }
 
-        private bool IsCameraUsingDeferredShading(Camera cam) {
-            return Camera.current.actualRenderingPath == RenderingPath.DeferredLighting || Camera.current.actualRenderingPath == RenderingPath.DeferredShading;
-        }
-
-        private static Portal _currentlyRenderingPortal;
-
-        //private struct CameraContext {
-        //    public Matrix4x4 ProjectionMatrix { get; set; }
-        //    public Matrix4x4 WorldToCameraMatrix { get; set; }
-        //}
-
-        //private struct StereoCameraContext {
-        //    public CameraContext MonoEye { get => LeftEye; set => LeftEye = value; }
-        //    public CameraContext LeftEye { get; set; }
-        //    public CameraContext RightEye { get; set; }
-        //}
-
-        //private struct PortalRenderContext {
-        //    public StereoCameraContext CurrentFrame { get; set; }
-        //    public StereoCameraContext PreviousFrame { get; set; }
-
-        //    public void FinalizeFrame() {
-        //        PreviousFrame = CurrentFrame;
-        //    }
-        //}
-
-        //private PortalRenderContext _renderContext = new PortalRenderContext();
-        //private PortalRenderContext GetRenderContext() {
-        //    return _renderContext;
-        //}
-
-        //private void ReleaseRenderContext(PortalRenderContext renderContext) {
-        //    renderContext.FinalizeFrame();
-        //}
-
-        //private Dictionary<Camera, RenderTexture> _renderTexturesByCamera = new Dictionary<Camera, RenderTexture>();
 
         private bool IsToplevelCamera() {
             return _currentRenderDepth == 0;
@@ -300,13 +292,6 @@ namespace Portals {
             MaterialPropertyBlock block = _propertyBlockObjectPool.Take();
             _renderer.GetPropertyBlock(block);
 
-            // Handle the player clipping through the portal's frontface
-            bool renderBackface = ShouldRenderBackface(Camera.current);
-            block.SetFloat("_BackfaceAlpha", renderBackface ? 1.0f : 0.0f);
-
-            // Get camera for next depth level
-            PortalCamera portalCamera = GetOrCreatePortalCamera(Camera.current);
-
             // Calculate where in screen space the portal lies.
             // We use this to only render as much of the screen as necessary, avoiding overdraw.
             Rect viewportRect = CalculatePortalViewportRect(Camera.current);
@@ -317,6 +302,13 @@ namespace Portals {
             if (pixelWidth < 1 || pixelHeight < 1) {
                 return;
             }
+
+            // Handle the player clipping through the portal's frontface
+            bool renderBackface = ShouldRenderBackface(Camera.current);
+            block.SetFloat("_BackfaceAlpha", renderBackface ? 1.0f : 0.0f);
+
+            // Get camera for next depth level
+            PortalCamera portalCamera = GetOrCreatePortalCamera(Camera.current);
 
             // Save which portal is rendering 
             var parentPortal = _currentlyRenderingPortal;
