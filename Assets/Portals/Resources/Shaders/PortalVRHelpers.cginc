@@ -20,7 +20,7 @@ float _PortalMultiPassCurrentEye;
 float4x4 PORTAL_MATRIX_VP;
 #endif
 
-static const float _AlphaCutoff = 0.5;
+static const float _AlphaCutoff = 0.1;
 
 sampler2D _DefaultTexture;
 sampler2D _LeftEyeTexture;

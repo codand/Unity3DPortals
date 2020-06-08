@@ -332,6 +332,11 @@ namespace Portals {
             return PortalRotation() * rotation;
         }
 
+        public Vector3 TeleportScale(Vector3 scale) {
+            Vector3 pScale = PortalScale();
+            return new Vector3(scale.x * pScale.x, scale.y * pScale.y, scale.z * pScale.z);
+        }
+
         public Vector3 InverseTeleportPoint(Vector3 point) {
             return PortalMatrix().inverse.MultiplyPoint3x4(point);
         }

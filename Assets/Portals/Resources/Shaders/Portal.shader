@@ -18,11 +18,11 @@ Shader "Portal/Portal"
 		Pass
 		{
 			// Stencil prevents the backface from rendering if we've already seen the frontface
-			Stencil{
-				Comp Always
-				Pass IncrSat
-				ZFail IncrSat
-			}
+			//Stencil{
+			//	Comp Always
+			//	Pass IncrSat
+			//	ZFail IncrSat
+			//}
 
 			Blend SrcAlpha OneMinusSrcAlpha
 			ZWrite On

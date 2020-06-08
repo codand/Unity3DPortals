@@ -9,6 +9,8 @@ namespace Portals {
     [ExecuteInEditMode]
     [RequireComponent(typeof(Camera))]
     public class PortalCamera : MonoBehaviour {
+        private const float ObliqueClippingOffset = 0.001f;
+            
         private Camera _parent;
         private Camera _camera;
         private Portal _portal;
@@ -264,6 +266,7 @@ namespace Portals {
                 Vector4 exitPlaneCameraSpace = _camera.worldToCameraMatrix.inverse.transpose * exitPlaneWorldSpace;
                 // Offset the clipping plane itself so that a character walking through a portal has no seams
                 //exitPlaneCameraSpace.w -= _portal.ClippingOffset;
+                exitPlaneCameraSpace.w -= ObliqueClippingOffset;
                 exitPlaneCameraSpace *= -1;
                 MathUtil.MakeProjectionMatrixOblique(ref projectionMatrix, exitPlaneCameraSpace);
             }

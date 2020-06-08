@@ -133,6 +133,7 @@ namespace Portals {
                     // Lock clone to master
                     clone.transform.position = portal.TeleportPoint(transform.position);
                     clone.transform.rotation = portal.TeleportRotation(transform.rotation);
+                    clone.transform.localScale = portal.TeleportScale(transform.localScale);
 
                     clone.CopyAnimations(this);
                 }
@@ -397,6 +398,7 @@ namespace Portals {
                 // TODO: Determine whether or not I need to be using rigidbody.position
                 transform.position = portal.TeleportPoint(_rigidbody.position);
                 transform.rotation = portal.TeleportRotation(_rigidbody.rotation);
+                transform.localScale = portal.TeleportScale(transform.localScale);
 
                 //m_Rigidbody.position = Vector3.zero;
                 //transform.position = Vector3.zero;

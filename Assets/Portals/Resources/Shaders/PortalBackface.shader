@@ -11,7 +11,7 @@ Shader "Portal/PortalBackface"
 
 	SubShader
 	{
-		Tags{ "RenderType" = "Opaque" "Queue" = "Geometry+101" }
+		Tags{ "RenderType" = "Opaque" "Queue" = "Transparent+101" }
 
 		//Pass
 		//{
@@ -48,16 +48,16 @@ Shader "Portal/PortalBackface"
 			// Stencil prevents the backface from rendering if we've already seen the frontface
 			// Don't render unless Stencil == 0. The value is decremented when we fail (saw a frontface)
 			// so that a recursive layer above us won't be prevented from rendering.
-			Stencil{
-				Ref 0
-				Comp Equal
-				Fail DecrSat
-				Pass IncrSat
-			}	
+			//Stencil{
+			//	Ref 0
+			//	Comp Equal
+			//	Fail DecrSat
+			//	Pass IncrSat
+			//}	
 
 			Blend One Zero
-			ZWrite On
-			ZTest LEqual
+			ZWrite Off
+			//ZTest LEqual
 			ZTest Always
 			Cull Back
 			Offset -0.1,-0.1

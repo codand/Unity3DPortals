@@ -259,6 +259,50 @@ namespace Portals {
             return _portal.FakeInfiniteRecursion && _portal.MaxRecursion >= 2 && _currentRenderDepth >= _portal.MaxRecursion;
         }
 
+        private bool ShouldRenderBackface(Camera camera) {
+            // Don't render back face for recursive calls
+            if (!IsToplevelCamera()) { return false; }
+            if (!CameraIsInFrontOfPortal(camera, _portal)) { return false; }
+            if (!NearClipPlaneIsBehindPortal(camera, _portal)) { return false; }
+            return true;
+        }
+
+        private bool NearClipPlaneIsBehindPortal(Camera camera, Portal portal) {
+            Vector4 portalPlaneWorldSpace = _portal.VectorPlane;
+            Vector4 portalPlaneViewSpace = camera.worldToCameraMatrix.inverse.transpose * portalPlaneWorldSpace;
+            portalPlaneViewSpace.z *= -1; // TODO: Why is this necessary?
+            Plane p = new Plane((Vector3)portalPlaneViewSpace, portalPlaneViewSpace.w);
+
+            Vector3[] nearPlaneCornersViewSpace = new Vector3[4];
+            camera.CalculateFrustumCorners(camera.rect, camera.nearClipPlane, camera.stereoActiveEye, nearPlaneCornersViewSpace);
+            for (int i = 0; i < nearPlaneCornersViewSpace.Length; i++) {
+                Vector3 corner = nearPlaneCornersViewSpace[i];
+
+                bool behindPortalPlane = p.GetSide(corner);
+                if (behindPortalPlane) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private bool CameraIsInFrontOfPortal(Camera camera, Portal portal) {
+            // TODO: Use eye position instead of camera position for VR
+            Vector3 cameraPosWS = camera.transform.position;
+            if (portal.Plane.GetSide(cameraPosWS)) {
+                return false;
+            }
+            
+            // Check if camera is inside the rectangular bounds of portal
+            float extents = 0.5f;
+            Vector3 cameraPosOS = _transform.InverseTransformPoint(cameraPosWS);
+            if (cameraPosOS.x < -extents) return false;
+            if (cameraPosOS.x > extents) return false;
+            if (cameraPosOS.y > extents) return false;
+            if (cameraPosOS.y < -extents) return false;
+            return true;
+        }
+
         private void InitializeIfNeeded() {
 #if UNITY_EDITOR
             // Workaround for Unity bug that causes Awake/Start to not be called when running in EditMode
@@ -528,29 +572,6 @@ namespace Portals {
             } else {
                 _portalMaterial.DisableKeyword("SAMPLE_DEFAULT_TEXTURE");
             }
-        }
-
-        private bool ShouldRenderBackface(Camera camera) {
-            // Decrease the size of the box in which we will render the backface when rendering stereo.
-            // This will prevent the backface from appearing in one eye when near the edge of the portal.
-            float scaleMultiplier = camera.stereoEnabled ? 0.9f : 1.0f;
-            if (_currentRenderDepth == 0 && LocalXYPlaneContainsPoint(Camera.current.transform.position, scaleMultiplier)) {
-                // Camera is within the border of the camera
-                if (!_portal.Plane.GetSide(Camera.current.transform.position)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        
-        private bool LocalXYPlaneContainsPoint(Vector3 point, float scaleMultiplier) {
-            float extents = 0.5f * scaleMultiplier;
-            Vector3 localPoint = _transform.InverseTransformPoint(point);
-            if (localPoint.x < -extents) return false;
-            if (localPoint.x > extents) return false;
-            if (localPoint.y > extents) return false;
-            if (localPoint.y < -extents) return false;
-            return true;
         }
 
         static Dictionary<Camera, Camera> _cameraMap = new Dictionary<Camera, Camera>();
