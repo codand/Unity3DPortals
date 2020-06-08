@@ -21,6 +21,9 @@ namespace Portals {
         private static int _activePortalRendererCount = 0;
         private static Portal _currentlyRenderingPortal;
 
+        // Buffer for calculating near plane corners
+        private static Vector3[] _nearPlaneCorners;
+
         private Portal _portal;
 
         // Maps cameras to their children
@@ -268,16 +271,20 @@ namespace Portals {
         }
 
         private bool NearClipPlaneIsBehindPortal(Camera camera, Portal portal) {
+            if (_nearPlaneCorners == null) {
+                _nearPlaneCorners = new Vector3[4];
+            }
+
             Vector4 portalPlaneWorldSpace = _portal.VectorPlane;
             Vector4 portalPlaneViewSpace = camera.worldToCameraMatrix.inverse.transpose * portalPlaneWorldSpace;
             portalPlaneViewSpace.z *= -1; // TODO: Why is this necessary?
             Plane p = new Plane((Vector3)portalPlaneViewSpace, portalPlaneViewSpace.w);
 
-            Vector3[] nearPlaneCornersViewSpace = new Vector3[4];
-            camera.CalculateFrustumCorners(camera.rect, camera.nearClipPlane, camera.stereoActiveEye, nearPlaneCornersViewSpace);
-            for (int i = 0; i < nearPlaneCornersViewSpace.Length; i++) {
-                Vector3 corner = nearPlaneCornersViewSpace[i];
+            camera.CalculateFrustumCorners(camera.rect, camera.nearClipPlane, camera.stereoActiveEye, _nearPlaneCorners);
+            for (int i = 0; i < _nearPlaneCorners.Length; i++) {
+                Vector3 corner = _nearPlaneCorners[i];
 
+                // Return as soon as a single corner is found behind the portal
                 bool behindPortalPlane = p.GetSide(corner);
                 if (behindPortalPlane) {
                     return true;
