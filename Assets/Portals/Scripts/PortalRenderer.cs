@@ -213,8 +213,9 @@ namespace Portals {
                 Vector3 corner = corners[i];
                 Vector3 direction = corner - origin;
                 float distance = direction.magnitude;
+                int layerMask = portal.RaycastOccluders;
 
-                if (Physics.Raycast(origin, direction, out RaycastHit hit, distance)) {
+                if (Physics.Raycast(origin, direction, out RaycastHit hit, distance, layerMask, QueryTriggerInteraction.Ignore)) {
                     // Hit something, check how far
                     float epsilon = 1f;
                     if (hit.distance + epsilon >= distance) {

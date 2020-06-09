@@ -31,6 +31,7 @@ namespace Portals {
             useObliqueProjectionMatrix = true,
             useScissorRect = true,
             useRaycastOcclusion = true,
+            raycastOccluders = ~0,
             clippingOffset = 0.01f,
             copyGlobalIllumination = false,
             supportedCameraTypes = CameraType.Game | CameraType.SceneView,
@@ -167,6 +168,14 @@ namespace Portals {
         public bool UseRaycastOcclusion {
             get { return _advancedSettings.useRaycastOcclusion; }
             set { _advancedSettings.useRaycastOcclusion = value; }
+        }
+        
+        /// <summary>
+        /// Layer mask determining which objects can occlude this portal
+        /// </summary>
+        public LayerMask RaycastOccluders {
+            get { return _advancedSettings.raycastOccluders; }
+            set { _advancedSettings.raycastOccluders = value; }
         }
 
         /// <summary>
@@ -423,6 +432,7 @@ namespace Portals {
             public bool copyGlobalIllumination;
             [Tooltip("If enabled, will use raycasting to determine whether or not to render this portal.")]
             public bool useRaycastOcclusion;
+            public LayerMask raycastOccluders;
             [Tooltip("Should portals be rendered in Scene view or in reflections?")]
             public CameraType supportedCameraTypes;
         }

@@ -71,6 +71,11 @@ namespace Portals {
         }
         #endregion
 
+        private PortalContext GetPortalContext(Portal portal) {
+            _contextByPortal.TryGetValue(portal, out PortalContext ctx);
+            return ctx;
+        }
+
         #region Initialization
         private void Awake() {
             // Awake is called on all clones
@@ -120,31 +125,31 @@ namespace Portals {
 
         #region Updates
         private void LateUpdate() {
-            if (!_isClone) {
-                if (!ShouldUseFixedUpdate()) {
-                    TeleportCheck();
-                }
+            if (_isClone) {
+                return;
+            }
 
-                foreach (KeyValuePair<Portal, PortalContext> kvp in _contextByPortal) {
-                    Portal portal = kvp.Key;
-                    PortalContext context = kvp.Value;
-                    Teleportable clone = context.clone;
+            if (!ShouldUseFixedUpdate()) {
+                TeleportCheck();
+            }
 
-                    // Lock clone to master
-                    clone.transform.position = portal.TeleportPoint(transform.position);
-                    clone.transform.rotation = portal.TeleportRotation(transform.rotation);
-                    clone.transform.localScale = portal.TeleportScale(transform.localScale);
+            foreach (KeyValuePair<Portal, PortalContext> kvp in _contextByPortal) {
+                Portal portal = kvp.Key;
+                PortalContext context = kvp.Value;
+                Teleportable clone = context.clone;
 
-                    clone.CopyAnimations(this);
-                }
+                // Lock clone to master
+                clone.transform.position = portal.TeleportPoint(transform.position);
+                clone.transform.rotation = portal.TeleportRotation(transform.rotation);
+                clone.transform.localScale = portal.TeleportScale(transform.localScale);
 
-                if (_camera) {
-                    _cameraPositionLastFrame = _camera.transform.position;
-                }
+                clone.CopyAnimations(this);
+            }
+
+            if (_camera) {
+                _cameraPositionLastFrame = _camera.transform.position;
             }
         }
-
-        Dictionary<Portal, int> m_PortalFrameCounter = new Dictionary<Portal, int>();
 
         private void OnTriggerStay(Collider other) {
             if (_isClone) {
@@ -155,11 +160,13 @@ namespace Portals {
             if (!portal) {
                 return;
             }
-            m_PortalFrameCounter[portal] = 2;
-            if (portal.IsOpen && !_contextByPortal.ContainsKey(portal)) {
 
-                //Debug.Log("Trigger");
+            // Enter portal if not already inside it
+            PortalContext ctx = GetPortalContext(portal);
+            if (portal.IsOpen && ctx == null) {
                 EnterPortal(portal);
+            } else if (ctx != null) {
+                ctx.framesRemaining = 1;
             }
         }
 
@@ -174,101 +181,102 @@ namespace Portals {
             foreach (var hit in hits) {
                 if (hit.collider.gameObject.layer == LayerMask.NameToLayer("Portal")) {
                     Portal portal = hit.collider.GetComponent<Portal>();
-
-                    m_PortalFrameCounter[portal] = 2;
-                    if (portal.IsOpen && !_contextByPortal.ContainsKey(portal)) {
-                        //Debug.Log("Enter " + portal);
+                    PortalContext ctx = GetPortalContext(portal);
+                    if (portal.IsOpen && ctx == null) {
                         EnterPortal(portal);
+                    } else if (ctx != null) {
+                        ctx.framesRemaining = 2;
                     }
                 }
             }
+        }
 
-            HashSet<Portal> toRemove = new HashSet<Portal>();
-            foreach(var kvp in m_PortalFrameCounter.ToList()) {
-                int count = kvp.Value - 1;
-                m_PortalFrameCounter[kvp.Key] = count;
-                if (count == -1) {
-                    toRemove.Add(kvp.Key);
-                    //Debug.Log("Adding " + kvp.Key);
-                }
-            }
-            
-            foreach (var portal in toRemove) {
-                //Debug.Log("Exit " + portal);
-                if (_contextByPortal.ContainsKey(portal)) {
+        private void CheckForExitedPortals() {
+            foreach (Portal portal in _contextByPortal.Keys.ToList()) {
+                PortalContext ctx = _contextByPortal[portal];
+                if (ctx.framesRemaining <= 0) {
                     ExitPortal(portal);
+                } else {
+                    ctx.framesRemaining -= 1;
                 }
-                m_PortalFrameCounter.Remove(portal);
             }
         }
 
+        private void DoClonePhysicsStep() {
+            foreach (KeyValuePair<Portal, PortalContext> kvp in _contextByPortal) {
+                Portal portal = kvp.Key;
+                PortalContext ctx = kvp.Value;
+                Teleportable clone = ctx.clone;
+
+                // Apply velocity restrictions to master
+                Vector3 slaveDeltaVelocity = clone._rigidbody.velocity - clone._rigidbodyLastTick.velocity;
+                Vector3 masterDeltaVelocity = _rigidbody.velocity - _rigidbodyLastTick.velocity;
+
+                Vector3 slaveDeltaPosition = clone._rigidbody.position - clone._rigidbodyLastTick.position;
+                Vector3 masterDeltaPosition = _rigidbody.position - _rigidbodyLastTick.position;
+
+                Vector3 slaveDeltaAngularVelocity = clone._rigidbody.angularVelocity - clone._rigidbodyLastTick.angularVelocity;
+                Vector3 masterDeltaAngularVelocity = _rigidbody.angularVelocity - _rigidbodyLastTick.angularVelocity;
+
+                //// Quaternion slaveDeltaRotation = clone.m_Rigidbody.rotation * Quaternion.Inverse(clone.m_RigidbodyLastTick.rotation);
+                //// Quaternion masterDeltaRotation = m_Rigidbody.rotation * Quaternion.Inverse(m_RigidbodyLastTick.rotation);
+
+                Vector3 velocityTransfer = CalculateImpulseTransfer(portal.InverseTeleportVector(slaveDeltaVelocity), masterDeltaVelocity);
+                Vector3 positionTransfer = CalculateImpulseTransfer(portal.InverseTeleportVector(slaveDeltaPosition), masterDeltaPosition);
+                Vector3 angularVelocityTransfer = CalculateImpulseTransfer(portal.InverseTeleportVector(slaveDeltaAngularVelocity), masterDeltaAngularVelocity);
+                //// Quaternion rotationTransfer = portal.ExitPortal.TeleportRotation(slaveDeltaRotation) * Quaternion.Inverse(masterDeltaRotation);
+
+                _rigidbody.velocity += velocityTransfer;
+                _rigidbody.position += positionTransfer;
+                _rigidbody.angularVelocity += angularVelocityTransfer;
+                //// _rigidbody.rotation *= rotationTransfer;
+
+            }
+        }
         private void Update() {
 
             //SweepTest();
         }
 
         private void FixedUpdate() {
-            if (!_isClone) {
-                //if (m_Rigidbody.IsSleeping()) {
-                //    m_Rigidbody.WakeUp();
-                //}
-                foreach (KeyValuePair<Portal, PortalContext> kvp in _contextByPortal) {
-                    Portal portal = kvp.Key;
-                    PortalContext context = kvp.Value;
-
-                    Teleportable clone = context.clone;
-
-                    // Lock clone to master
-                    clone._rigidbody.position = portal.TeleportPoint(_rigidbody.position);
-                    clone._rigidbody.rotation = portal.TeleportRotation(_rigidbody.rotation);
-                    clone._rigidbody.velocity = portal.TeleportVector(_rigidbody.velocity);
-                    clone._rigidbody.angularVelocity = portal.TeleportVector(_rigidbody.angularVelocity);
-
-                    // Save clone's modified state
-                    clone.SaveRigidbodyInfo();
-                }
-
-                // Save master unmodified state
-                SaveRigidbodyInfo();
+            if (_isClone) {
+                return;
             }
+
+            //if (m_Rigidbody.IsSleeping()) {
+            //    m_Rigidbody.WakeUp();
+            //}
+            foreach (KeyValuePair<Portal, PortalContext> kvp in _contextByPortal) {
+                Portal portal = kvp.Key;
+                PortalContext ctx = kvp.Value;
+
+                Teleportable clone = ctx.clone;
+
+                // Lock clone to master
+                clone._rigidbody.position = portal.TeleportPoint(_rigidbody.position);
+                clone._rigidbody.rotation = portal.TeleportRotation(_rigidbody.rotation);
+                clone._rigidbody.velocity = portal.TeleportVector(_rigidbody.velocity);
+                clone._rigidbody.angularVelocity = portal.TeleportVector(_rigidbody.angularVelocity);
+
+                // Save clone's modified state
+                clone.SaveRigidbodyInfo();
+            }
+
+            // Save master unmodified state
+            SaveRigidbodyInfo();
         }
 
         private void LateFixedUpdate() {
-            if (!_isClone) {
-                SweepTest();
-                foreach (KeyValuePair<Portal, PortalContext> kvp in _contextByPortal) {
-                    Portal portal = kvp.Key;
-                    PortalContext context = kvp.Value;
-                    Teleportable clone = context.clone;
+            if (_isClone) {
+                return;
+            }
 
-                    // Apply velocity restrictions to master
-                    Vector3 slaveDeltaVelocity = clone._rigidbody.velocity - clone._rigidbodyLastTick.velocity;
-                    Vector3 masterDeltaVelocity = _rigidbody.velocity - _rigidbodyLastTick.velocity;
+            SweepTest();
+            CheckForExitedPortals();
+            DoClonePhysicsStep();
 
-                    Vector3 slaveDeltaPosition = clone._rigidbody.position - clone._rigidbodyLastTick.position;
-                    Vector3 masterDeltaPosition = _rigidbody.position - _rigidbodyLastTick.position;
-
-                    Vector3 slaveDeltaAngularVelocity = clone._rigidbody.angularVelocity - clone._rigidbodyLastTick.angularVelocity;
-                    Vector3 masterDeltaAngularVelocity = _rigidbody.angularVelocity - _rigidbodyLastTick.angularVelocity;
-
-                    //// Quaternion slaveDeltaRotation = clone.m_Rigidbody.rotation * Quaternion.Inverse(clone.m_RigidbodyLastTick.rotation);
-                    //// Quaternion masterDeltaRotation = m_Rigidbody.rotation * Quaternion.Inverse(m_RigidbodyLastTick.rotation);
-
-                    Vector3 velocityTransfer = CalculateImpulseTransfer(portal.InverseTeleportVector(slaveDeltaVelocity), masterDeltaVelocity);
-                    Vector3 positionTransfer = CalculateImpulseTransfer(portal.InverseTeleportVector(slaveDeltaPosition), masterDeltaPosition);
-                    Vector3 angularVelocityTransfer = CalculateImpulseTransfer(portal.InverseTeleportVector(slaveDeltaAngularVelocity), masterDeltaAngularVelocity);
-                    //// Quaternion rotationTransfer = portal.ExitPortal.TeleportRotation(slaveDeltaRotation) * Quaternion.Inverse(masterDeltaRotation);
-
-                    _rigidbody.velocity += velocityTransfer;
-                    _rigidbody.position += positionTransfer;
-                    _rigidbody.angularVelocity += angularVelocityTransfer;
-                    //// _rigidbody.rotation *= rotationTransfer;
-
-                }
-
-                if (ShouldUseFixedUpdate()) {
-                    TeleportCheck();
-                }
+            if (ShouldUseFixedUpdate()) {
+                TeleportCheck();
             }
         }
         #endregion
@@ -337,14 +345,18 @@ namespace Portals {
             portal.OnExitPortalChanged += OnExitPortalChanged;
             portal.ExitPortal.OnIgnoredCollidersChanged += clone.OnIgnoredCollidersChanged;
 
-            PortalContext context = new PortalContext() { clone = clone };
+            PortalContext context = new PortalContext() {
+                clone = clone,
+                framesRemaining = 2
+            };
             _contextByPortal[portal] = context;
         }
 
         private void Teleport(Portal portal) {
-            PortalContext context = _contextByPortal[portal];
-            Teleportable clone = context.clone;
+            PortalContext ctx = _contextByPortal[portal];
+            Teleportable clone = ctx.clone;
             clone.SaveRigidbodyInfo();
+            ctx.framesRemaining = 1;
 
             // Always replace our shader because we only support 1 clipping plane at the moment
             ReplaceShaders(this.gameObject, portal.ExitPortal);
@@ -363,8 +375,7 @@ namespace Portals {
                 portal.ExitPortal.OnIgnoredCollidersChanged -= clone.OnIgnoredCollidersChanged;
 
                 if (portal.ExitPortal.ExitPortal) {
-                    // In the case that the exit portal does not point back to the portal itself,
-                    // 
+                    // In the case that the exit portal does not point back to the portal itself
                     portal.ExitPortal.OnIgnoredCollidersChanged += OnIgnoredCollidersChanged;
                     portal.ExitPortal.OnExitPortalChanged += OnExitPortalChanged;
                     portal.ExitPortal.ExitPortal.OnIgnoredCollidersChanged += clone.OnIgnoredCollidersChanged;
@@ -376,7 +387,7 @@ namespace Portals {
                     // Swap clones if we're not already standing in the exit portal
                     // This only applies to portals very close together.
                     _contextByPortal.Remove(portal);
-                    _contextByPortal.Add(portal.ExitPortal, context);
+                    _contextByPortal.Add(portal.ExitPortal, ctx);
                 } else {
                     _contextByPortal.Remove(portal);
                     DespawnClone(clone);
@@ -659,8 +670,10 @@ namespace Portals {
 
         private class PortalContext {
             public Teleportable clone;
-            public TriggerStatus triggerStatus;
+            //public TriggerStatus triggerStatus;
+            public int framesRemaining;
             public bool isInFrontOfPortal;
+
         }
         #endregion
     }
