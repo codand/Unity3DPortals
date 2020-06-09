@@ -68,6 +68,7 @@ Shader "Portal/PortalBackface"
 			#include "PortalVRHelpers.cginc"
 
 			#pragma multi_compile _ SAMPLE_PREVIOUS_FRAME SAMPLE_DEFAULT_TEXTURE
+			#pragma multi_compile _ PORTAL_WAVING_ENABLED
 
 			#pragma vertex vertPortal
 			#pragma fragment fragPortal

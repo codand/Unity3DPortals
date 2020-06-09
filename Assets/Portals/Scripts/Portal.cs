@@ -403,7 +403,7 @@ namespace Portals {
         [System.Serializable]
         private struct PortalQualitySettings {
             [Tooltip("Reduce portal rendering resolution. Use 1 for the best quality, use higher numbers for better performance.")]
-            [Range(1, 4)]
+            [Range(1, 32)]
             public int downscaling;
 
             // TODO: Tooltip

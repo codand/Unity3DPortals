@@ -71,6 +71,7 @@ namespace Portals {
 
         private void OnPortalTeleport(Portal portal) {
             _previousHeadRotation = portal.TeleportRotation(_previousHeadRotation);
+            _head.GetComponent<Camera>().nearClipPlane *= portal.PortalScaleAverage();
         }
 
         private void DoHeadRotation(float xRot, float yRot) {
@@ -108,10 +109,11 @@ namespace Portals {
         }
 
         private void DoGroundCheck() {
+            float skinWidth = 0.01f * transform.lossyScale.x;
             Vector3 origin = transform.position;
-            float radius = _capsuleCollider.radius;
+            float radius = _capsuleCollider.radius * transform.lossyScale.x - skinWidth;
             Vector3 direction = -1 * UpVector;
-            float distance = ((_capsuleCollider.height / 2f) - _capsuleCollider.radius) + _groundCheckDistance;
+            float distance = ((_capsuleCollider.height / 2f) - _capsuleCollider.radius) + _groundCheckDistance * transform.lossyScale.x + skinWidth;
             int layerMask = _collisionMask.value;
             _isGrounded = Physics.SphereCast(origin, radius, direction, out RaycastHit hit, distance, layerMask, QueryTriggerInteraction.Ignore);
         }

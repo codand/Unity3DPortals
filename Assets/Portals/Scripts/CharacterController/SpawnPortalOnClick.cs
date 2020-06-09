@@ -87,8 +87,8 @@ public class SpawnPortalOnClick : MonoBehaviour {
         // Test if we hit a portal first to make them wobble
         bool hitPortal = Physics.Raycast(ray, out RaycastHit portalHit, Mathf.Infinity, PortalPhysics.PortalLayerMask, QueryTriggerInteraction.Collide);
         if (hitPortal) {
-            Portal portal = portalHit.collider.GetComponentInParent<Portal>();
-            WavePortalOverTime(portal, hit.point, _portalWaveAmplitude, _portalWaveDuration);
+            Portal portal = portalHit.collider.GetComponent<Portal>();
+            WavePortalOverTime(portal, portalHit.point, _portalWaveAmplitude, _portalWaveDuration);
         } else if (hitWall) {
             TrySpawnPortal(polarity, hit);
         }
@@ -307,14 +307,21 @@ public class SpawnPortalOnClick : MonoBehaviour {
         return portal.transform.InverseTransformPoint(pointWorldSpace) + Vector3.one * 0.5f;
     }
 
+    private Coroutine _wavingCoroutine;
     private void WavePortalOverTime(Portal portal, Vector3 originWorldSpace, float amplitude, float duration) {
-        StartCoroutine(WavePortalOverTimeRoutine(portal, originWorldSpace, amplitude, duration));
+        if (_wavingCoroutine != null) {
+            StopCoroutine(_wavingCoroutine);
+        }
+        _wavingCoroutine = StartCoroutine(WavePortalOverTimeRoutine(portal, originWorldSpace, amplitude, duration));
     }
 
     IEnumerator WavePortalOverTimeRoutine(Portal portal, Vector3 originWorldSpace, float amplitude, float duration) {
         Vector2 originUVSpace = CalculatePortalUVSpacePoint(portal, originWorldSpace);
         portal.PortalRenderer.FrontFaceMaterial.SetVector("_WaveOrigin", originUVSpace);
         portal.PortalRenderer.BackFaceMaterial.SetVector("_WaveOrigin", originUVSpace);
+
+        portal.PortalRenderer.FrontFaceMaterial.EnableKeyword("PORTAL_WAVING_ENABLED");
+        portal.PortalRenderer.BackFaceMaterial.EnableKeyword("PORTAL_WAVING_ENABLED");
 
         float elapsed = 0;
         while (elapsed < duration) {
@@ -327,6 +334,9 @@ public class SpawnPortalOnClick : MonoBehaviour {
         }
         portal.PortalRenderer.FrontFaceMaterial.SetFloat("_WaveAmplitude", 0);
         portal.PortalRenderer.BackFaceMaterial.SetFloat("_WaveAmplitude", 0);
+
+        portal.PortalRenderer.FrontFaceMaterial.DisableKeyword("PORTAL_WAVING_ENABLED");
+        portal.PortalRenderer.BackFaceMaterial.DisableKeyword("PORTAL_WAVING_ENABLED");
     }
 
     GameObject SpawnBullet(GameObject prefab, Vector3 position, Vector3 direction, float distance, Color color) {

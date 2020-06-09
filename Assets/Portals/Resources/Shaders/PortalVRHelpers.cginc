@@ -3,6 +3,10 @@
 
 #include "UnityCG.cginc"
 
+#ifdef PORTAL_WAVING_ENABLED
+#include "PortalWaving.cginc"
+#endif
+
 #define PORTAL_VR_EYE_LEFT 0
 #define PORTAL_VR_EYE_RIGHT 1
 //#define PORTAL_VR_EYE_MONO 2
@@ -15,6 +19,7 @@ float _PortalMultiPassCurrentEye;
 #define PORTAL_VR_CURRENT_EYE ((_PortalMultiPassCurrentEye == 0 || _PortalMultiPassCurrentEye == 2) ? PORTAL_VR_EYE_LEFT : PORTAL_VR_EYE_RIGHT)
 //#define PORTAL_VR_CURRENT_EYE (unity_CameraProjection[0][2] <= 0 ? PORTAL_VR_EYE_LEFT : PORTAL_VR_EYE_RIGHT)
 #endif
+
 
 #ifdef SAMPLE_PREVIOUS_FRAME
 float4x4 PORTAL_MATRIX_VP;
@@ -29,15 +34,10 @@ sampler2D _TransparencyMask;
 
 sampler2D _PortalTexture;
 float4x4 _PortalProjectionMatrix;
-float4x4 _PortalProjectionMatrix2;
 
 #ifdef IS_BACKFACE
 float _BackfaceAlpha;
 #endif
-
-
-float _WaveAmplitude;
-float2 _WaveOrigin; // UV space
 
 struct appdata
 {
@@ -64,7 +64,7 @@ v2f vertPortal(appdata v)
 	// calculate the clip position of the portal from a higher level portal. PORTAL_MATRIX_VP == camera.projectionMatrix.
 	float4 clipPos = mul(PORTAL_MATRIX_VP, mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1.0)));
 	clipPos.y *= _ProjectionParams.x;
-	//clipPos.z = 1;
+	//clipPos.z = 1;    
 	o.screenUV = ComputeNonStereoScreenPos(clipPos);
 #else
 	o.screenUV = ComputeNonStereoScreenPos(o.pos);
@@ -80,23 +80,6 @@ float4 sampleCurrentTextureProj(float4 uv)
 	else {
 		return tex2Dproj(_RightEyeTexture, uv);
 	}
-	//return tex2Dproj(_PortalTexture, uv);
-}
-
-float wave(float2 position, float2 origin, float time) {
-    float d = length(position - origin);
-    float t = time - d * 20;
-    return sin(t);
-}
-
-float2 waveSlope(float2 position, float2 origin, float amplitude) {
-    const float2 dx = float2(0.01f, 0);
-    const float2 dy = float2(0, 0.01f);
-
-    float2 time = _Time.y * 50;
-    float w = wave(position, origin, time);
-    float2 dw = float2(wave(position + dx, origin, time) - w, wave(position + dy, origin, time) - w);
-    return dw * amplitude;
 }
 
 // Given a vertex position that is NOT coplanar with the portal front face,
@@ -121,11 +104,14 @@ fixed4 fragPortal(v2f i, fixed face : VFACE) : SV_Target
     clip(_BackfaceAlpha - _AlphaCutoff);
     i.objUV = reconstructFrontFaceUV(i.objPos);
 #else
-    i.screenUV /= i.screenUV.w;
+    //i.screenUV /= i.screenUV.w;
 #endif
+    i.screenUV /= i.screenUV.w;
 
-    float2 waveUVOffset = waveSlope(i.objUV.xy, _WaveOrigin, _WaveAmplitude);
-    i.screenUV.xy += waveUVOffset;
+#ifdef PORTAL_WAVING_ENABLED
+    //float2 waveUVOffset = waveSlope(i.objUV.xy, _WaveOrigin, _WaveAmplitude);
+    i.screenUV.xy = screenSpaceWave(i.screenUV.xy, i.objUV.xy);
+#endif    
 
 #ifdef SAMPLE_DEFAULT_TEXTURE
 	float4 col = tex2D(_DefaultTexture, i.objUV);

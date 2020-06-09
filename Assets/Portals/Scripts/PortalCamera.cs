@@ -164,6 +164,7 @@ namespace Portals {
             RenderTexture rt = RenderTexture.GetTemporary(w, h, depth, format, writeMode, msaaSamples, memoryless, vrUsage, useDynamicScale);
             //rt.name = this.gameObject.name;
             rt.filterMode = FilterMode.Point;
+            rt.wrapMode = TextureWrapMode.Clamp;
             //rt.filterMode = FilterMode.Bilinear;
 
             return rt;
