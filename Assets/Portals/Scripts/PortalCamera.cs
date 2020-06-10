@@ -193,6 +193,8 @@ namespace Portals {
                     worldToCameraMatrix = _parent.worldToCameraMatrix;
                     break;
             }
+            _camera.transform.position = _portal.TeleportPoint(_parent.transform.position);
+            _camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
             _camera.projectionMatrix = projectionMatrix;
             _camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
 
@@ -219,6 +221,14 @@ namespace Portals {
                 _camera.rect = new Rect(0, 0, 1, 1);
             }
 
+            if (_portal.UseOcclusionMatrix) {
+                _camera.cullingMatrix = CalculateCullingMatrix();
+            }
+            
+            if (_portal.UseRaycastOcclusion) {
+                _camera.useOcclusionCulling = false;
+            }
+
             RenderTexture texture = GetTemporaryRT();
             _camera.targetTexture = texture;
             _camera.Render();
@@ -226,6 +236,33 @@ namespace Portals {
             SaveFrameData(eye);
 
             return texture;
+        }
+
+        private Matrix4x4 CalculateCullingMatrix() {
+            _camera.ResetCullingMatrix();
+            Vector3[] corners = _portal.ExitPortal.WorldSpaceCorners();
+
+            // Lower left of the backside of our plane in world coordinates
+            Vector3 pa = _portal.ExitPortal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 0));
+            // Lower right
+            Vector3 pb = _portal.ExitPortal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 0));
+            // Upper left
+            Vector3 pc = _portal.ExitPortal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 0));
+            Vector3 pe = _camera.transform.position;
+
+            // Calculate what our horizontal field of view would be with off-axis projection.
+            // If this fov is greater than our camera's fov, we should just use the camera's default projection
+            // matrix instead. Otherwise, the frustum's fov will approach 180 degrees (way too large).
+            Vector3 camToLowerLeft = pa - _camera.transform.position;
+            camToLowerLeft.y = 0;
+            Vector3 camToLowerRight = pb - _camera.transform.position;
+            camToLowerRight.y = 0;
+            float fieldOfView = Vector3.Angle(camToLowerLeft, camToLowerRight);
+            //if (fieldOfView > _camera.fieldOfView) {
+            //    return _camera.cullingMatrix;
+            //} else {
+                return MathUtil.OffAxisProjectionMatrix(_camera.nearClipPlane, _camera.farClipPlane, pa, pb, pc, pe);
+            //}
         }
 
         public static void CopyCameraSettings(Camera src, Camera dst) {

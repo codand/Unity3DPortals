@@ -29,6 +29,7 @@ namespace Portals {
         };
         [SerializeField] private PortalAdvancedSettings _advancedSettings = new PortalAdvancedSettings() {
             useObliqueProjectionMatrix = true,
+            useOcclusionMatrix = true,
             useScissorRect = true,
             useRaycastOcclusion = true,
             raycastOccluders = ~0,
@@ -150,6 +151,14 @@ namespace Portals {
         public bool UseObliqueProjectionMatrix {
             get { return _advancedSettings.useObliqueProjectionMatrix; }
             set { _advancedSettings.useObliqueProjectionMatrix = value; }
+        }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        public bool UseOcclusionMatrix {
+            get { return _advancedSettings.useOcclusionMatrix; }
+            set { _advancedSettings.useOcclusionMatrix = value; }
         }
 
         /// <summary>
@@ -424,6 +433,8 @@ namespace Portals {
         private struct PortalAdvancedSettings {
             [Tooltip("If enabled, uses a custom projection matrix to prevent objects behind the portal from being drawn.")]
             public bool useObliqueProjectionMatrix;
+            [Tooltip("If enabled, uses a custom occlusion culling matrix")]
+            public bool useOcclusionMatrix;
             [Tooltip("Enabling reduces overdraw by not rendering any pixels outside of a portal frame.")]
             public bool useScissorRect;
             [Tooltip("Offset at which the custom projection matrix will be disabled.Increase this value if you experience Z-Fighting issues. Decrease this if you can see objects behind the portal.")]
