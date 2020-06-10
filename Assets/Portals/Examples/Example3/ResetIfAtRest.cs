@@ -7,7 +7,12 @@ using Portals;
 public class ResetIfAtRest : MonoBehaviour
 {
     [SerializeField] private Vector3 _launchForce;
+
     private Vector3 _startPosition;
+    private Vector3 _startScale;
+    private Quaternion _startRotation;
+    private float _startMass;
+
     private Rigidbody _rigidbody;
     private Vector3 _prevVelocity;
 
@@ -18,7 +23,10 @@ public class ResetIfAtRest : MonoBehaviour
     }
     void Start()
     {
-        _startPosition = transform.position;
+        _startPosition = _rigidbody.position;
+        _startRotation = _rigidbody.rotation;
+        _startScale = transform.localScale;
+        _startMass = _rigidbody.mass;
         Reset();
     }
 
@@ -34,7 +42,10 @@ public class ResetIfAtRest : MonoBehaviour
     }
 
     private void Reset() {
+        transform.localScale = _startScale;
         _rigidbody.position = _startPosition;
+        _rigidbody.rotation = _startRotation;
+        _rigidbody.mass = _startMass;
         _rigidbody.AddForce(_launchForce);
 
         var gravityManipulator = GetComponent<GravityManipulator>();

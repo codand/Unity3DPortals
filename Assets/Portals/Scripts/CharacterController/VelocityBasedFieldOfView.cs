@@ -8,10 +8,10 @@ namespace Portals {
         private Rigidbody _rigidbody;
 
         [SerializeField]
-        private float _triggerSpeed = 3.0f;
+        private float _minSpeed = 10.0f;
 
         [SerializeField]
-        private float _maxSpeedModified = 10.0f;
+        private float _maxSpeed = 40.0f;
 
         [SerializeField]
         private float _fovAmplification = 1.5f;
@@ -21,6 +21,10 @@ namespace Portals {
 
         private float _defaultFoV;
         private Camera _camera;
+
+        private float ScaleMultiplier {
+            get => transform.lossyScale.x;
+        }
 
         private void Start() {
             _camera = GetComponent<Camera>();
@@ -34,8 +38,9 @@ namespace Portals {
                 return;
             }
             float speed = Vector3.Dot(_rigidbody.velocity, _camera.transform.forward);
-
-            float ratio = Mathf.Clamp01((speed - _triggerSpeed) / (_maxSpeedModified - _triggerSpeed));
+            float speedMin = _minSpeed * ScaleMultiplier;
+            float speedMax = _maxSpeed * ScaleMultiplier;
+            float ratio = Mathf.Clamp01((speed - speedMin) / (speedMax - speedMin));
 
             float minFoV = _defaultFoV;
             float maxFoV = _defaultFoV * _fovAmplification;

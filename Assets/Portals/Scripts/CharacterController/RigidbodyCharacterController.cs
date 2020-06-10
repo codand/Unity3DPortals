@@ -47,6 +47,10 @@ namespace Portals {
             get => _gravityManipulator ? _gravityManipulator.upVector : Vector3.up;
         }
 
+        private float SizeMultiplier {
+            get => transform.localScale.x;
+        }
+
         private void Awake() {
             _rigidbody = GetComponent<Rigidbody>();
             _capsuleCollider = GetComponent<CapsuleCollider>();
@@ -109,11 +113,11 @@ namespace Portals {
         }
 
         private void DoGroundCheck() {
-            float skinWidth = 0.01f * transform.lossyScale.x;
+            float skinWidth = 0.01f * SizeMultiplier;
             Vector3 origin = transform.position;
-            float radius = _capsuleCollider.radius * transform.lossyScale.x - skinWidth;
+            float radius = _capsuleCollider.radius * SizeMultiplier - skinWidth;
             Vector3 direction = -1 * UpVector;
-            float distance = ((_capsuleCollider.height / 2f) - _capsuleCollider.radius) + _groundCheckDistance * transform.lossyScale.x + skinWidth;
+            float distance = ((_capsuleCollider.height * SizeMultiplier / 2f) - radius) + _groundCheckDistance * SizeMultiplier + 2 * skinWidth;
             int layerMask = _collisionMask.value;
             _isGrounded = Physics.SphereCast(origin, radius, direction, out RaycastHit hit, distance, layerMask, QueryTriggerInteraction.Ignore);
         }
@@ -132,10 +136,17 @@ namespace Portals {
         private void ApplyDrag() {
             Vector3 horizontalVelocity = Vector3.ProjectOnPlane(_rigidbody.velocity, this.UpVector);
             Vector3 verticalVelocity = _rigidbody.velocity - horizontalVelocity;
-            _rigidbody.AddForce(-1 * horizontalVelocity * (_isGrounded ? _movementInfo.dragGrounded : _movementInfo.dragAerial), ForceMode.VelocityChange);
 
-            //horizontalVelocity = Vector3.ClampMagnitude(horizontalVelocity, _movementInfo.maxSpeedHorizontal);
-            verticalVelocity = Vector3.ClampMagnitude(verticalVelocity, _movementInfo.maxSpeedVertical);
+            // Add horizontal force opposite velocity
+            float drag = _isGrounded ? _movementInfo.dragGrounded : _movementInfo.dragAerial;
+            Vector3 dragForce = horizontalVelocity * drag;
+            horizontalVelocity -= dragForce;
+
+            // Clamp velocity to maximums
+            float maxHorizontal = SizeMultiplier * _movementInfo.maxSpeedHorizontal;
+            float maxVertical = SizeMultiplier * _movementInfo.maxSpeedVertical;
+            horizontalVelocity = Vector3.ClampMagnitude(horizontalVelocity, maxHorizontal);
+            verticalVelocity = Vector3.ClampMagnitude(verticalVelocity, maxVertical);
 
             _rigidbody.velocity = horizontalVelocity + verticalVelocity;
         }
@@ -151,22 +162,25 @@ namespace Portals {
                 _rigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
             }
         }
-
+        
         public void Move(Vector3 direction) {
-            float scaleFactor = this.transform.localScale.x;
+            float scaleFactor = SizeMultiplier;
 
             if (_noClipEnabled) {
-                transform.position += direction * _flySpeed * scaleFactor * Time.deltaTime;
+                transform.position += scaleFactor * direction * _flySpeed * Time.deltaTime;
             } else {
-                Vector3 forward = Vector3.ProjectOnPlane(direction, UpVector).normalized;
+                Vector3 forwardVector = Vector3.ProjectOnPlane(direction, UpVector).normalized;
+                //Vector3 verticalVelocity = UpVector * Vector3.Dot(UpVector, _rigidbody.velocity);
+                //Vector3 horizontalVelocity = _rigidbody.velocity - verticalVelocity;
 
-                Vector3 verticalVelocity = UpVector * Vector3.Dot(UpVector, _rigidbody.velocity);
-                Vector3 horizontalVelocity = _rigidbody.velocity - verticalVelocity;
+                float accel = _isGrounded ? _movementInfo.accellerationGrounded : _movementInfo.accellerationAerial;
+                Vector3 movement = scaleFactor * forwardVector * accel;
 
-                Vector3 movement = forward * scaleFactor * (_isGrounded ? _movementInfo.accellerationGrounded : _movementInfo.accellerationAerial);
+                //float maxHorizontal = _movementInfo.maxSpeedHorizontal * scaleFactor;
+                //horizontalVelocity = Vector3.ClampMagnitude(scaleFactor * horizontalVelocity + movement, maxHorizontal);
+                //_rigidbody.velocity = horizontalVelocity + verticalVelocity;
 
-                horizontalVelocity = Vector3.ClampMagnitude(horizontalVelocity + movement, Mathf.Max(horizontalVelocity.magnitude, _movementInfo.maxSpeedHorizontal));
-                _rigidbody.velocity = horizontalVelocity + verticalVelocity;
+                _rigidbody.velocity += movement;
             }
         }
 

@@ -398,9 +398,9 @@ namespace Portals {
             if (_rigidbody && !_rigidbody.isKinematic) {
                 _rigidbody.velocity = portal.TeleportVector(_rigidbody.velocity);
 
-                //// float scaleDelta = portal.PortalScaleAverage();
+                float scaleDelta = portal.PortalScaleAverage();
                 ////
-                //// _rigidbody.mass *= scaleDelta * scaleDelta * scaleDelta;
+                _rigidbody.mass *= scaleDelta * scaleDelta * scaleDelta;
 
                 //Debug.Log(m_Rigidbody.position + " " + portal.TeleportPoint(m_Rigidbody.position));
                 //m_Rigidbody.position = portal.TeleportPoint(m_Rigidbody.position);
