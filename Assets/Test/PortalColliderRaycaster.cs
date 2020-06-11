@@ -36,13 +36,13 @@ public class PortalColliderRaycaster : MonoBehaviour {
     }
 
     private void UpdateColliders() {
-        Vector3 position = transform.position - transform.forward * _collider.bounds.extents.z;
-        Vector3 extents = _collider.bounds.extents * _boxcastScaleMultiplier;
+        Vector3 position = transform.position;
+        Vector3 extents = transform.lossyScale * _boxcastScaleMultiplier * 0.5f;
+        extents.z = 0.1f;
         Quaternion rotation = transform.rotation;
         Vector3 direction = transform.forward;
         float distance = _boxcastDistance;
-
-        Debug.DrawLine(position, position + direction * distance);
+        
         RaycastHit[] hits = Physics.BoxCastAll(position, extents, direction, rotation, distance, _layerMask, QueryTriggerInteraction.Ignore);
         _portal.IgnoredColliders = hits.Select(hit => hit.collider).ToArray();
     }

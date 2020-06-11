@@ -229,13 +229,38 @@ namespace Portals {
                 _camera.useOcclusionCulling = false;
             }
 
+
+            //CommandBuffer buf = new CommandBuffer();
+            //buf.ClearRenderTarget(true, true, Color.red, 1.0f);
+            //_camera.RemoveAllCommandBuffers();
+            //_camera.AddCommandBuffer(CameraEvent.BeforeForwardOpaque, buf);
+
+            
             RenderTexture texture = GetTemporaryRT();
+
+            if (_portal.FakeInfiniteRecursion) {
+                // RenderTexture must be cleared when using fake infinite recursion because
+                // we might sometimes sample uninitialized garbage pixels otherwise, which can
+                // cause significant visual artifacts.
+                ClearRenderTexture(texture);
+            }
+
             _camera.targetTexture = texture;
             _camera.Render();
 
             SaveFrameData(eye);
 
             return texture;
+        }
+
+        private void ClearRenderTexture(RenderTexture rt) {
+            // TODO: This is probably a fairly expensive operation. We can make it cheaper by using
+            // CommandBuffers to avoid swapping the active texture, but we have to clear the whole screen
+            // instead of just the portion that is rendering
+            var oldRT = RenderTexture.active;
+            RenderTexture.active = rt;
+            GL.Clear(false, true, Color.black);
+            RenderTexture.active = oldRT;
         }
 
         private Matrix4x4 CalculateCullingMatrix() {
