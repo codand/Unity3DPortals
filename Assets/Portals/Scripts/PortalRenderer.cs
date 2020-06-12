@@ -401,7 +401,13 @@ namespace Portals {
             // Check if the currently rendering portal is viewing itself.
             // If it is, render the bottom of the stack with the parent camera's view/projection.
             if (portalCam.portal == _portal && parentPortalCam.portal == _portal) {
-                PortalCamera.FrameData frameData = parentPortalCam.PreviousFrameData;
+                // TODO: Don't need to loop, could just cache portal camera instead
+                PortalCamera rootPortalCam = portalCam;
+                for (int i = 0; i < _currentRenderDepth - 1; i++) {
+                    rootPortalCam = rootPortalCam.parent.GetComponent<PortalCamera>();
+                }
+                PortalCamera.FrameData frameData = rootPortalCam.PreviousFrameData;
+
                 Matrix4x4 projectionMatrix;
                 Matrix4x4 worldToCameraMatrix;
                 Texture texture;
