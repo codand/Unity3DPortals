@@ -181,6 +181,9 @@ namespace Portals {
             foreach (var hit in hits) {
                 if (hit.collider.gameObject.layer == LayerMask.NameToLayer("Portal")) {
                     Portal portal = hit.collider.GetComponent<Portal>();
+                    if (!portal) {
+                        continue;
+                    }
                     PortalContext ctx = GetPortalContext(portal);
                     if (portal.IsOpen && ctx == null) {
                         EnterPortal(portal);

@@ -264,10 +264,10 @@ namespace Portals {
 
         /// <summary>
         /// Returns a list of this portals corner's in world space.
-        /// corners[0] = TopLeft
-        /// corners[1] = TopRight
-        /// corners[2] = BottomRight
-        /// corners[3] = BottomLeft
+        /// TopLeft = corners[0]
+        /// TopRight = corners[1]
+        /// BottomRight = corners[2]
+        /// BottomLeft = corners[3]
         /// </summary>
         public Vector3[] WorldSpaceCorners() {
             if (transform.hasChanged) {

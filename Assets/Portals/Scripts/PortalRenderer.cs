@@ -215,8 +215,10 @@ namespace Portals {
                 float distance = direction.magnitude;
                 int layerMask = portal.RaycastOccluders;
 
+                Debug.DrawRay(origin, direction.normalized * distance, Color.white);
                 if (Physics.Raycast(origin, direction, out RaycastHit hit, distance, layerMask, QueryTriggerInteraction.Ignore)) {
                     // Hit something, check how far
+                    Debug.DrawRay(origin, direction.normalized * hit.distance, Color.red);
                     float epsilon = 1f;
                     if (hit.distance + epsilon >= distance) {
                         return false;

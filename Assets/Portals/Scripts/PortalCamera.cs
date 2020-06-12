@@ -150,10 +150,8 @@ namespace Portals {
         }
         
         private RenderTexture GetTemporaryRT() {
-            //int w = Camera.current.pixelWidth / _portal.Downscaling;
-            //int h = Camera.current.pixelHeight / _portal.Downscaling;
-            int w = Screen.width;
-            int h = Screen.height;
+            int w = Camera.current.pixelWidth / _portal.Downscaling;
+            int h = Camera.current.pixelHeight / _portal.Downscaling;
             int depth = (int)_portal.DepthBufferQuality;
             var format = _camera.allowHDR ? RenderTextureFormat.DefaultHDR : RenderTextureFormat.Default;
             var writeMode = RenderTextureReadWrite.Default;
@@ -177,6 +175,7 @@ namespace Portals {
 
             // Copy parent camera's settings
             CopyCameraSettings(_parent, _camera);
+            //_camera.farClipPlane = _parent.farClipPlane * _portal.PortalScaleAverage();
 
             Matrix4x4 projectionMatrix;
             Matrix4x4 worldToCameraMatrix;
@@ -198,22 +197,16 @@ namespace Portals {
             _camera.transform.position = _portal.TeleportPoint(_parent.transform.position);
             _camera.transform.rotation = _portal.TeleportRotation(_parent.transform.rotation);
             _camera.projectionMatrix = projectionMatrix;
-            _camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
+            //_camera.worldToCameraMatrix = worldToCameraMatrix * _portal.PortalMatrix().inverse;
+            _camera.ResetWorldToCameraMatrix();
+
+            Matrix4x4 defaultProjection = _camera.projectionMatrix;
 
             if (_portal.UseObliqueProjectionMatrix) {
+                _camera.ResetProjectionMatrix();
                 _camera.projectionMatrix = CalculateObliqueProjectionMatrix(projectionMatrix);
             } else {
-                CommandBuffer enableClippingCmdBuffer = new CommandBuffer();
-                enableClippingCmdBuffer.EnableShaderKeyword("PLANAR_CLIPPING_ENABLED");
-                enableClippingCmdBuffer.SetGlobalVector("_ClippingPlane", _portal.ExitPortal.VectorPlane);
-                CommandBuffer disableClippingCmdBuffer = new CommandBuffer();
-                disableClippingCmdBuffer.DisableShaderKeyword("PLANAR_CLIPPING_ENABLED");
-
-                _camera.RemoveAllCommandBuffers();
-                _camera.AddCommandBuffer(CameraEvent.BeforeForwardOpaque, enableClippingCmdBuffer);
-                _camera.AddCommandBuffer(CameraEvent.AfterForwardOpaque, disableClippingCmdBuffer);
-                _camera.AddCommandBuffer(CameraEvent.BeforeDepthTexture, enableClippingCmdBuffer);
-                _camera.AddCommandBuffer(CameraEvent.AfterDepthTexture, disableClippingCmdBuffer);
+                _camera.ResetProjectionMatrix();
             }
 
             if (_portal.UseScissorRect) {
@@ -225,19 +218,20 @@ namespace Portals {
 
             if (_portal.UseOcclusionMatrix) {
                 _camera.cullingMatrix = CalculateCullingMatrix();
+            } else {
+                _camera.cullingMatrix = _camera.projectionMatrix * _camera.worldToCameraMatrix;
             }
-            
+
+            //Util.DrawDebugFrustum2(_camera.projectionMatrix * _camera.worldToCameraMatrix, Color.red);
+            //Util.DrawDebugFrustum3(_camera.projectionMatrix * _camera.worldToCameraMatrix, Color.red);
+            //Util.DrawDebugFrustum2(_camera.cullingMatrix, Color.red);
+            Util.DrawDebugFrustum3(_camera.cullingMatrix, Color.blue);
+
+
             if (_portal.UseRaycastOcclusion) {
                 _camera.useOcclusionCulling = false;
             }
 
-
-            //CommandBuffer buf = new CommandBuffer();
-            //buf.ClearRenderTarget(true, true, Color.red, 1.0f);
-            //_camera.RemoveAllCommandBuffers();
-            //_camera.AddCommandBuffer(CameraEvent.BeforeForwardOpaque, buf);
-
-            
             RenderTexture texture = GetTemporaryRT();
 
             if (_portal.FakeInfiniteRecursion) {
@@ -263,33 +257,6 @@ namespace Portals {
             RenderTexture.active = rt;
             GL.Clear(false, true, Color.black);
             RenderTexture.active = oldRT;
-        }
-
-        private Matrix4x4 CalculateCullingMatrix() {
-            _camera.ResetCullingMatrix();
-            Vector3[] corners = _portal.ExitPortal.WorldSpaceCorners();
-
-            // Lower left of the backside of our plane in world coordinates
-            Vector3 pa = _portal.ExitPortal.transform.TransformPoint(new Vector3(0.5f, -0.5f, 0));
-            // Lower right
-            Vector3 pb = _portal.ExitPortal.transform.TransformPoint(new Vector3(-0.5f, -0.5f, 0));
-            // Upper left
-            Vector3 pc = _portal.ExitPortal.transform.TransformPoint(new Vector3(0.5f, 0.5f, 0));
-            Vector3 pe = _camera.transform.position;
-
-            // Calculate what our horizontal field of view would be with off-axis projection.
-            // If this fov is greater than our camera's fov, we should just use the camera's default projection
-            // matrix instead. Otherwise, the frustum's fov will approach 180 degrees (way too large).
-            Vector3 camToLowerLeft = pa - _camera.transform.position;
-            camToLowerLeft.y = 0;
-            Vector3 camToLowerRight = pb - _camera.transform.position;
-            camToLowerRight.y = 0;
-            float fieldOfView = Vector3.Angle(camToLowerLeft, camToLowerRight);
-            //if (fieldOfView > _camera.fieldOfView) {
-            //    return _camera.cullingMatrix;
-            //} else {
-                return MathUtil.OffAxisProjectionMatrix(_camera.nearClipPlane, _camera.farClipPlane, pa, pb, pc, pe);
-            //}
         }
 
         public static void CopyCameraSettings(Camera src, Camera dst) {
@@ -330,13 +297,40 @@ namespace Portals {
                 Vector4 exitPlaneWorldSpace = _portal.ExitPortal.VectorPlane;
                 Vector4 exitPlaneCameraSpace = _camera.worldToCameraMatrix.inverse.transpose * exitPlaneWorldSpace;
                 // Offset the clipping plane itself so that a character walking through a portal has no seams
-                //exitPlaneCameraSpace.w -= _portal.ClippingOffset;
                 exitPlaneCameraSpace.w -= ObliqueClippingOffset;
                 exitPlaneCameraSpace *= -1;
                 MathUtil.MakeProjectionMatrixOblique(ref projectionMatrix, exitPlaneCameraSpace);
+                //projectionMatrix = _camera.CalculateObliqueMatrix(exitPlaneCameraSpace);
             }
             return projectionMatrix;
         }
+
+        private Matrix4x4 CalculateCullingMatrix() {
+            _camera.ResetCullingMatrix();
+            Vector3[] corners = _portal.ExitPortal.WorldSpaceCorners();
+
+            Vector3 pa = corners[3]; // Lower left
+            Vector3 pb = corners[2]; // Lower right
+            Vector3 pc = corners[0]; // Upper left
+            Vector3 pe = _camera.transform.position;
+
+            // Calculate what our horizontal field of view would be with off-axis projection.
+            // If this fov is greater than our camera's fov, we should just use the camera's default projection
+            // matrix instead. Otherwise, the frustum's fov will approach 180 degrees (way too large).
+            Vector3 camToLowerLeft = pa - _camera.transform.position;
+            camToLowerLeft.y = 0;
+            Vector3 camToLowerRight = pb - _camera.transform.position;
+            camToLowerRight.y = 0;
+            float fieldOfView = Vector3.Angle(camToLowerLeft, camToLowerRight);
+            if (fieldOfView > _camera.fieldOfView) {
+                return _camera.cullingMatrix;
+            } else {
+                float near = _camera.nearClipPlane;
+                float far = _camera.farClipPlane;
+                return MathUtil.OffAxisProjectionMatrix(near, far, pa, pb, pc, pe);
+            }
+        }
+
 
         [System.Serializable]
         public class FrameData {

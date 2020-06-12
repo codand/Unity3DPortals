@@ -54,6 +54,22 @@ namespace Portals {
             return info;
         }
 
+        //public static void MakeProjectionMatrixOblique(ref Matrix4x4 projection, Vector4 clipPlane) {
+        //    // Source: http://aras-p.info/texts/obliqueortho.html
+        //    Vector4 q = new Vector4(
+        //        (Mathf.Sign(clipPlane.x) + projection[8]) / projection[0],
+        //        (Mathf.Sign(clipPlane.y) + projection[9]) / projection[5],
+        //        -1.0f,
+        //        (1.0f + projection[10]) / projection[14]
+        //    );
+        //    Vector4 c = clipPlane * (2.0F / (Vector4.Dot(clipPlane, q)));
+        //    // third row = clip plane - fourth row
+        //    projection[2] = c.x;
+        //    projection[6] = c.y;
+        //    projection[10] = c.z + 1.0f;
+        //    projection[14] = c.w;
+        //}
+
         public static void MakeProjectionMatrixOblique(ref Matrix4x4 projection, Vector4 clipPlane) {
             // Source: http://aras-p.info/texts/obliqueortho.html
             Vector4 q = projection.inverse * new Vector4(
@@ -135,7 +151,6 @@ namespace Portals {
 
             // Set near clip plane
             near = d; // + _clippingDistance;
-                      //camera.nearClipPlane = n;
 
             l = Vector3.Dot(vr, va) * near / d;
             r = Vector3.Dot(vr, vb) * near / d;

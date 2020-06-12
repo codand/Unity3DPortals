@@ -40,13 +40,6 @@ public class InputManager : MonoBehaviour {
         float xRotation = Input.GetAxis("Mouse X") * _mouseSensitivity;
         float yRotation = Input.GetAxis("Mouse Y") * _mouseSensitivity;
         _playerController.Rotate(xRotation, yRotation);
-        //if (rotationX != 0) {
-        //    _playerController.RotateBody(rotationX);
-        //}
-
-        //if (rotationY != 0) {
-        //    _playerController.RotateHead(rotationY);
-        //}
 
         if (Input.GetKeyDown(KeyCode.Space)) {
             _playerController.Jump();

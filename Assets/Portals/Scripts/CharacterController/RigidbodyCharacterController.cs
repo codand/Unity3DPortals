@@ -99,7 +99,6 @@ namespace Portals {
             _previousHeadRotation = _head.rotation;
         }
 
-        // TODO: This could work a lot better
         private float ClampRotation(float rotation, float maxRotation) {
             Vector3 centerForward = Vector3.ProjectOnPlane(_head.forward, UpVector);
             float currentAngle = Vector3.SignedAngle(_head.forward, centerForward, _head.right);
@@ -170,16 +169,8 @@ namespace Portals {
                 transform.position += scaleFactor * direction * _flySpeed * Time.deltaTime;
             } else {
                 Vector3 forwardVector = Vector3.ProjectOnPlane(direction, UpVector).normalized;
-                //Vector3 verticalVelocity = UpVector * Vector3.Dot(UpVector, _rigidbody.velocity);
-                //Vector3 horizontalVelocity = _rigidbody.velocity - verticalVelocity;
-
                 float accel = _isGrounded ? _movementInfo.accellerationGrounded : _movementInfo.accellerationAerial;
                 Vector3 movement = scaleFactor * forwardVector * accel;
-
-                //float maxHorizontal = _movementInfo.maxSpeedHorizontal * scaleFactor;
-                //horizontalVelocity = Vector3.ClampMagnitude(scaleFactor * horizontalVelocity + movement, maxHorizontal);
-                //_rigidbody.velocity = horizontalVelocity + verticalVelocity;
-
                 _rigidbody.velocity += movement;
             }
         }

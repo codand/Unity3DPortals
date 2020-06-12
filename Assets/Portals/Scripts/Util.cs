@@ -12,7 +12,6 @@ namespace Portals {
             }
         }
 
-
         public static void DrawDebugFrustum(Matrix4x4 matrix, Color color) {
             Vector3[] nearCorners = new Vector3[4]; //Approx'd nearplane corners
             Vector3[] farCorners = new Vector3[4]; //Approx'd farplane corners
@@ -35,6 +34,76 @@ namespace Portals {
                     (-p2.distance * Vector3.Cross(p3.normal, p1.normal)) +
                     (-p3.distance * Vector3.Cross(p1.normal, p2.normal))) /
                 (Vector3.Dot(p1.normal, Vector3.Cross(p2.normal, p3.normal)));
+        }
+
+        public static void DrawDebugFrustum2(Matrix4x4 vp, Color color) {
+            float w = 50f;
+            float step = 2f;
+            for (float x = -w / 2; x < w / 2; x += step) {
+                for (float y = -w / 2; y < w / 2; y += step) {
+                    for (float z = -w / 2; z < w / 2; z += step) {
+                        Vector4 wPt = new Vector4(x, y, z, 1);
+                        Vector4 cPt = vp * wPt;
+                        if (cPt.w > 0) {
+                            cPt /= cPt.w;
+                            if (cPt.x > -1f && cPt.x < 1f && cPt.y > -1f && cPt.y < 1f && cPt.z > -1f && cPt.z < 1f) {
+                                Debug.DrawLine(wPt, (Vector3)wPt + Vector3.up * step / 2);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        public static void DrawDebugFrustum3(Matrix4x4 vp, Color color) {
+            Vector4 c_nbl = new Vector4(-1, -1, -1,  1);
+            Vector4 c_nbr = new Vector4( 1, -1, -1,  1);
+            Vector4 c_ntl = new Vector4(-1,  1, -1,  1);
+            Vector4 c_ntr = new Vector4( 1,  1, -1,  1);
+
+            Vector4 c_fbl = new Vector4(-1, -1,  1,  1);
+            Vector4 c_fbr = new Vector4( 1, -1,  1,  1);
+            Vector4 c_ftl = new Vector4(-1,  1,  1,  1);
+            Vector4 c_ftr = new Vector4( 1,  1,  1,  1);
+
+            Matrix4x4 ivp = vp.inverse;
+
+            Vector4 nbl = ivp * c_nbl;
+            Vector4 nbr = ivp * c_nbr;
+            Vector4 ntl = ivp * c_ntl;
+            Vector4 ntr = ivp * c_ntr;
+
+            Vector4 fbl = ivp * c_fbl;
+            Vector4 fbr = ivp * c_fbr;
+            Vector4 ftl = ivp * c_ftl;
+            Vector4 ftr = ivp * c_ftr;
+
+            nbl /= nbl.w;
+            nbr /= nbr.w;
+            ntl /= ntl.w;
+            ntr /= ntr.w;
+            fbl /= fbl.w;
+            fbr /= fbr.w;
+            ftl /= ftl.w;
+            ftr /= ftr.w;
+
+            // Near plane
+            Debug.DrawLine(nbl, ntl, Color.green);
+            Debug.DrawLine(ntl, ntr, Color.green);
+            Debug.DrawLine(ntr, nbr, Color.green);
+            Debug.DrawLine(nbr, nbl, Color.green);
+
+            // Far plane
+            Debug.DrawLine(fbl, ftl, Color.red);
+            Debug.DrawLine(ftl, ftr, Color.red);
+            Debug.DrawLine(ftr, fbr, Color.red);
+            Debug.DrawLine(fbr, fbl, Color.red);
+
+            // Sides
+            Debug.DrawLine(nbl, fbl, color);
+            Debug.DrawLine(ntl, ftl, color);
+            Debug.DrawLine(ntr, ftr, color);
+            Debug.DrawLine(nbr, fbr, color);
         }
     }
 }
