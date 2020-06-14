@@ -27,7 +27,7 @@ public class ResetIfAtRest : MonoBehaviour
         _startRotation = _rigidbody.rotation;
         _startScale = transform.localScale;
         _startMass = _rigidbody.mass;
-        Reset();
+        ResetObject();
     }
 
     void FixedUpdate()
@@ -36,12 +36,12 @@ public class ResetIfAtRest : MonoBehaviour
         // then change in velocity is very low.
         Vector3 dv = _rigidbody.velocity - _prevVelocity;
         if (dv.magnitude < SleepThreshold) {
-            Reset();
+            ResetObject();
         }
         _prevVelocity = _rigidbody.velocity;
     }
 
-    private void Reset() {
+    private void ResetObject() {
         transform.localScale = _startScale;
         _rigidbody.position = _startPosition;
         _rigidbody.rotation = _startRotation;

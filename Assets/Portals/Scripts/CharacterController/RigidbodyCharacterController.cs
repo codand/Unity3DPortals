@@ -164,6 +164,10 @@ namespace Portals {
         
         public void Move(Vector3 direction) {
             float scaleFactor = SizeMultiplier;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // https://answers.unity.com/questions/1602433/player-movement-is-at-a-completely-different-speed.html
+            scaleFactor /= 2;
+#endif
 
             if (_noClipEnabled) {
                 transform.position += scaleFactor * direction * _flySpeed * Time.deltaTime;
@@ -176,6 +180,12 @@ namespace Portals {
         }
 
         public void Rotate(float xAngle, float yAngle) {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // https://answers.unity.com/questions/1602433/player-movement-is-at-a-completely-different-speed.html
+            xAngle /= 2;
+            yAngle /= 2;
+#endif
+
             _xFrameRotation = xAngle;
             _yFrameRotation = yAngle;
         }

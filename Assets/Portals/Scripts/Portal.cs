@@ -36,6 +36,7 @@ namespace Portals {
             clippingOffset = 0.01f,
             copyGlobalIllumination = false,
             supportedCameraTypes = CameraType.Game | CameraType.SceneView,
+            debugEnabled = false
         };
 
         private PortalRenderer _portalRenderer;
@@ -217,6 +218,14 @@ namespace Portals {
         public CameraType SupportedCameraTypes {
             get { return _advancedSettings.supportedCameraTypes; }
             set { _advancedSettings.supportedCameraTypes = value; }
+        }
+
+        /// <summary>
+        /// Enable or disable debugging in the editor
+        /// </summary>
+        public bool DebuggingEnabled {
+            get { return _advancedSettings.debugEnabled; }
+            set { _advancedSettings.debugEnabled = value; }
         }
 
         /// <summary>
@@ -446,6 +455,8 @@ namespace Portals {
             public LayerMask raycastOccluders;
             [Tooltip("Should portals be rendered in Scene view or in reflections?")]
             public CameraType supportedCameraTypes;
+
+            public bool debugEnabled;
         }
     }
 }

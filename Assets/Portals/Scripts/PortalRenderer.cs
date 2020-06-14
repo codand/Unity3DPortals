@@ -201,12 +201,21 @@ namespace Portals {
 #endif
         }
 
+        private Vector3 IntersectPlane(Vector3 point, Vector3 direction, Plane plane) {
+            Vector3 nDir = direction.normalized;
+            if (plane.Raycast(new Ray(point, nDir), out float enter)) {
+                return point + nDir * enter;
+            }
+            return point;
+        }
+
         private bool IsPortalOccluded(Portal portal, Camera camera) {
             if (!portal.UseRaycastOcclusion) {
                 return false;
             }
 
             Vector3 origin = camera.transform.position;
+            PortalCamera pc = PortalCamera.current;
 
             var corners = portal.WorldSpaceCorners();
             for (int i = 0; i < corners.Length; i++) {
@@ -215,10 +224,15 @@ namespace Portals {
                 float distance = direction.magnitude;
                 int layerMask = portal.RaycastOccluders;
 
-                Debug.DrawRay(origin, direction.normalized * distance, Color.white);
+                if (pc) {
+                    origin = IntersectPlane(origin, direction, pc.portal.ExitPortal.Plane);
+                    distance = (corner - origin).magnitude;
+                }
+
+                if (portal.DebuggingEnabled) { Debug.DrawRay(origin, direction.normalized * distance, Color.white); }
                 if (Physics.Raycast(origin, direction, out RaycastHit hit, distance, layerMask, QueryTriggerInteraction.Ignore)) {
                     // Hit something, check how far
-                    Debug.DrawRay(origin, direction.normalized * hit.distance, Color.red);
+                    if (portal.DebuggingEnabled) { Debug.DrawRay(origin, direction.normalized * hit.distance, Color.red); }
                     float epsilon = 1f;
                     if (hit.distance + epsilon >= distance) {
                         return false;

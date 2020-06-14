@@ -150,8 +150,10 @@ namespace Portals {
         }
         
         private RenderTexture GetTemporaryRT() {
-            int w = Camera.current.pixelWidth / _portal.Downscaling;
-            int h = Camera.current.pixelHeight / _portal.Downscaling;
+            //int w = Camera.current.pixelWidth / _portal.Downscaling;
+            //int h = Camera.current.pixelHeight / _portal.Downscaling;
+            int w = Screen.width;
+            int h = Screen.height;
             int depth = (int)_portal.DepthBufferQuality;
             var format = _camera.allowHDR ? RenderTextureFormat.DefaultHDR : RenderTextureFormat.Default;
             var writeMode = RenderTextureReadWrite.Default;
@@ -222,10 +224,13 @@ namespace Portals {
                 _camera.cullingMatrix = _camera.projectionMatrix * _camera.worldToCameraMatrix;
             }
 
-            //Util.DrawDebugFrustum2(_camera.projectionMatrix * _camera.worldToCameraMatrix, Color.red);
-            //Util.DrawDebugFrustum3(_camera.projectionMatrix * _camera.worldToCameraMatrix, Color.red);
-            //Util.DrawDebugFrustum2(_camera.cullingMatrix, Color.red);
-            Util.DrawDebugFrustum3(_camera.cullingMatrix, Color.blue);
+            if (_portal.DebuggingEnabled) {
+                //Util.DrawDebugFrustum3(_camera.projectionMatrix * _camera.worldToCameraMatrix, Color.white);
+
+                if (_portal.UseOcclusionMatrix) {
+                    Util.DrawDebugFrustum3(_camera.cullingMatrix, Color.blue);
+                }
+            }
 
 
             if (_portal.UseRaycastOcclusion) {
