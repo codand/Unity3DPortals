@@ -1,6 +1,7 @@
 # Added by Cody
 .vs/
 portals_Data/
+/[Ww]WebBuild/
 
 /[Ll]ibrary/
 /[Tt]emp/
