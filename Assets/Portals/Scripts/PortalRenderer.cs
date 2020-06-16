@@ -224,8 +224,13 @@ namespace Portals {
                 float distance = direction.magnitude;
                 int layerMask = portal.RaycastOccluders;
 
+                // If this portal is being rendered from another portal, the raycast check
+                // must begin from the portal plane instead of the camera origin in order
+                // to avoid intersection non-rendered geometry.
                 if (pc) {
                     origin = IntersectPlane(origin, direction, pc.portal.ExitPortal.Plane);
+                    // Offset along ray slightly to avoid early intersection
+                    origin += direction * 0.001f; 
                     distance = (corner - origin).magnitude;
                 }
 
