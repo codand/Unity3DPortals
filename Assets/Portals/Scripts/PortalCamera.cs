@@ -150,10 +150,10 @@ namespace Portals {
         }
         
         private RenderTexture GetTemporaryRT() {
-            //int w = Camera.current.pixelWidth / _portal.Downscaling;
-            //int h = Camera.current.pixelHeight / _portal.Downscaling;
-            int w = Screen.width;
-            int h = Screen.height;
+            int w = Camera.current.pixelWidth / _portal.Downscaling;
+            int h = Camera.current.pixelHeight / _portal.Downscaling;
+            //int w = Screen.width;
+            //int h = Screen.height;
             int depth = (int)_portal.DepthBufferQuality;
             var format = _camera.allowHDR ? RenderTextureFormat.DefaultHDR : RenderTextureFormat.Default;
             var writeMode = RenderTextureReadWrite.Default;
