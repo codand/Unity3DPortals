@@ -20,18 +20,17 @@ public class InputManager : MonoBehaviour {
         Cursor.lockState = CursorLockMode.Locked;
     }
 
-
     void Update() {
-        if (Input.GetKeyDown(KeyCode.BackQuote)) {
-            _movementEnabled = !_movementEnabled;
-            if (_movementEnabled) {
-                Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
-            } else {
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-            }
-        }
+        //if (Input.GetKeyDown(KeyCode.BackQuote)) {
+        //    _movementEnabled = !_movementEnabled;
+        //    if (_movementEnabled) {
+        //        Cursor.lockState = CursorLockMode.Locked;
+        //        Cursor.visible = false;
+        //    } else {
+        //        Cursor.lockState = CursorLockMode.None;
+        //        Cursor.visible = true;
+        //    }
+        //}
 
         if (!_movementEnabled) {
             return;

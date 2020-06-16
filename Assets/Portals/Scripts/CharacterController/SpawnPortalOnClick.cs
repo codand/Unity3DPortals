@@ -202,13 +202,15 @@ public class SpawnPortalOnClick : MonoBehaviour {
             Vector3 corner = corners[i] + offset;
 
             // Perform raycast from a tiny bit back from the contact point to a little bit through the contact point
-            float normalOffset = 0.01f;
+            float normalOffset = 0.1f;
             Ray ray = new Ray(corner - direction * normalOffset, direction);
-            bool hitCollider = collider.Raycast(ray, out RaycastHit hitInfo, normalOffset * 2);
-            bool hitPortal = Physics.Raycast(ray, out hitInfo, normalOffset * 2, PortalPhysics.PortalLayerMask, QueryTriggerInteraction.Collide);
-            outHits[i] = hitCollider && !hitPortal;
-            if (outHits[i]) {
-                numHits++;
+            if (Physics.Raycast(ray, out RaycastHit hit, normalOffset * 2, _canHit, QueryTriggerInteraction.Collide)) {
+                if (hit.collider == collider) {
+                    outHits[i] = true;
+                    numHits++;
+                } else {
+                    outHits[i] = false;
+                }
             }
         }
         return numHits;
