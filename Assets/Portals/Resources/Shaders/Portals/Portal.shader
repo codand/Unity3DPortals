@@ -1,4 +1,4 @@
-Shader "Portal/Portal"
+Shader "Portals/Portal"
 {
 	Properties
 	{

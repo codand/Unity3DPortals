@@ -1,4 +1,4 @@
-Shader "Portal/PortalBackface"
+Shader "Portals/PortalBackface"
 {
 	Properties
 	{
