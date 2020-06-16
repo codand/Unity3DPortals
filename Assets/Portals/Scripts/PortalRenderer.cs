@@ -114,8 +114,10 @@ namespace Portals {
         }
 
         private Rect MakePixelPerfect(Rect r, Camera cam) {
-            float wCam = cam.pixelWidth;
-            float hCam = cam.pixelHeight;
+            //float wCam = cam.pixelWidth;
+            //float hCam = cam.pixelHeight;
+            float wCam = Screen.width;
+            float hCam = Screen.height;
 
             Rect pr = new Rect(r.x * wCam, r.y * hCam, r.width * wCam, r.height * hCam);
             float xFloor = Mathf.Floor(pr.x);

@@ -19,6 +19,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
     [SerializeField] GameObject _bulletPrefab;
     [SerializeField] float _bulletSpawnOffset = 3.0f;
     [SerializeField] float _bulletSpeed = 20.0f;
+    [SerializeField] GameObject _splashParticles;
     [SerializeField] GameObject _portalPrefab;
     [SerializeField] LayerMask _canHit = -1;
     [SerializeField] AnimationCurve _portalSpawnCurve = AnimationCurves.Overshoot;
@@ -74,31 +75,35 @@ public class SpawnPortalOnClick : MonoBehaviour {
     }
 
     private void Fire(Polarity polarity) {
+        Color color = polarity == Polarity.Left ? LeftPortalColor : RightPortalColor;
         Ray ray = new Ray(_camera.transform.position, _camera.transform.forward);
         RaycastHit hit;
         bool hitWall;
 
         if (_shootThroughPortals) {
-            hitWall = PortalPhysics.Raycast(ray, out hit, Mathf.Infinity, _canHit, QueryTriggerInteraction.Ignore);
+            hitWall = PortalPhysics.Raycast(ray, out hit, Mathf.Infinity, _canHit, QueryTriggerInteraction.Collide);
         } else {
-            hitWall = Physics.Raycast(ray, out hit, Mathf.Infinity, _canHit, QueryTriggerInteraction.Ignore);
+            int mask = _canHit | PortalPhysics.PortalLayerMask;
+            hitWall = Physics.Raycast(ray, out hit, Mathf.Infinity, mask, QueryTriggerInteraction.Collide);
         }
 
-        // Test if we hit a portal first to make them wobble
-        bool hitPortal = Physics.Raycast(ray, out RaycastHit portalHit, Mathf.Infinity, PortalPhysics.PortalLayerMask, QueryTriggerInteraction.Collide);
-        if (hitPortal) {
-            Portal portal = portalHit.collider.GetComponent<Portal>();
-            WavePortalOverTime(portal, portalHit.point, _portalWaveAmplitude, _portalWaveDuration);
-        } else if (hitWall) {
-            TrySpawnPortal(polarity, hit);
+        if (hitWall) {
+            Portal portal = hit.collider.GetComponent<Portal>();
+            if (portal) {
+                WavePortalOverTime(portal, hit.point, _portalWaveAmplitude, _portalWaveDuration);
+            } else {
+                bool spawnedPortal = TrySpawnPortal(polarity, hit);
+                if (!spawnedPortal) {
+                    SpawnSplashParticles(hit.point, hit.normal, color);
+                }
+            }
         }
         
         // Spawn a bullet that will auto-destroy itself after it travels a certain distance
-        Color color = polarity == Polarity.Left ? LeftPortalColor : RightPortalColor;
         SpawnBullet(_bulletPrefab, _camera.transform.position + _camera.transform.forward * _bulletSpawnOffset, _camera.transform.forward, hit.distance, color);
     }
 
-    private void TrySpawnPortal(Polarity polarity, RaycastHit hit) {
+    private bool TrySpawnPortal(Polarity polarity, RaycastHit hit) {
         Portal portal = polarity == Polarity.Left ? _leftPortal : _rightPortal;
 
         // Calculate the portal's rotation based off the hit object's normal.
@@ -123,7 +128,11 @@ public class SpawnPortalOnClick : MonoBehaviour {
             // Scale the portal's renderer up from 0 to 1 for a nice visual pop-in
             Renderer portalRenderer = portal.GetComponentInChildren<MeshRenderer>();
             SetScaleOverTime(portalRenderer.transform, Vector3.zero, Vector3.one, _portalSpawnCurve, _portalSpawnTime);
+
+            return true;
         }
+
+        return false;
     }
 
     Portal SpawnPortal(Vector3 location, Quaternion rotation, Color color) {
@@ -157,7 +166,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
             return FindFitMeshCollider(portal, collider, out newPosition);
         } else {
             newPosition = portal.transform.position;
-            return true;
+            return false;
         }
     }
 
@@ -337,6 +346,16 @@ public class SpawnPortalOnClick : MonoBehaviour {
 
         portal.PortalRenderer.FrontFaceMaterial.DisableKeyword("PORTAL_WAVING_ENABLED");
         portal.PortalRenderer.BackFaceMaterial.DisableKeyword("PORTAL_WAVING_ENABLED");
+    }
+
+    void SpawnSplashParticles(Vector3 position, Vector3 direction, Color color) {
+        GameObject obj = Instantiate(_splashParticles);
+        obj.transform.position = position;
+        obj.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+
+        ParticleSystem particles = obj.GetComponent<ParticleSystem>();
+        ParticleSystem.MainModule main = particles.main;
+        main.startColor = color;
     }
 
     GameObject SpawnBullet(GameObject prefab, Vector3 position, Vector3 direction, float distance, Color color) {
