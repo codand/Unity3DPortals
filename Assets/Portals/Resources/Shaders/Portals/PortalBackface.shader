@@ -60,7 +60,7 @@ Shader "Portals/PortalBackface"
 			//ZTest LEqual
 			ZTest Always
 			Cull Back
-			Offset -0.1,-0.1
+			//Offset -0.1,-0.1
 
 			CGPROGRAM
 			#define IS_BACKFACE

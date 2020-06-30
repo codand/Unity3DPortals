@@ -14,7 +14,7 @@ Category {
 	ColorMask RGB
 	Cull Back Lighting Off ZWrite Off
 	//Offset -8, -2
-	Offset -3, -3
+	//Offset -3, -3
 	
 	SubShader {
 		Pass {
