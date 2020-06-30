@@ -19,14 +19,12 @@ namespace CodJam {
         void Start() {
             if (updateMode == UpdateMode.Start) {
                 Application.targetFrameRate = targetFrameRate;
-                QualitySettings.vSyncCount = 0;
             }
         }
 
         void Update() {
             if (updateMode == UpdateMode.Update) {
                 Application.targetFrameRate = targetFrameRate;
-                QualitySettings.vSyncCount = 0;
             }
         }
     }
