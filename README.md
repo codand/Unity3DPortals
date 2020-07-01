@@ -1,23 +1,22 @@
 # Unity Portals
 
-> Another seamless portal implementation inspired by Valve's Portal
+> Another seamless portal implementation inspired by Valve's Portal and Demruth's Antichamber
 
-## NOTE: Please do not use this in commercial products. This is a learning project and there are still plenty of bugs.
+## NOTE: Please do not use this in commercial products. This is a learning project and there are still bugs.
 
+This project is a portal implementation written for Unity. It uses multiple cameras, RenderTextures, and volumetric geometry to create a seamless transition from one point in space to another. Currently, it only supports forward rendering on the standard render pipeline. It is currently built with Unity v2019.3.4f1, and has not been tested on other versions.
 
-* Forward rendering
-* Legacy rendering pipeline
-* DEMO
-
+[You can try the WebGL demo here, but please note that this has been tested only with Windows 10 with Nvidia graphics cards.](http://localhost:8000/PortalDemo/index.html) 
 ## Features
+---
 
-https://thumbs.gfycat.com/InsidiousFarBoto-small.gif
+### Seamless transitions
 
-### Recursive rendering
+Portals are rendered as an inverted cube with the front face flipped in order to avoid near-plane clipping.
 
-Portals can render recursively to a user-defined maximum depth. Portals beyond the maximum depth can fake recursion by reprojecting previous frames. This example is rendered with only two recursions.
+![Recusive Rendering](https://thumbs.gfycat.com/InsidiousFarBoto-size_restricted.gif)
 
-![Recusive Rendering](https://thumbs.gfycat.com/OnlyCanineGemsbok-small.gif)
+---
 
 ### Gravity modification
 
@@ -25,11 +24,23 @@ Users can specify per-portal if gravity should be realligned.
 
 ![Gravity reallignement](https://thumbs.gfycat.com/DelectableFarFrogmouth-small.gif)
 
+---
+
+### Recursive rendering
+
+Portals can render recursively to a user-defined maximum depth. Portals beyond the maximum depth can fake recursion by reprojecting previous frames. This example is rendered with only two recursions.
+
+![Recusive Rendering](https://thumbs.gfycat.com/OnlyCanineGemsbok-small.gif)
+
+---
+
 ### Scale modification
 
 Portals will scale and shrink objects and players seamlessly.
 
 ![Scale adjustment](https://thumbs.gfycat.com/FrenchEqualGourami-small.gif)
+
+---
 
 ### Image effects
 
@@ -37,11 +48,15 @@ Portals are rendered into textures which enables image effects on portals.
 
 ![Image effects](https://thumbs.gfycat.com/EnchantingAbleCutworm-small.gif)
 
+---
+
 ### Per-object planar clipping
 
 Objects entering a portal are not rendered behind the portal.
 
 ![Per-object planar clipping](https://thumbs.gfycat.com/HatefulBarrenAustraliankestrel-size_restricted.gif)
+
+---
 
 ### Physics
 
@@ -49,20 +64,27 @@ Every object in a portal has a clone object on the other side which can share fo
 
 ![Portal scale adjustment](https://thumbs.gfycat.com/CalculatingNegativeCob-size_restricted.gif)
 
+---
+
 ### Efficient rendering
 
 Portals only render visible pixels to improve performance
 
 ![Portal scale adjustment](https://thumbs.gfycat.com/SomberShallowDassierat-small.gif)
 
+---
+
 ### Transparency masks
 
 Portal transparency can me masked with a texture
 
+---
+
 ## Missing features
 
+* VR Support. It's actually already 90% of the way there for VR support, I just don't have a VR headset to test it!
 * Deferred rendering support
-* Depth buffer reconstruction
+* Depth buffer and motion vector reconstruction
 * URP and HDRP support
 * Occlusion culling support. Not currently fixable due to https://issuetracker.unity3d.com/issues/setting-the-cameras-culling-matrix-breaks-culling-for-oblique-matrices. Portals currently employ a raycasting based solution to avoid rendering portals behind walls, but it is not perfect, and relies on all objects having accurate colliders.
 * Scene-to-scene teleportation
