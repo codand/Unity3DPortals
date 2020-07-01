@@ -93,5 +93,6 @@ Portal transparency can me masked with a texture
 
 ## Known bugs
 
+* Player can sometimes fall outside of the level. Have not yet diagnosed the cause, but I suspect it is caused by the clone object.
 * Anti-aliasing produces visible seams at the edges of portals due to the spatial discontinuity. This seam can be hidden if using a transparency mask, but I haven't yet thought of a way to mitigate it.
 * Projection matrix is sometimes (very rarely) invalid which causes an assertion failure, but does not cause any rendering artifacts. I suspect this has to do with sub-single-pixel width portals.
