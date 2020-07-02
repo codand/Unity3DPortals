@@ -141,7 +141,7 @@ namespace Portals {
 
             // Calculate the viewport rect of portal's front face by transforming each world space
             // corner to screen space.
-            var corners = _portal.WorldSpaceCorners();
+            var corners = _portal.WorldSpaceCorners;
             Vector4 tl, tr, br, bl;
             tl = WorldToViewportPoint(vp, corners[0]);
             tr = WorldToViewportPoint(vp, corners[1]);
@@ -219,7 +219,7 @@ namespace Portals {
             Vector3 origin = camera.transform.position;
             PortalCamera pc = PortalCamera.current;
 
-            var corners = portal.WorldSpaceCorners();
+            var corners = portal.WorldSpaceCorners;
             for (int i = 0; i < corners.Length; i++) {
                 Vector3 corner = corners[i];
                 Vector3 direction = corner - origin;

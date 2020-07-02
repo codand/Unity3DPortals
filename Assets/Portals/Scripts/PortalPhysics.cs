@@ -4,7 +4,6 @@ using UnityEngine;
 
 namespace Portals {
     public static class PortalPhysics {
-        // TODO: Figure this shit out
         public static int PortalLayer = 8;
         public static int PortalLayerMask = 1 << PortalLayer;
         
@@ -34,7 +33,7 @@ namespace Portals {
                     return false;
                 }
 
-                Matrix4x4 portalMatrix = portal.PortalMatrix();
+                Matrix4x4 portalMatrix = portal.PortalMatrix;
                 Vector3 newDirection = portalMatrix.MultiplyVector(direction);
                 // Offset by Epsilon so we can't hit the exit portal on our way out
                 Vector3 newOrigin = portalMatrix.MultiplyPoint3x4(portalHitInfo.point) + newDirection * Epsilon;

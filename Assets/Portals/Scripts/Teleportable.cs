@@ -224,9 +224,9 @@ namespace Portals {
                 //// Quaternion slaveDeltaRotation = clone.m_Rigidbody.rotation * Quaternion.Inverse(clone.m_RigidbodyLastTick.rotation);
                 //// Quaternion masterDeltaRotation = m_Rigidbody.rotation * Quaternion.Inverse(m_RigidbodyLastTick.rotation);
 
-                Vector3 velocityTransfer = CalculateImpulseTransfer(portal.InverseTeleportVector(slaveDeltaVelocity), masterDeltaVelocity);
-                Vector3 positionTransfer = CalculateImpulseTransfer(portal.InverseTeleportVector(slaveDeltaPosition), masterDeltaPosition);
-                Vector3 angularVelocityTransfer = CalculateImpulseTransfer(portal.InverseTeleportVector(slaveDeltaAngularVelocity), masterDeltaAngularVelocity);
+                Vector3 velocityTransfer = CalculateImpulseTransfer(portal.ExitPortal.TeleportVector(slaveDeltaVelocity), masterDeltaVelocity);
+                Vector3 positionTransfer = CalculateImpulseTransfer(portal.ExitPortal.TeleportVector(slaveDeltaPosition), masterDeltaPosition);
+                Vector3 angularVelocityTransfer = CalculateImpulseTransfer(portal.ExitPortal.TeleportVector(slaveDeltaAngularVelocity), masterDeltaAngularVelocity);
                 //// Quaternion rotationTransfer = portal.ExitPortal.TeleportRotation(slaveDeltaRotation) * Quaternion.Inverse(masterDeltaRotation);
 
                 _rigidbody.velocity += velocityTransfer;
@@ -401,8 +401,7 @@ namespace Portals {
             if (_rigidbody && !_rigidbody.isKinematic) {
                 _rigidbody.velocity = portal.TeleportVector(_rigidbody.velocity);
 
-                float scaleDelta = portal.PortalScaleAverage();
-                ////
+                float scaleDelta = portal.PortalScaleAverage;
                 _rigidbody.mass *= scaleDelta * scaleDelta * scaleDelta;
 
                 //Debug.Log(m_Rigidbody.position + " " + portal.TeleportPoint(m_Rigidbody.position));

@@ -77,7 +77,7 @@ namespace Portals {
                 }
 
                 // Multiply joint values by portal scale
-                float scaleMultiplier = portal.PortalScaleAverage();
+                float scaleMultiplier = portal.PortalScaleAverage;
 
                 SoftJointLimit softJointLimit = _joint.linearLimit;
                 softJointLimit.limit *= scaleMultiplier;
@@ -164,7 +164,7 @@ namespace Portals {
         }
 
         void OnPortalTeleport(Portal portal) {
-            _pickupRange *= portal.PortalScaleAverage();
+            _pickupRange *= portal.PortalScaleAverage;
         }
 
         void Update() {
@@ -180,7 +180,7 @@ namespace Portals {
         void FixedUpdate() {
             if (_currentObjectPortal) {
                 // Current object on other side of portal, let's warp our position
-                _currentObjectPortal.ApplyWorldToPortalTransform(_floatingAnchor.transform, _staticAnchor.transform);
+                _currentObjectPortal.TeleportTransform(_floatingAnchor.transform, _staticAnchor.transform);
             } else {
                 _floatingAnchor.transform.position = _staticAnchor.transform.position;
                 _floatingAnchor.transform.rotation = _staticAnchor.transform.rotation;

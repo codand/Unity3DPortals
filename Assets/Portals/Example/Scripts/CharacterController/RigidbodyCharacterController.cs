@@ -75,7 +75,7 @@ namespace Portals {
 
         private void OnPortalTeleport(Portal portal) {
             _previousHeadRotation = portal.TeleportRotation(_previousHeadRotation);
-            _head.GetComponent<Camera>().nearClipPlane *= portal.PortalScaleAverage();
+            _head.GetComponent<Camera>().nearClipPlane *= portal.PortalScaleAverage;
         }
 
         private void DoHeadRotation(float xRot, float yRot) {

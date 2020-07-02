@@ -278,130 +278,129 @@ namespace Portals {
         /// BottomRight = corners[2]
         /// BottomLeft = corners[3]
         /// </summary>
-        public Vector3[] WorldSpaceCorners() {
-            if (transform.hasChanged) {
-                Vector3 topLeft = transform.TransformPoint(new Vector3(-0.5f, 0.5f));
-                Vector3 topRight = transform.TransformPoint(new Vector3(0.5f, 0.5f));
-                Vector3 bottomRight = transform.TransformPoint(new Vector3(0.5f, -0.5f));
-                Vector3 bottomLeft = transform.TransformPoint(new Vector3(-0.5f, -0.5f));
-                if (_cornerBuffer == null) {
-                    _cornerBuffer = new Vector3[4];
+        public Vector3[] WorldSpaceCorners {
+            get {
+                if (transform.hasChanged) {
+                    Vector3 topLeft = transform.TransformPoint(new Vector3(-0.5f, 0.5f));
+                    Vector3 topRight = transform.TransformPoint(new Vector3(0.5f, 0.5f));
+                    Vector3 bottomRight = transform.TransformPoint(new Vector3(0.5f, -0.5f));
+                    Vector3 bottomLeft = transform.TransformPoint(new Vector3(-0.5f, -0.5f));
+                    if (_cornerBuffer == null) {
+                        _cornerBuffer = new Vector3[4];
+                    }
+                    _cornerBuffer[0] = topLeft;
+                    _cornerBuffer[1] = topRight;
+                    _cornerBuffer[2] = bottomRight;
+                    _cornerBuffer[3] = bottomLeft;
+
+                    transform.hasChanged = false;
                 }
-                _cornerBuffer[0] = topLeft;
-                _cornerBuffer[1] = topRight;
-                _cornerBuffer[2] = bottomRight;
-                _cornerBuffer[3] = bottomLeft;
 
-                transform.hasChanged = false;
+                return _cornerBuffer;
             }
-
-            return _cornerBuffer;
         }
 
-        public Vector3[] GetCorners() {
-            //Bounds bounds = _meshFilter.sharedMesh.bounds;
-
-            //Vector3 lowerLeft = transform.TransformPoint(new Vector3(bounds.extents.x, -bounds.extents.y, 0));
-            //Vector3 lowerRight = transform.TransformPoint(new Vector3(-bounds.extents.x, -bounds.extents.y, 0));
-            //Vector3 upperLeft = transform.TransformPoint(new Vector3(bounds.extents.x, bounds.extents.y, 0));
-            //Vector3 upperRight = transform.TransformPoint(new Vector3(-bounds.extents.x, bounds.extents.y, 0));
-
-            //return new Vector3[] {
-            //    lowerLeft,
-            //    upperLeft,
-            //    upperRight,
-            //    lowerRight,
-            //};
-            throw new System.NotImplementedException();
-        }
-
-        public float PortalScaleAverage() {
-            return MathUtil.VectorInternalAverage(this.PortalScale());
+        /// <summary>
+        /// Returns an estimate of the change in scale between the entrance portal and the exit portal.
+        /// </summary>
+        public float PortalScaleAverage {
+            get {
+                return MathUtil.VectorInternalAverage(this.PortalScale);
+            }
         }
         
-        public Vector3 PortalScale() {
-            return new Vector3(
-                ExitPortal.transform.lossyScale.x / this.transform.lossyScale.x,
-                ExitPortal.transform.lossyScale.y / this.transform.lossyScale.y,
-                ExitPortal.transform.lossyScale.z / this.transform.lossyScale.z);
+        /// <summary>
+        /// Returns a vector representing the size difference between the entrance portal and the exit portal
+        /// </summary>
+        public Vector3 PortalScale {
+            get {
+                return new Vector3(
+                    ExitPortal.transform.lossyScale.x / this.transform.lossyScale.x,
+                    ExitPortal.transform.lossyScale.y / this.transform.lossyScale.y,
+                    ExitPortal.transform.lossyScale.z / this.transform.lossyScale.z);
+            }
         }
 
-        public Quaternion PortalRotation() {
-            // Transforms a quaternion or vector into the second portal's space.
-            // We have to flip the camera in between so that we face the outside direction of the portal
-            return ExitPortal.transform.rotation * Quaternion.Euler(180, 0, 180) * Quaternion.Inverse(this.transform.rotation);
+        /// <summary>
+        /// Matrix which transforms world space coordinates to the other side of the portal
+        /// </summary>
+        public Matrix4x4 PortalMatrix {
+            get {
+                // Convert to portal's local space, rotate 180 degrees, then convert to world space from the Exit portal
+                Matrix4x4 rotate = Matrix4x4.Rotate(Quaternion.Euler(0, 180, 0));
+                Matrix4x4 worldToPortal = transform.worldToLocalMatrix;
+                Matrix4x4 portalToWorld = ExitPortal.transform.localToWorldMatrix * rotate;
+
+                return portalToWorld * worldToPortal;
+            }
         }
 
-        public Matrix4x4 PortalMatrix() {
-            Quaternion flip = Quaternion.Euler(0, 180, 0);
-
-            Matrix4x4 TRSEnter = Matrix4x4.TRS(
-                this.transform.position,
-                this.transform.rotation,
-                this.transform.lossyScale);
-            Matrix4x4 TRSExit = Matrix4x4.TRS(
-                ExitPortal.transform.position,
-                ExitPortal.transform.rotation * flip, // Flip around Y axis
-                ExitPortal.transform.lossyScale);
-
-            return TRSExit * TRSEnter.inverse; // Place origin at portal, then apply Exit portal's transform
-        }
-
+        /// <summary>
+        /// Teleports a point through the portal
+        /// </summary>
+        /// <param name="point"></param>
+        /// <returns></returns>
         public Vector3 TeleportPoint(Vector3 point) {
-            return PortalMatrix().MultiplyPoint3x4(point);
+            return PortalMatrix.MultiplyPoint3x4(point);
         }
 
+        /// <summary>
+        /// Teleports a directional vector through the portal
+        /// </summary>
+        /// <param name="vector"></param>
+        /// <returns></returns>
         public Vector3 TeleportVector(Vector3 vector) {
-            return PortalMatrix().MultiplyVector(vector);
+            return PortalMatrix.MultiplyVector(vector);
         }
 
+        /// <summary>
+        /// Teleports a rotation through the portal
+        /// </summary>
+        /// <param name="rotation"></param>
+        /// <returns></returns>
         public Quaternion TeleportRotation(Quaternion rotation) {
-            return PortalRotation() * rotation;
+            Quaternion portalRotation = ExitPortal.transform.rotation * Quaternion.Euler(180, 0, 180) * Quaternion.Inverse(this.transform.rotation);
+            return portalRotation * rotation;
         }
 
+        /// <summary>
+        /// Returns a Vector3 that has been scaled by the difference in scale of the entrance portal and the exit portal
+        /// </summary>
+        /// <param name="scale"></param>
+        /// <returns></returns>
         public Vector3 TeleportScale(Vector3 scale) {
-            Vector3 pScale = PortalScale();
+            Vector3 pScale = PortalScale;
             return new Vector3(scale.x * pScale.x, scale.y * pScale.y, scale.z * pScale.z);
         }
 
-        public Vector3 InverseTeleportPoint(Vector3 point) {
-            return PortalMatrix().inverse.MultiplyPoint3x4(point);
+        /// <summary>
+        /// Teleports a transform based on the reference transform's position, rotation, and scale
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="reference"></param>
+        public void TeleportTransform(Transform target, Transform reference) {
+            target.position = TeleportPoint(reference.position);
+            target.rotation = TeleportRotation(reference.rotation);
+            target.localScale = TeleportScale(reference.localScale);
         }
 
-        public Vector3 InverseTeleportVector(Vector3 vector) {
-            return PortalMatrix().inverse.MultiplyVector(vector);
+        /// <summary>
+        /// Teleports a transform
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="reference"></param>
+        public void TeleportTransform(Transform target) {
+            target.position = TeleportPoint(target.position);
+            target.rotation = TeleportRotation(target.rotation);
+            target.localScale = TeleportScale(target.localScale);
         }
 
-        public Quaternion InverseTeleportRotation(Quaternion rotation) {
-            return Quaternion.Inverse(PortalRotation()) * rotation;
-        }
-
-        public void ApplyWorldToPortalTransform(Transform target, Vector3 referencePosition, Quaternion referenceRotation, Vector3 referenceScale, bool ignoreScale = false) {
-            Vector3 inversePosition = transform.InverseTransformPoint(referencePosition);
-
-            Quaternion flip = Quaternion.Euler(0, 180, 0);
-
-            target.position = ExitPortal.transform.TransformPoint(flip * inversePosition);
-            target.rotation = PortalRotation() * referenceRotation;
-            if (!ignoreScale) {
-                Vector3 scale = PortalScale();
-                target.localScale = new Vector3(
-                    referenceScale.x * scale.x,
-                    referenceScale.y * scale.y,
-                    referenceScale.z * scale.z);
-            }
-        }
-
-        public void ApplyWorldToPortalTransform(Transform target, Transform reference, bool ignoreScale = false) {
-            ApplyWorldToPortalTransform(target, reference.position, reference.rotation, reference.lossyScale, ignoreScale);
-        }
-        
-        ////private void OnDrawGizmos() {
-        ////    if (ExitPortal) {
-        ////        Gizmos.color = Color.magenta;
-        ////        Gizmos.DrawLine(this.transform.position, ExitPortal.transform.position);
-        ////    }
-        ////}
+        //private void OnDrawGizmos() {
+        //    if (ExitPortal) {
+        //        Gizmos.color = Color.magenta;
+        //        Gizmos.DrawLine(this.transform.position, ExitPortal.transform.position);
+        //    }
+        //}
 
         private void OnValidate() {
             // Calls OnX methods

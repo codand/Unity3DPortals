@@ -312,7 +312,7 @@ namespace Portals {
 
         private Matrix4x4 CalculateCullingMatrix() {
             _camera.ResetCullingMatrix();
-            Vector3[] corners = _portal.ExitPortal.WorldSpaceCorners();
+            Vector3[] corners = _portal.ExitPortal.WorldSpaceCorners;
 
             Vector3 pa = corners[3]; // Lower left
             Vector3 pb = corners[2]; // Lower right

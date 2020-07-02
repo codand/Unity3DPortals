@@ -176,7 +176,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
         // and choose the most extreme of each.
         Vector3 minOffset = new Vector3(Mathf.Infinity, Mathf.Infinity, Mathf.Infinity);
         Vector3 maxOffset = new Vector3(Mathf.NegativeInfinity, Mathf.NegativeInfinity, Mathf.NegativeInfinity);
-        foreach (Vector3 corner in portal.WorldSpaceCorners()) {
+        foreach (Vector3 corner in portal.WorldSpaceCorners) {
             Vector3 closestPoint = collider.ClosestPoint(corner);
             Vector3 offset_ = closestPoint - corner;
 
@@ -286,7 +286,7 @@ public class SpawnPortalOnClick : MonoBehaviour {
             return false;
         }
         Vector3 center = portal.transform.position;
-        Vector3[] corners = portal.WorldSpaceCorners();
+        Vector3[] corners = portal.WorldSpaceCorners;
         Vector3 forward = portal.transform.forward;
         
         int numIterations = _meshColliderIterationCount;

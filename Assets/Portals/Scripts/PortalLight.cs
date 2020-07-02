@@ -32,7 +32,7 @@ namespace Portals {
             portalLight._portal = portal;
             portalLight.PortalDepth = this.PortalDepth + 1;
             portalLight.CopyLight(this._light);
-            portal.ApplyWorldToPortalTransform(portalLight.transform, this.transform);
+            portal.TeleportTransform(portalLight.transform, this.transform);
             return portalLight;
         }
 
@@ -167,7 +167,7 @@ namespace Portals {
             if (_parentLight) {
                 CopyParentLightRecursive();
                 if (_portal && _portal.ExitPortal) {
-                    _portal.ApplyWorldToPortalTransform(this.transform, _parentLight.transform);
+                    _portal.TeleportTransform(this.transform, _parentLight.transform);
                 }
                 //_light.shadows = LightShadows.None;
             }

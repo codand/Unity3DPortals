@@ -4,8 +4,7 @@ using UnityEngine.SceneManagement;
 using UnityEditor;
 #endif
 
-// Thanks to glitchers and Halfbiscuit @ http://answers.unity3d.com/questions/242794/inspector-field-for-scene-asset.html
-
+// Credit to glitchers and Halfbiscuit @ http://answers.unity3d.com/questions/242794/inspector-field-for-scene-asset.html
 namespace Portals {
     [System.Serializable]
     public class SceneField {

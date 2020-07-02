@@ -27,7 +27,7 @@ namespace Portals {
 
         private void OnPortalTeleport(Portal portal) {
             if (portal.ModifyGravity) {
-                Vector3 newUp = portal.PortalRotation() * upVector;
+                Vector3 newUp = portal.TeleportVector(upVector);
                 upVector = newUp.normalized;
                 if (invert) {
                     upVector *= -1;
