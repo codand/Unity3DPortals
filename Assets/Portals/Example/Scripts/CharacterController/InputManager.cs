@@ -44,9 +44,9 @@ public class InputManager : MonoBehaviour {
             _playerController.Jump();
         }
 
-        if (Input.GetKeyDown(KeyCode.Q)) {
-            _playerController.ToggleNoClip();
-        }
+        //if (Input.GetKeyDown(KeyCode.Q)) {
+        //    _playerController.ToggleNoClip();
+        //}
     }
 
     void HandleMovement() {
