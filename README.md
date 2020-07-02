@@ -1,6 +1,6 @@
 # Unity Portals
 
-> Another seamless portal implementation inspired by Valve's Portal and Demruth's Antichamber
+> A seamless portal implementation inspired by Valve's Portal and Demruth's Antichamber
 
 ## NOTE: Please do not use this in commercial products. This is a learning project and there are still bugs.
 
