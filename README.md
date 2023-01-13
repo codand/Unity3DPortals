@@ -6,7 +6,7 @@
 
 This project is a portal implementation written for Unity. It uses multiple cameras, RenderTextures, and volumetric geometry to create a seamless transition from one point in space to another. Currently, it only supports forward rendering on the standard render pipeline. It is currently built with Unity v2019.3.4f1, and has not been tested on other versions.
 
-[You can try the WebGL demo here.](http://localhost:8000/PortalDemo/index.html) Please note that this runs much slower on the web because Unity does not support multithreaded rendering for WebGL. Tested on Windows 10 with a GTX 1060 graphics card.
+[You can try the WebGL demo here.](https://codand.github.io/PortalDemo/index.html) Please note that this runs much slower on the web because Unity does not support multithreaded rendering for WebGL. Tested on Windows 10 with a GTX 1060 graphics card.
 ## Features
 ---
 
