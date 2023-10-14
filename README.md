@@ -14,7 +14,7 @@ This project is a portal implementation written for Unity. It uses multiple came
 
 Portals are rendered as an inverted cube with the front face flipped in order to avoid near-plane clipping.
 
-![Recusive Rendering](https://thumbs.gfycat.com/InsidiousFarBoto-size_restricted.gif)
+https://github.com/codand/Unity3DPortals/assets/2474928/ff5cc6ac-71ef-4de0-9196-0e8a87f947b9
 
 ---
 
@@ -22,7 +22,7 @@ Portals are rendered as an inverted cube with the front face flipped in order to
 
 Users can specify per-portal if gravity should be realligned.
 
-![Gravity reallignement](https://thumbs.gfycat.com/DelectableFarFrogmouth-small.gif)
+https://github.com/codand/Unity3DPortals/assets/2474928/fc8b794e-09c4-47ee-85e6-8848edae8984
 
 ---
 
@@ -30,7 +30,7 @@ Users can specify per-portal if gravity should be realligned.
 
 Portals can render recursively to a user-defined maximum depth. Portals beyond the maximum depth can fake recursion by reprojecting previous frames. This example is rendered with only two recursions.
 
-![Recusive Rendering](https://thumbs.gfycat.com/OnlyCanineGemsbok-small.gif)
+https://github.com/codand/Unity3DPortals/assets/2474928/d32a4924-0db8-41cc-891b-ebc4bda64cf4
 
 ---
 
@@ -38,7 +38,7 @@ Portals can render recursively to a user-defined maximum depth. Portals beyond t
 
 Portals will scale and shrink objects and players seamlessly.
 
-![Scale adjustment](https://thumbs.gfycat.com/FrenchEqualGourami-small.gif)
+https://github.com/codand/Unity3DPortals/assets/2474928/d44080aa-d088-41e1-b8e8-12f01f7f51ed
 
 ---
 
@@ -46,15 +46,11 @@ Portals will scale and shrink objects and players seamlessly.
 
 Portals are rendered into textures which enables image effects on portals.
 
-![Image effects](https://thumbs.gfycat.com/EnchantingAbleCutworm-small.gif)
-
 ---
 
 ### Per-object planar clipping
 
 Objects entering a portal are not rendered behind the portal.
-
-![Per-object planar clipping](https://thumbs.gfycat.com/HatefulBarrenAustraliankestrel-size_restricted.gif)
 
 ---
 
@@ -62,15 +58,11 @@ Objects entering a portal are not rendered behind the portal.
 
 Every object in a portal has a clone object on the other side which can share forces with the other. This works well enough to be believable most of the time, but it does not behave the same as normal physics.
 
-![Portal scale adjustment](https://thumbs.gfycat.com/CalculatingNegativeCob-size_restricted.gif)
-
 ---
 
 ### Efficient rendering
 
 Portals only render visible pixels to improve performance
-
-![Portal scale adjustment](https://thumbs.gfycat.com/SomberShallowDassierat-small.gif)
 
 ---
 
